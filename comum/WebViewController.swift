@@ -8,6 +8,7 @@ import AVFoundation
 ///   estilo -> "escuro" (letras pretas) ou "claro" (letras brancas) na barra de cima
 ///   som    -> toca o clique.mp3 do app (se existir) com o volume pedido (0 a 1)
 ///   ble    -> Bluetooth feito pelo próprio iPhone (ponte-bluetooth.js + PonteBluetooth.swift)
+///   segundoPlano -> true: um som mudo mantém o app acordado com a tela apagada (só apps com SEGUNDO_PLANO=1)
 final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     private var webView: WKWebView!
     private var esconderBarra = false
@@ -16,6 +17,8 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     private let esconderIndicador = (Bundle.main.object(forInfoDictionaryKey: "EsconderIndicador") as? Bool) ?? false
     private let manterAcesa = (Bundle.main.object(forInfoDictionaryKey: "ManterTelaAcesa") as? Bool) ?? false
     private let ponte = PonteBluetooth()
+    private var mudo: AVAudioPlayer?
+    private var querMudo = false
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -31,7 +34,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             config.userContentController.addUserScript(
                 WKUserScript(source: codigo, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
-        for nome in ["barra", "estilo", "som", "ble"] {
+        for nome in ["barra", "estilo", "som", "ble", "segundoPlano"] {
             config.userContentController.add(self, name: nome)
         }
 
@@ -84,6 +87,8 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             tocarClique(volume: (message.body as? NSNumber)?.floatValue ?? 1)
         case "ble":
             ponte.receber(message.body)
+        case "segundoPlano":
+            ligarMudo((message.body as? Bool) ?? false)
         default:
             break
         }
@@ -116,6 +121,33 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         }
     }
 
+    // MARK: segundo plano (tela apagada)
+    private func ligarMudo(_ ligar: Bool) {
+        querMudo = ligar
+        guard ligar else { mudo?.stop(); return }
+        let sessao = AVAudioSession.sharedInstance()
+        try? sessao.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? sessao.setActive(true)
+        if mudo == nil {
+            mudo = try? AVAudioPlayer(data: PonteMudo.wav())
+            mudo?.numberOfLoops = -1
+            mudo?.volume = 0.01
+            _ = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification,
+                                                       object: nil, queue: .main) { [weak self] _ in
+                // depois de uma ligação ou alarme, volta a tocar o som mudo
+                guard let self = self, self.querMudo else { return }
+                try? AVAudioSession.sharedInstance().setActive(true)
+                self.mudo?.play()
+            }
+            _ = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                                                       object: nil, queue: .main) { [weak self] _ in
+                guard let self = self, self.querMudo else { return }
+                if self.mudo?.isPlaying != true { self.mudo?.play() }
+            }
+        }
+        mudo?.play()
+    }
+
     // Libera o sensor de movimento sem perguntar
     @available(iOS 15.0, *)
     func webView(_ webView: WKWebView,
@@ -130,4 +162,19 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
     override var prefersHomeIndicatorAutoHidden: Bool { esconderIndicador }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+}
+
+/// Um segundo de "som" baixinho (inaudível), em formato WAV, feito na hora.
+enum PonteMudo {
+    static func wav() -> Data {
+        let n = 8000
+        var d = Data()
+        func u32(_ v: UInt32) { var x = v.littleEndian; d.append(Data(bytes: &x, count: 4)) }
+        func u16(_ v: UInt16) { var x = v.littleEndian; d.append(Data(bytes: &x, count: 2)) }
+        d.append("RIFF".data(using: .ascii)!); u32(UInt32(36 + n * 2)); d.append("WAVE".data(using: .ascii)!)
+        d.append("fmt ".data(using: .ascii)!); u32(16); u16(1); u16(1); u32(8000); u32(16000); u16(2); u16(16)
+        d.append("data".data(using: .ascii)!); u32(UInt32(n * 2))
+        for i in 0..<n { u16(i % 2 == 0 ? 1 : 0xFFFF) }
+        return d
+    }
 }

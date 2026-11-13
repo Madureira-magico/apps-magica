@@ -11,7 +11,7 @@ LINKS=""
 
 for conf in apps/*/app.conf; do
   ID="$(basename "$(dirname "$conf")")"
-  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0
+  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0; SEGUNDO_PLANO=0
   source "$conf"
   echo "::group::Montando $NOME ($BUNDLE)"
   T="$RAIZ/build/$ID"; rm -rf "$T"; mkdir -p "$T/App/Assets.xcassets/AppIcon.appiconset"
@@ -28,6 +28,7 @@ J
 J
   if [ "$ESCONDER_INDICADOR" = "1" ]; then IND=true; else IND=false; fi
   if [ "$MANTER_ACESA" = "1" ]; then ACESA=true; else ACESA=false; fi
+  if [ "$SEGUNDO_PLANO" = "1" ]; then FUNDO="        UIBackgroundModes: [audio, bluetooth-central]"; else FUNDO=""; fi
   cat > "$T/project.yml" <<Y
 name: App
 options:
@@ -59,6 +60,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         EsconderIndicador: $IND
         ManterTelaAcesa: $ACESA
+$FUNDO
         NSBluetoothAlwaysUsageDescription: "Para conversar com os aparelhos de mágica (relógio, Post-It)."
     settings:
       base:

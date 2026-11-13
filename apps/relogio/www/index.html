@@ -131,6 +131,10 @@
   .pass .pk .z { grid-column: 2; }
   .pass .pc { position: absolute; bottom: calc(env(safe-area-inset-bottom) + 34px); right: 44px; font-size: 17px; background: none; border: 0; color: #fff; font-family: inherit; }
 
+  /* tela de ícones falsa (depois do código) */
+  .icones { position: fixed; inset: 0; z-index: 63; display: none; background: #000 center / cover no-repeat; touch-action: none; }
+  .icones.show { display: block; }
+
   /* telas por cima (configurações, calibragem) */
   .screen { position: fixed; inset: 0; background: #26282d; z-index: 10; display: none; flex-direction: column;
     padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 16px); }
@@ -268,7 +272,7 @@
     </button>
   </div>
   <div id="diag" class="hide" style="font-size:11px;color:#EF9F27;text-align:center;min-height:14px;word-break:break-word;-webkit-user-select:text;user-select:text"></div>
-  <div class="ver">v2.4.1</div>
+  <div class="ver">v2.5</div>
 </div>
 
 <!-- Tela de configurações -->
@@ -281,19 +285,22 @@
     <button class="row" data-set="freeze"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>Tempo Congelado</span><b class="v" id="vFreeze">--</b></button>
     <button class="row" data-set="safe"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><rect x="9" y="11" width="6" height="5" rx="1"/><path d="M10 11V9a2 2 0 0 1 4 0v2"/></svg>Tempo de Segurança</span><b class="v" id="vSafe">--</b></button>
     <button class="row" id="calOpen"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h8M16 6h4M4 12h2M10 12h10M4 18h10M18 18h2"/><circle cx="14" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>Calibragem</span><b class="v">›</b></button>
-    <button class="row" id="rxRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 19v-3M9.5 19v-6M14 19v-9M18.5 19V7"/></svg>Receber pela internet</span><i class="sw" id="rxSw"></i></button>
-    <button class="row" id="linkRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Link do assistente</span><b class="v">copiar</b></button>
-    <button class="row" id="dzRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Disfarce</span><i class="sw" id="dzSw"></i></button>
-    <button class="row" id="dzTipoRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/></svg>Tipo de disfarce</span><b class="v" id="vDzTipo">apenas disfarce</b></button>
-    <button class="row" id="fotoRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Foto do fundo</span><b class="v" id="vFoto">escolher</b></button>
-    <button class="row" id="fotoTiraRow" style="display:none"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Voltar ao fundo cinza</span><b class="v">›</b></button>
-    <button class="row" id="camRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l1.5 2H20a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V7.5A1.5 1.5 0 0 1 4 6h3.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>Aviso na câmera</span><b class="v" id="vCam">desenho</b></button>
-    <button class="row" id="gotRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>Tempo do laranja</span><b class="v" id="vGot">até a próxima</b></button>
-    <button class="row" id="dgRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>Mostrar diagnóstico</span><i class="sw" id="dgSw"></i></button>
     <div class="sec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4"/><path d="M13.5 6.5l4 4"/></svg>Post-It</div>
     <button class="row" id="padRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4"/><path d="M13.5 6.5l4 4"/></svg>Usar Post-It</span><i class="sw" id="padSw"></i></button>
     <button class="row" id="padDevRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8l10 8-5 4V4l5 4-10 8"/></svg>Aparelho</span><b class="v" id="vPadDev">conectar</b></button>
     <button class="row" id="rhRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Modo ensaio</span><i class="sw" id="rhSw"></i></button>
+    <div class="sec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Geral</div>
+    <button class="row" id="rxRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 19v-3M9.5 19v-6M14 19v-9M18.5 19V7"/></svg>Receber pela internet</span><i class="sw" id="rxSw"></i></button>
+    <button class="row" id="linkRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Link do assistente</span><b class="v">copiar</b></button>
+    <button class="row" id="dzRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Disfarce</span><i class="sw" id="dzSw"></i></button>
+    <button class="row" id="dzTipoRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/></svg>Tipo de disfarce</span><b class="v" id="vDzTipo">apenas disfarce</b></button>
+    <button class="row" id="posCodRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg>Depois do código</span><b class="v" id="vPosCod">senha errada</b></button>
+    <button class="row" id="fotoRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Foto do bloqueio</span><b class="v" id="vFoto">escolher</b></button>
+    <button class="row" id="iconesRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h2M14 8h2M8 12h2M14 12h2"/></svg>Foto da tela de ícones</span><b class="v" id="vIcones">escolher</b></button>
+    <button class="row" id="camRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l1.5 2H20a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V7.5A1.5 1.5 0 0 1 4 6h3.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>Aviso na câmera</span><b class="v" id="vCam">desenho</b></button>
+    <button class="row" id="gotRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>Tempo do laranja</span><b class="v" id="vGot">até a próxima</b></button>
+    <button class="row" id="bgRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Funcionar com a tela apagada</span><i class="sw" id="bgSw"></i></button>
+    <button class="row" id="dgRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>Mostrar diagnóstico</span><i class="sw" id="dgSw"></i></button>
   </div>
   <div class="note" id="cfgNote"></div>
   <button class="wide" id="cfgBack">‹ Voltar</button>
@@ -352,6 +359,9 @@
   <button class="pc" id="passCancel">Cancelar</button>
 </div>
 <input type="file" id="fotoIn" accept="image/*" style="display:none">
+<input type="file" id="iconesIn" accept="image/*" style="display:none">
+<!-- Tela de ícones falsa: dois toques = tela de bloqueio; segurar 1,5 s = app -->
+<div class="icones" id="icones"></div>
 
 <!-- Modo ensaio -->
 <div class="rh" id="rh">
@@ -368,6 +378,7 @@
 </div>
 
 <script>
+const NATIVO = !!window.__NATIVE_APP__;   // dentro do app de iPhone
 // ===== Constantes do relógio Iarvel =====
 const SVC    = '58570001-b5a3-f393-e0a9-e50e24dcca9e';
 const WRITE  = '58570002-b5a3-f393-e0a9-e50e24dcca9e';
@@ -914,10 +925,10 @@ window.addEventListener('offline', () => { if (rxOn) setAnt('err'); });
 // tela apagando / outro app: avisa "saí" e fecha a conexão na hora; ao voltar, reconecta
 document.addEventListener('visibilitychange', () => {
   if (!rxOn) return;
-  if (document.visibilityState === 'hidden') { closeChannel(); setAnt('err'); }
+  if (document.visibilityState === 'hidden') { if (NATIVO && bgOn) return; closeChannel(); setAnt('err'); }
   else if (!ably) openChannel();
 });
-window.addEventListener('pagehide', () => { if (rxOn) closeChannel(); });
+window.addEventListener('pagehide', () => { if (rxOn && !(NATIVO && bgOn)) closeChannel(); });
 window.addEventListener('pageshow', () => { if (rxOn && !ably) openChannel(); });
 
 // ===== Disfarce: tela de bloqueio falsa =====
@@ -933,7 +944,8 @@ function showFake() { tickFake(); clearInterval(fakeTimer); fakeTimer = setInter
 function hideFake() { closePass(true); $('fake').classList.remove('show'); clearInterval(fakeTimer); corBarra(); }
 /* cor da hora/bateria de verdade do iPhone (só no app): preta sobre o fundo cinza claro, branca no resto */
 function corBarra() {
-  try { window.webkit.messageHandlers.estilo.postMessage($('fake').classList.contains('show') && !fakeFoto ? 'escuro' : 'claro'); } catch (e) {}
+  const ic = $('icones') && $('icones').classList.contains('show');
+  try { window.webkit.messageHandlers.estilo.postMessage(!ic && $('fake').classList.contains('show') && !fakeFoto ? 'escuro' : 'claro'); } catch (e) {}
 }
 
 // ----- foto do fundo da tela de bloqueio -----
@@ -943,11 +955,9 @@ function applyFoto() {
   f.classList.toggle('foto', !!fakeFoto); f.style.backgroundImage = url;
   $('passBg').style.backgroundImage = url;
   $('vFoto').textContent = fakeFoto ? 'trocar' : 'escolher';
-  $('fotoTiraRow').style.display = fakeFoto ? '' : 'none';
   corBarra();
 }
 $('fotoRow').addEventListener('click', () => $('fotoIn').click());
-$('fotoTiraRow').addEventListener('click', () => { fakeFoto = null; store.set('fakeFoto', null); applyFoto(); $('cfgNote').textContent = 'Fundo cinza de volta'; });
 $('fotoIn').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0]; e.target.value = '';
   if (!file) return;
@@ -977,6 +987,144 @@ function setDzTipo(t) { dzTipo = t; store.set('dzTipo', t); $('vDzTipo').textCon
 $('dzTipoRow').addEventListener('click', () => setDzTipo(dzTipo === 'teclado' ? 'simples' : 'teclado'));
 setDzTipo(dzTipo);
 
+// ----- depois do código: senha errada / tela de ícones -----
+let posCod = store.get('posCod') === 'icones' ? 'icones' : 'errada';
+function setPosCod(v) { posCod = v; store.set('posCod', v); $('vPosCod').textContent = v === 'icones' ? 'tela de ícones' : 'senha errada'; }
+$('posCodRow').addEventListener('click', () => {
+  setPosCod(posCod === 'icones' ? 'errada' : 'icones');
+  if (posCod === 'icones' && !iconesFoto) $('cfgNote').textContent = 'Escolha a Foto da tela de ícones (um print da sua tela de início)';
+});
+
+// ----- foto da tela de ícones (um print da tela de início; a hora, o sinal e a bateria do print são apagados) -----
+  /* Apaga só as letras/ícones da barra de cima (hora, sinal, bateria) do print,
+     preenchendo cada ponto com as cores em volta. O resto da imagem não muda. */
+  function apagarBarra(c){
+    var W=c.width,H=c.height,bh=Math.round(H*0.072);if(bh<8||W<50){return;}
+    var g=c.getContext('2d'),id=g.getImageData(0,0,W,bh),d=id.data,n=W*bh,i,x,y;
+    var L=new Float32Array(n);
+    for(i=0;i<n;i++){L[i]=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2];}
+    function blur(src,w,r){ /* média de uma caixa (2r+1)², com peso w (pontos marcados não contam) */
+      var t=new Float32Array(n),tw=new Float32Array(n),o=new Float32Array(n),ow=new Float32Array(n),acc,accw,k;
+      for(y=0;y<bh;y++){acc=0;accw=0;
+        for(x=-r;x<W+r;x++){
+          if(x+r<W&&x+r>=0){k=y*W+x+r;acc+=src[k]*w[k];accw+=w[k];}
+          if(x-r-1>=0){k=y*W+x-r-1;acc-=src[k]*w[k];accw-=w[k];}
+          if(x>=0&&x<W){t[y*W+x]=acc;tw[y*W+x]=accw;}}}
+      for(x=0;x<W;x++){acc=0;accw=0;
+        for(y=-r;y<bh+r;y++){
+          if(y+r<bh&&y+r>=0){k=(y+r)*W+x;acc+=t[k];accw+=tw[k];}
+          if(y-r-1>=0){k=(y-r-1)*W+x;acc-=t[k];accw-=tw[k];}
+          if(y>=0&&y<bh){o[y*W+x]=accw>0?acc/accw:0;ow[y*W+x]=accw;}}}
+      return [o,ow];
+    }
+    var one=new Float32Array(n).fill(1),r1=Math.max(4,Math.round(W*0.03));
+    var base=blur(L,one,r1)[0],m=new Uint8Array(n),wt=new Float32Array(n),thr=12,pass;
+    for(pass=0;pass<2;pass++){ /* 2ª passada: o fundo é recalculado sem as letras */
+      for(i=0;i<n;i++){m[i]=Math.abs(L[i]-base[i])>(pass?thr:thr*2)?1:0;wt[i]=m[i]?0:1;}
+      if(!pass){var bb=blur(L,wt,r1);for(i=0;i<n;i++){if(bb[1][i]>0){base[i]=bb[0][i];}}}
+    }
+    /* fica só com "manchas" do tamanho de letras/ícones; bordas grandes do papel de parede não entram */
+    var lab=new Int32Array(n),st=new Int32Array(n),maxH=H*0.03,maxW=W*0.2,comp=[];
+    for(i=0;i<n;i++){if(!m[i]||lab[i]){continue;}
+      var top=0,sp=0,x0=W,x1=0,y0=bh,y1=0,cid=comp.length+1,list=[];st[sp++]=i;lab[i]=cid;
+      while(sp){var k=st[--sp];list.push(k);var kx=k%W,ky=(k/W)|0;
+        if(kx<x0)x0=kx;if(kx>x1)x1=kx;if(ky<y0)y0=ky;if(ky>y1)y1=ky;
+        var nb=[k-1,k+1,k-W,k+W];
+        for(var q=0;q<4;q++){var t2=nb[q];if(t2<0||t2>=n)continue;if((q===0&&kx===0)||(q===1&&kx===W-1))continue;
+          if(m[t2]&&!lab[t2]){lab[t2]=cid;st[sp++]=t2;}}}
+      var ok=list.length>=Math.max(6,Math.round(W*W*0.000015))&&(y1-y0)<maxH&&(x1-x0)<maxW&&y0>0&&y1<bh-1;
+      if(!ok){for(q=0;q<list.length;q++){m[list[q]]=0;}}
+      comp.push(cid);
+    }
+    /* engrossa a máscara para pegar a borda suave das letras */
+    var rad=Math.max(2,Math.round(W*0.005)),m2=new Uint8Array(n);
+    for(y=0;y<bh;y++){for(x=0;x<W;x++){if(!m[y*W+x]){continue;}
+      for(var yy=Math.max(0,y-rad);yy<=Math.min(bh-1,y+rad);yy++){for(var xx=Math.max(0,x-rad);xx<=Math.min(W-1,x+rad);xx++){m2[yy*W+xx]=1;}}}}
+    var w=new Float32Array(n);for(i=0;i<n;i++){w[i]=m2[i]?0:1;}
+    var ch=[new Float32Array(n),new Float32Array(n),new Float32Array(n)],fill=[];
+    for(var cc=0;cc<3;cc++){for(i=0;i<n;i++){ch[cc][i]=d[i*4+cc];}}
+    var r2=Math.max(r1,Math.round(W*0.035));
+    for(cc=0;cc<3;cc++){fill.push(blur(ch[cc],w,r2));}
+    var r3=Math.round(W*0.09),fb=[];
+    for(cc=0;cc<3;cc++){fb.push(blur(ch[cc],w,r3)[0]);}
+    for(i=0;i<n;i++){if(!m2[i]){continue;}
+      for(cc=0;cc<3;cc++){var v=fill[cc][1][i]>0?fill[cc][0][i]:fb[cc][i];d[i*4+cc]=Math.max(0,Math.min(255,Math.round(v)));}}
+    g.putImageData(id,0,0);
+  }
+
+let iconesFoto = store.get('iconesFoto') || null;
+function applyIcones() { $('icones').style.backgroundImage = iconesFoto ? 'url(' + iconesFoto + ')' : ''; $('vIcones').textContent = iconesFoto ? 'trocar' : 'escolher'; }
+$('iconesRow').addEventListener('click', () => $('iconesIn').click());
+$('iconesIn').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const u = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    const r = Math.max(screen.width, screen.height) / Math.min(screen.width, screen.height) || 2.17;
+    const W = 1000, H = Math.round(W * r), c = document.createElement('canvas');
+    let sw = im.naturalWidth, sh = im.naturalHeight, sx = 0, sy = 0;
+    if (sh / sw > r) { sh = sw * r; sy = (im.naturalHeight - sh) / 2; } else { sw = sh / r; sx = (im.naturalWidth - sw) / 2; }
+    c.width = W; c.height = H; c.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, W, H);
+    URL.revokeObjectURL(u);
+    try { apagarBarra(c); } catch (err) {}                    // tira hora, sinal, Wi-Fi e bateria do print
+    let data = c.toDataURL('image/jpeg', .85);
+    if (data.length > 1500000) data = c.toDataURL('image/jpeg', .6);
+    iconesFoto = data; store.set('iconesFoto', data);
+    if (store.get('iconesFoto') !== data) { iconesFoto = null; $('cfgNote').textContent = 'Sem espaço para guardar a foto'; }
+    else { $('cfgNote').textContent = 'Foto da tela de ícones trocada'; if (posCod !== 'icones') setPosCod('icones'); }
+    applyIcones();
+  };
+  im.onerror = () => { URL.revokeObjectURL(u); $('cfgNote').textContent = 'Não consegui abrir essa foto'; };
+  im.src = u;
+});
+applyIcones(); setPosCod(posCod);
+
+function openIcones() { $('icones').classList.add('show'); corBarra(); }
+function closeIcones() { $('icones').classList.remove('show'); corBarra(); }
+let icTap = 0, icHold = null, icX = 0, icY = 0;
+$('icones').addEventListener('touchstart', e => {
+  const t = e.touches[0]; icX = t ? t.clientX : 0; icY = t ? t.clientY : 0;
+  clearTimeout(icHold);
+  icHold = setTimeout(() => { icHold = null; icTap = 0; closeIcones(); hideFake(); }, 1500);   // segurar 1,5 s: volta para o app
+}, { passive: true });
+$('icones').addEventListener('touchmove', e => {
+  const t = e.touches[0]; if (t && Math.hypot(t.clientX - icX, t.clientY - icY) > 15) { clearTimeout(icHold); icHold = null; }
+}, { passive: true });
+$('icones').addEventListener('touchend', e => {
+  e.preventDefault();
+  if (!icHold) return;                       // já saiu pelo "segurar"
+  clearTimeout(icHold); icHold = null;
+  const t = Date.now();
+  if (t - icTap < 400) { icTap = 0; closeIcones(); showFake(); }      // dois toques: volta para a tela de bloqueio
+  else icTap = t;
+}, { passive: false });
+
+// ----- funcionar com a tela apagada / em segundo plano (só no app) -----
+// Um som mudo (inaudível) mantém o app acordado com a tela apagada: Bluetooth e internet continuam.
+let bgOn = store.get('bgOn') !== false, bgAudio = null;
+function silencioWav() {
+  const n = 8000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, i % 2 ? 1 : -1, true);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+function bgAplicar() {
+  if (!NATIVO) return;
+  try { window.webkit.messageHandlers.segundoPlano.postMessage(!!bgOn); } catch (e) {}
+  if (bgOn) {
+    if (!bgAudio) { bgAudio = new Audio(silencioWav()); bgAudio.loop = true; bgAudio.setAttribute('playsinline', ''); }
+    const p = bgAudio.play(); if (p && p.catch) p.catch(() => {});
+  } else if (bgAudio) bgAudio.pause();
+}
+function setBg(on) { bgOn = on; store.set('bgOn', on); $('bgSw').classList.toggle('on', on); bgAplicar(); }
+$('bgRow').addEventListener('click', () => setBg(!bgOn));
+if (!NATIVO) $('bgRow').style.display = 'none';
+setBg(bgOn);
+document.addEventListener('touchend', () => { if (bgOn && bgAudio && bgAudio.paused) bgAplicar(); }, { passive: true });
+
 // ----- teclado de senha: 4 números = hora e minuto (1047 = 10:47) -----
 let passCode = '', passBusy = false, passTimer = null;
 function drawPass() { $('passDots').querySelectorAll('i').forEach((d, i) => d.classList.toggle('f', i < passCode.length)); $('passCancel').textContent = passCode ? 'Apagar' : 'Cancelar'; }
@@ -994,7 +1142,8 @@ document.querySelectorAll('#pass [data-p]').forEach(b => b.addEventListener('cli
   const h = +passCode.slice(0, 2), m = +passCode.slice(2);
   if (h <= 23 && m <= 59) {
     sendTime(h, m);                                           // manda ao relógio
-    errarSenha(() => setTimeout(() => closePass(), 250));     // "senha errada" e volta para a tela de bloqueio
+    if (posCod === 'icones' && iconesFoto) { setTimeout(() => { closePass(); openIcones(); }, 180); }   // "desbloqueia" na tela de ícones
+    else errarSenha(() => setTimeout(() => closePass(), 250));     // "senha errada" e volta para a tela de bloqueio
   } else errarSenha(() => { passBusy = false; });             // número que não é hora: só treme
 }));
 $('passCancel').addEventListener('click', () => {
