@@ -5,7 +5,7 @@ RAIZ="$(pwd)"
 DONO="$(echo "${GITHUB_REPOSITORY_OWNER:-madureira-magico}" | tr "[:upper:]" "[:lower:]")"
 REPO="${GITHUB_REPOSITORY#*/}"
 PAGINA="https://$DONO.github.io/$REPO"
-NUM="${GITHUB_RUN_NUMBER:-1}"
+NUM="$((100 + ${GITHUB_RUN_NUMBER:-1}))"   # sempre maior que as montagens antigas (bola-app)
 mkdir -p site
 LINKS=""
 
