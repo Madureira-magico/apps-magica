@@ -1,0 +1,15 @@
+# Monta a Lousa: ../www/index.html (app do iPhone) e ../web/assistente.html (página do assistente)
+import base64, shutil
+b64 = lambda f: 'data:image/png;base64,' + base64.b64encode(open(f, 'rb').read()).decode()
+def fill(t, parts):
+    for k, f in parts: t = t.replace('/*' + k + '*/', open(f).read())
+    for k, f in [('ICON', 'assets/icon180.png'), ('WORDMARK', 'assets/wordmark.png')]: t = t.replace('/*' + k + '*/', b64(f))
+    for k in 'SHDC': t = t.replace('/*SUIT_' + k + '*/', b64('assets/suit_' + k + '.png'))
+    return t.replace('/*HAND*/null', open('assets/hand.json').read())
+app = fill(open('src/template.html').read(), [('QLZ', 'src/qlz.js'), ('CORE', 'src/core.js'), ('BLE', 'src/ble.js'), ('POSTIT', 'src/postit.js'), ('APP', 'src/app.js')])
+open('../www/index.html', 'w').write(app)
+web = fill(open('src/assist_template.html').read(), [('CORE', 'src/core.js'), ('ASSIST', 'src/assist.js')])
+open('../web/assistente.html', 'w').write(web)
+shutil.copy('../www/ably.min.js', '../web/ably.min.js')
+shutil.copy('assets/icon180.png', '../web/apple-touch-icon.png')
+print('ok', len(app) // 1024, 'KB app,', len(web) // 1024, 'KB assistente')

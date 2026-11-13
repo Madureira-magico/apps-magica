@@ -1,13 +1,18 @@
 APPS DE MÁGICA — um projeto só para todos os apps de iPhone
 
-apps/         uma pasta para cada app (por enquanto: listas)
+apps/         uma pasta para cada app (listas, bola, relogio, lousa)
   listas/app.conf   nome do app e identificação
   listas/icone.png  ícone
   listas/www/       o app em si (a mesma página do site)
   listas/extras/    arquivos extras (ex.: clique.mp3), se houver
+  lousa/web/        páginas que vão para o site (app do assistente da lousa)
+  lousa/fonte/      as peças da Lousa (python3 build.py monta www/ e web/)
 comum/        a "casca" do iPhone, igual para todos os apps
 scripts/      a receita que monta os apps
 .github/      o robô do GitHub que monta tudo a cada envio
 
 Página para instalar no iPhone (abrir no Safari):
 https://madureira-magico.github.io/apps-magica/
+
+App do assistente da Lousa (o link com o código sai em Opções › Assistente):
+https://madureira-magico.github.io/apps-magica/lousa/assistente.html

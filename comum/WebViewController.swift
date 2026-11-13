@@ -8,6 +8,7 @@ import AVFoundation
 ///   estilo -> "escuro" (letras pretas) ou "claro" (letras brancas) na barra de cima
 ///   som    -> toca o clique.mp3 do app (se existir) com o volume pedido (0 a 1)
 ///   ble    -> Bluetooth feito pelo próprio iPhone (ponte-bluetooth.js + PonteBluetooth.swift)
+///   giro   -> true: pode deitar o iPhone (e já deita) / false: volta em pé (só apps com DEITAR=1)
 ///   segundoPlano -> true: um som mudo mantém o app acordado com a tela apagada (só apps com SEGUNDO_PLANO=1)
 final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     private var webView: WKWebView!
@@ -19,6 +20,8 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     private let ponte = PonteBluetooth()
     private var mudo: AVAudioPlayer?
     private var querMudo = false
+    private let permiteDeitar = (Bundle.main.object(forInfoDictionaryKey: "PermiteDeitar") as? Bool) ?? false
+    private var deitado = false
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -34,7 +37,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             config.userContentController.addUserScript(
                 WKUserScript(source: codigo, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
-        for nome in ["barra", "estilo", "som", "ble", "segundoPlano"] {
+        for nome in ["barra", "estilo", "som", "ble", "segundoPlano", "giro"] {
             config.userContentController.add(self, name: nome)
         }
 
@@ -89,6 +92,8 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             ponte.receber(message.body)
         case "segundoPlano":
             ligarMudo((message.body as? Bool) ?? false)
+        case "giro":
+            girar((message.body as? Bool) ?? false)
         default:
             break
         }
@@ -148,6 +153,20 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         mudo?.play()
     }
 
+    // MARK: deitar o iPhone (escrita manual)
+    private func girar(_ deitar: Bool) {
+        guard permiteDeitar, deitar != deitado else { return }
+        deitado = deitar
+        if #available(iOS 16.0, *) {
+            setNeedsUpdateOfSupportedInterfaceOrientations()
+            let mascara: UIInterfaceOrientationMask = deitar ? .landscape : .portrait
+            view.window?.windowScene?.requestGeometryUpdate(UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mascara)) { _ in }
+        } else {
+            UIDevice.current.setValue((deitar ? UIInterfaceOrientation.landscapeRight : .portrait).rawValue, forKey: "orientation")
+            UIViewController.attemptRotationToDeviceOrientation()
+        }
+    }
+
     // Libera o sensor de movimento sem perguntar
     @available(iOS 15.0, *)
     func webView(_ webView: WKWebView,
@@ -161,7 +180,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     override var preferredStatusBarStyle: UIStatusBarStyle { barraEscura ? .darkContent : .lightContent }
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
     override var prefersHomeIndicatorAutoHidden: Bool { esconderIndicador }
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { deitado ? .landscape : .portrait }
 }
 
 /// Um segundo de "som" baixinho (inaudível), em formato WAV, feito na hora.

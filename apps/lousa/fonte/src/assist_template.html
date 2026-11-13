@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Lousa · assistente</title>
+<link rel="apple-touch-icon" href="/*ICON*/">
+<link rel="icon" href="/*ICON*/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap">
+<style>
+:root{--bg:#16181C;--card:#23262C;--line:#2F333A;--text:#F2EDE4;--muted:#A9AEB6;--accent:#C8733A;--wood:#9A5A32;--ok:#4CC38A;--bad:#E5534B}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.screen{display:none;min-height:100%;padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 20px);flex-direction:column;gap:14px}
+.screen.on{display:flex}
+.top{display:flex;align-items:center;gap:12px;min-height:44px}
+.title{font-weight:700;font-size:20px}
+.logo{font-family:Caveat,cursive;font-size:40px;line-height:1;flex:1}
+.ibtn{width:44px;height:44px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;flex:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid #8A8F98;border-radius:999px;padding:10px 18px;font-size:15px;font-weight:700}
+.chip.ok{background:rgba(52,199,89,.18);border-color:#34C759;color:#34C759}
+.chip.busy{border-color:#E0A43C;color:#E0A43C}.chip.bad{border-color:var(--bad);color:#FF8A82}
+.dot{width:10px;height:10px;border-radius:50%;background:#8A8F98;flex:none}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.busy{background:#E0A43C}
+.board{border:10px solid var(--wood);border-radius:10px;background:#0E0F11;line-height:0;position:relative}
+.board canvas{width:100%;height:auto;display:block;aspect-ratio:3/2}
+.board .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:Caveat,cursive;font-size:30px;color:#6b6f76;line-height:1}
+.small{font-size:13px;color:var(--muted);text-align:center}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tile{background:var(--card);border-radius:16px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:92px;text-align:center}
+.tile.wide{grid-column:1/-1;flex-direction:row;gap:12px;min-height:58px;padding:12px}
+.tile b{font-size:16px}.tile span{font-size:12px;color:var(--muted)}
+.tile .ico{font-size:26px;line-height:1;height:28px;display:flex;align-items:center;justify-content:center}
+.tile .ico.spade{font-size:38px;height:30px}
+.big{height:54px;border-radius:14px;background:var(--accent);color:#fff;font-weight:700;font-size:17px;width:100%}
+.big:disabled{background:#3A3D44;color:#8A8F98}
+.big.alt{background:var(--card);color:var(--text)}
+.label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.suits{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.suit{height:64px;border-radius:14px;font-size:34px;background:var(--card);border:2px solid var(--card)}
+.suit.red{color:#FF7A6B}.suit.sel{border-color:var(--accent);background:#2E2620}
+.vals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.vals button,.pad button{height:54px;border-radius:12px;background:var(--card);font-size:21px;font-weight:600}
+.vals button.sel{background:#2E2620;box-shadow:inset 0 0 0 2px var(--accent)}
+.vals button:active,.pad button:active,.suit:active,.tile:active{transform:scale(.97);filter:brightness(1.2)}
+.pad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.display{font-size:52px;font-weight:700;letter-spacing:3px;text-align:center;font-variant-numeric:tabular-nums}
+.display .act{color:var(--accent)}
+.display.err{color:var(--bad);animation:shake .35s}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.list{background:var(--card);border-radius:14px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);min-height:52px}
+.row:last-child{border-bottom:none}
+.row label{flex:1}
+.sw{appearance:none;-webkit-appearance:none;width:52px;height:32px;border-radius:999px;background:#3A3D44;position:relative;flex:none;transition:.2s}
+.sw:checked{background:var(--accent)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s}
+.sw:checked::after{left:23px}
+.seg{display:flex;background:#3A3D44;border-radius:10px;padding:3px;gap:3px;flex:none}
+.seg button{height:32px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button.sel{background:var(--accent);color:#fff}
+#frame{position:absolute;border:1.5px solid rgba(242,237,228,.35);border-radius:6px;pointer-events:none}
+.cbar{position:absolute;left:12px;right:12px;bottom:12px;height:8px;border-radius:4px;background:rgba(255,255,255,.15);overflow:hidden;display:none}
+.cbar.on{display:block}.cbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+#cSize,.rng{width:100%;accent-color:var(--accent);height:30px;margin:0}
+.sbar{display:none;margin:2px 0 4px}.sbar.on{display:block}
+.sbar .t{height:14px;border-radius:7px;background:#2A2D33;overflow:hidden}
+.sbar .t i{display:block;height:100%;width:0;border-radius:7px;background:linear-gradient(90deg,#C8733A,#E0A43C);transition:width .15s}
+.sbar .l{display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-top:6px}
+.sbar.ok .t i{background:#34C759}.sbar.ok .l{color:#34C759}
+.sbar.bad .t i{background:var(--bad)}.sbar.bad .l{color:#FF8A82}
+.sbar.esc{position:absolute;left:25%;right:25%;bottom:calc(env(safe-area-inset-bottom) + 14px);z-index:3;margin:0;background:rgba(14,15,17,.85);padding:8px 12px;border-radius:12px}
+.sbar.esc .t{height:10px}
+#fontPrompt{position:absolute;top:calc(env(safe-area-inset-top) + 18px);left:0;right:0;text-align:center;font-size:17px;font-weight:700;pointer-events:none;display:none}
+#fontPrompt b{font-family:Caveat,cursive;font-size:30px;color:var(--accent);margin:0 4px}
+.mini{height:36px;padding:0 14px;border-radius:10px;background:#3A3D44;font-size:14px;font-weight:600}
+#log{font:11px/1.4 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-wrap;max-height:180px;overflow:auto;background:#0E0F11;border-radius:10px;padding:10px;-webkit-user-select:text;user-select:text}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 18px);background:#2B2E35;border-radius:12px;padding:12px 14px;font-size:14px;z-index:60;opacity:0;transform:translateY(10px);transition:.25s;pointer-events:none}
+#toast.on{opacity:1;transform:none}#toast.bad{background:#5a2422}
+/* escrita manual */
+#escrita{position:fixed;inset:0;background:#0E0F11;display:none;z-index:40;padding:0}
+#escrita.on{display:block}
+#pad{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+#escrita .tools{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:calc(env(safe-area-inset-left) + 12px);right:calc(env(safe-area-inset-right) + 12px);display:flex;justify-content:space-between;pointer-events:none}
+#escrita .tools>div{display:flex;gap:10px}
+#escrita .tools button{pointer-events:auto;background:rgba(255,255,255,.08)}
+#escrita .send{height:44px;padding:0 18px;border-radius:12px;background:var(--accent)!important;color:#fff;font-weight:700}
+#rotate{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);font-size:16px;text-align:center;padding:30px;pointer-events:none}
+@media (orientation:portrait){#rotate{display:flex}#frame{display:none}}
+/* v1.0.7: telas compactas (Enviar sem rolar) */
+.screen{gap:10px}
+.vals button,.pad button{height:46px}
+.pad{gap:8px}.vals{gap:7px}.suits{gap:8px}.suit{height:50px;font-size:30px}
+.display{font-size:42px}
+.big{height:52px}
+.tile{min-height:64px;padding:10px;gap:5px}
+.grid2{gap:8px!important}
+.tile.wide{min-height:50px}
+#s-inicio .board{max-height:none}
+#hHint,#dHint,#lastCard{display:none}
+body.soicones #s-inicio .grid2 .tile b{display:none}
+body.soicones #s-inicio .grid2 .tile .ico{transform:scale(1.8);height:40px}
+body.soicones #s-inicio .grid2 .tile.wide .ico{transform:scale(1.5)}
+.sec{background:var(--card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:16px;width:100%;text-align:left}
+.sec::after{content:'▸';color:var(--muted)}.sec.open::after{content:'▾'}
+.secbody{display:none}.secbody.open{display:block}
+.wordin{width:100%;height:52px;border-radius:14px;border:2px solid var(--accent);background:var(--card);color:var(--text);font-size:22px;padding:0 14px;font-family:inherit}
+.note{font-size:13px;color:var(--muted);padding:13px 16px}
+/* v1.1 nativo: Post-It, assistente, disfarce */
+.chip.sm{padding:8px 12px;font-size:14px}
+.chip .ant{width:16px;height:16px}
+.hide{display:none!important}
+.row .v{color:var(--muted);font-size:14px}
+#trCanvas{width:100%;height:auto;aspect-ratio:3/2;display:block;background:#0E0F11}
+.trbig{font-family:Caveat,cursive;font-size:76px;line-height:1;text-align:center;color:var(--accent)}
+/* disfarce: tela de bloqueio falsa */
+.fake{position:fixed;inset:0;z-index:80;display:none;overflow:hidden;touch-action:none;background:radial-gradient(circle at 30% 20%,#5a7fa8,#28394f 55%,#141c27);color:#fff;font-family:-apple-system,"SF Pro Display",system-ui,sans-serif}
+.fake.show{display:block}
+.fake.foto{background:#000 center/cover no-repeat}
+.fake .fdate{position:absolute;top:calc(env(safe-area-inset-top) + 30px);left:12px;right:12px;text-align:center;font-size:25px;font-weight:600;opacity:.95;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fake .fdate .it{font-weight:700}
+.fake .fclk{position:absolute;top:calc(env(safe-area-inset-top) + 62px);width:100%;text-align:center;font-size:27vw;font-weight:700;letter-spacing:-0.04em;line-height:1;font-variant-numeric:tabular-nums}
+.fake .fbtn{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 34px);width:52px;height:52px;border-radius:50%;background:rgba(40,42,48,.32);display:flex;align-items:center;justify-content:center;color:#fff;transition:background .15s,color .15s}
+.fake .fbtn svg{width:24px;height:24px}
+.fake .fbar{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 8px);left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#fff;opacity:.9}
+</style>
+<style>
+#dInfo{display:block!important}
+.top .dot{width:12px;height:12px}
+</style>
+</head>
+<body>
+<section class="screen on" id="s-inicio">
+  <div class="top"><div class="logo"><img src="/*WORDMARK*/" alt="Lousa" style="height:58px;display:block"></div></div>
+  <div class="chips"><div class="chip" id="chipBoard"><span class="dot" id="dotBoard"></span><span id="txtBoard">Procurando…</span></div></div>
+  <div class="board"><canvas class="pv" id="pvHome"></canvas><div class="empty">nada enviado ainda</div></div>
+  <div class="sbar"><div class="t"><i></i></div><div class="l"><span></span><span></span></div></div>
+  <div class="grid2">
+    <button class="tile" data-go="carta"><div class="ico spade">♠</div><b>Carta</b></button>
+    <button class="tile" data-go="relogio"><div class="ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><b>Relógio</b></button>
+    <button class="tile" data-go="nascimento"><div class="ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 17.5h2"/></svg></div><b>Data de Nascimento</b></button>
+        <button class="tile" data-go="palavra"><div class="ico"><svg width="30" height="26" viewBox="0 0 28 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="24" height="16" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M19 9h.01M7 13h.01M11 13h.01M15 13h.01M19 13h.01M9 17h10"/></svg></div><b>Palavra</b></button>
+    <button class="tile" data-go="quadrado"><div class="ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></div><b>Quadrado mágico</b></button>
+    <button class="tile wide" id="btnClear"><div class="ico"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><path d="M3 17l8-8 6 6-4 4H7z"/><path d="M11 9l4-4 6 6-4 4"/><path d="M3 21h18"/></svg></div><b>Limpar lousa</b></button>
+  </div>
+  <div class="small" style="margin-top:auto" id="verTxt">assistente</div>
+</section>
+<section class="screen" id="s-carta">
+  <div class="top"><button class="ibtn" data-go="inicio" aria-label="Voltar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><div class="title">Carta</div><div style="flex:1"></div><span class="dot" data-dot></span></div>
+  <div class="board"><canvas class="pv" id="pvCard"></canvas><div class="empty">a prévia aparece aqui</div></div>
+  <div class="sbar"><div class="t"><i></i></div><div class="l"><span></span><span></span></div></div>
+  <div class="label">1. Naipe</div>
+  <div class="suits">
+    <button class="suit" data-s="S" aria-label="Espadas">♠</button>
+    <button class="suit red" data-s="H" aria-label="Copas">♥</button>
+    <button class="suit sel" data-s="C" aria-label="Paus">♣</button>
+    <button class="suit red" data-s="D" aria-label="Ouros">♦</button>
+  </div>
+  <div class="label">2. Valor</div>
+  <div class="vals" id="vals"></div>
+  <button class="big" id="cSend" disabled>Enviar</button>
+</section>
+<section class="screen" id="s-relogio">
+  <div class="top"><button class="ibtn" data-go="inicio" aria-label="Voltar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><div class="title">Relógio</div><div style="flex:1"></div><span class="dot" data-dot></span></div>
+  <div class="board"><canvas class="pv" id="pvClock"></canvas><div class="empty">a prévia aparece aqui</div></div>
+  <div class="sbar"><div class="t"><i></i></div><div class="l"><span></span><span></span></div></div>
+  <div class="display" id="hDisp"><span id="hh">--</span> : <span id="mm">--</span></div>
+  <div class="pad" id="hPad"></div>
+  <button class="big" id="hSend" disabled>Enviar</button>
+</section>
+<section class="screen" id="s-nascimento">
+  <div class="top"><button class="ibtn" data-go="inicio" aria-label="Voltar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><div class="title">Data de Nascimento</div><div style="flex:1"></div><span class="dot" data-dot></span></div>
+  <div class="board"><canvas class="pv" id="pvDate"></canvas><div class="empty">a prévia aparece aqui</div></div>
+  <div class="sbar"><div class="t"><i></i></div><div class="l"><span></span><span></span></div></div>
+  <div class="display" id="dDisp">__/__/__</div>
+  <div class="small" id="dInfo"></div>
+  <div class="pad" id="dPad"></div>
+  <button class="big" id="dSend" disabled>Enviar</button>
+</section>
+<section class="screen" id="s-palavra">
+  <div class="top"><button class="ibtn" data-go="inicio" aria-label="Voltar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><div class="title">Palavra</div><div style="flex:1"></div><span class="dot" data-dot></span></div>
+  <div class="board"><canvas class="pv" id="pvWord"></canvas><div class="empty">a prévia aparece aqui</div></div>
+  <div class="sbar"><div class="t"><i></i></div><div class="l"><span></span><span></span></div></div>
+  <form id="wForm" autocomplete="off"><input class="wordin" id="wIn" type="text" enterkeyhint="send" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Digite a palavra ou o nome"></form>
+  <button class="big" id="wSend" disabled>Enviar</button>
+</section>
+<section class="screen" id="s-quadrado">
+  <div class="top"><button class="ibtn" data-go="inicio" aria-label="Voltar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><div class="title">Quadrado mágico</div><div style="flex:1"></div><span class="dot" data-dot></span></div>
+  <div class="board"><canvas class="pv" id="pvSq"></canvas><div class="empty">a prévia aparece aqui</div></div>
+  <div class="sbar"><div class="t"><i></i></div><div class="l"><span></span><span></span></div></div>
+  <div class="display" id="qDisp">—</div>
+  <div class="pad" id="qPad"></div>
+  <button class="big" id="qSend" disabled>Enviar</button>
+</section>
+<div id="toast"></div>
+<script>window.__LOUSA_HAND=/*HAND*/null;window.__LOUSA_SUITS={S:"/*SUIT_S*/",H:"/*SUIT_H*/",D:"/*SUIT_D*/",C:"/*SUIT_C*/"};</script>
+<script>
+/*CORE*/
+</script>
+<script src="ably.min.js"></script>
+<script>
+/*ASSIST*/
+</script>
+</body>
+</html>

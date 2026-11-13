@@ -11,7 +11,7 @@ LINKS=""
 
 for conf in apps/*/app.conf; do
   ID="$(basename "$(dirname "$conf")")"
-  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0; SEGUNDO_PLANO=0
+  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0; SEGUNDO_PLANO=0; DEITAR=0
   source "$conf"
   echo "::group::Montando $NOME ($BUNDLE)"
   T="$RAIZ/build/$ID"; rm -rf "$T"; mkdir -p "$T/App/Assets.xcassets/AppIcon.appiconset"
@@ -28,6 +28,7 @@ J
 J
   if [ "$ESCONDER_INDICADOR" = "1" ]; then IND=true; else IND=false; fi
   if [ "$MANTER_ACESA" = "1" ]; then ACESA=true; else ACESA=false; fi
+  if [ "$DEITAR" = "1" ]; then GIRO="[UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]"; DEITA=true; else GIRO="[UIInterfaceOrientationPortrait]"; DEITA=false; fi
   if [ "$SEGUNDO_PLANO" = "1" ]; then FUNDO="        UIBackgroundModes: [audio, bluetooth-central]"; else FUNDO=""; fi
   cat > "$T/project.yml" <<Y
 name: App
@@ -54,12 +55,13 @@ targets:
         UIRequiresFullScreen: true
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: true
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations: $GIRO
         NSCameraUsageDescription: "Para escolher imagens."
         NSPhotoLibraryUsageDescription: "Para escolher imagens."
         ITSAppUsesNonExemptEncryption: false
         EsconderIndicador: $IND
         ManterTelaAcesa: $ACESA
+        PermiteDeitar: $DEITA
 $FUNDO
         NSBluetoothAlwaysUsageDescription: "Para conversar com os aparelhos de mágica (relógio, Post-It)."
     settings:
@@ -114,6 +116,7 @@ P
   </dict>
 </dict></array></dict></plist>
 M
+  [ -d "apps/$ID/web" ] && cp -R "apps/$ID/web/." "site/$ID/" || true
   LINKS="$LINKS<a class=\"app\" href=\"itms-services://?action=download-manifest&amp;url=$PAGINA/$ID/manifest.plist\"><img src=\"$ID/icone.png\" alt=\"\"><span><b>$NOME</b><small>Toque para instalar ou atualizar</small></span></a>"
   echo "::endgroup::"
 done
