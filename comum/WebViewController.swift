@@ -7,12 +7,15 @@ import AVFoundation
 ///   barra  -> true esconde / false mostra a barra de cima (hora, sinal, bateria)
 ///   estilo -> "escuro" (letras pretas) ou "claro" (letras brancas) na barra de cima
 ///   som    -> toca o clique.mp3 do app (se existir) com o volume pedido (0 a 1)
+///   ble    -> Bluetooth feito pelo próprio iPhone (ponte-bluetooth.js + PonteBluetooth.swift)
 final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     private var webView: WKWebView!
     private var esconderBarra = false
     private var barraEscura = false
     private var clique: AVAudioPlayer?
     private let esconderIndicador = (Bundle.main.object(forInfoDictionaryKey: "EsconderIndicador") as? Bool) ?? false
+    private let manterAcesa = (Bundle.main.object(forInfoDictionaryKey: "ManterTelaAcesa") as? Bool) ?? false
+    private let ponte = PonteBluetooth()
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -23,7 +26,12 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         let flag = WKUserScript(source: "window.__NATIVE_APP__=true;",
                                 injectionTime: .atDocumentStart, forMainFrameOnly: true)
         config.userContentController.addUserScript(flag)
-        for nome in ["barra", "estilo", "som"] {
+        if let url = Bundle.main.url(forResource: "ponte-bluetooth", withExtension: "js"),
+           let codigo = try? String(contentsOf: url, encoding: .utf8) {
+            config.userContentController.addUserScript(
+                WKUserScript(source: codigo, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        for nome in ["barra", "estilo", "som", "ble"] {
             config.userContentController.add(self, name: nome)
         }
 
@@ -38,6 +46,13 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         webView.scrollView.bounces = false
         webView.allowsLinkPreview = false
         view = webView
+        ponte.webView = webView
+        ponte.tela = self
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if manterAcesa { UIApplication.shared.isIdleTimerDisabled = true }
     }
 
     override func viewDidLoad() {
@@ -67,6 +82,8 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
             setNeedsStatusBarAppearanceUpdate()
         case "som":
             tocarClique(volume: (message.body as? NSNumber)?.floatValue ?? 1)
+        case "ble":
+            ponte.receber(message.body)
         default:
             break
         }

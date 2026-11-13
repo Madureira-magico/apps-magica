@@ -11,11 +11,11 @@ LINKS=""
 
 for conf in apps/*/app.conf; do
   ID="$(basename "$(dirname "$conf")")"
-  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0
+  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0
   source "$conf"
   echo "::group::Montando $NOME ($BUNDLE)"
   T="$RAIZ/build/$ID"; rm -rf "$T"; mkdir -p "$T/App/Assets.xcassets/AppIcon.appiconset"
-  cp comum/*.swift "$T/App/"
+  cp comum/*.swift comum/*.js "$T/App/"
   [ -d "apps/$ID/extras" ] && cp -R "apps/$ID/extras/." "$T/App/" || true
   cp -R "apps/$ID/www" "$T/www"
   rm -f "$T/www/sw.js"
@@ -27,6 +27,7 @@ J
 {"images":[{"filename":"icone.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}
 J
   if [ "$ESCONDER_INDICADOR" = "1" ]; then IND=true; else IND=false; fi
+  if [ "$MANTER_ACESA" = "1" ]; then ACESA=true; else ACESA=false; fi
   cat > "$T/project.yml" <<Y
 name: App
 options:
@@ -57,6 +58,8 @@ targets:
         NSPhotoLibraryUsageDescription: "Para escolher imagens."
         ITSAppUsesNonExemptEncryption: false
         EsconderIndicador: $IND
+        ManterTelaAcesa: $ACESA
+        NSBluetoothAlwaysUsageDescription: "Para conversar com os aparelhos de mágica (relógio, Post-It)."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: "$BUNDLE"
