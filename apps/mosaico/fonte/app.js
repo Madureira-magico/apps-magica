@@ -265,25 +265,34 @@ async function baixarFamoso(f, novo) {
 }
 
 /* desenha o nome em letras e devolve a grade de cores */
-function gradeTexto(nome, cols, rows) {
+function gradeTexto(nome, cols, rows) {   // nome escrito: letras altas e estreitas, traço grosso, uma palavra por linha
   const k = 8, c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
   const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
-  const linhas = []; let lin = '';
-  for (const p of nome.toUpperCase().split(' ')) { const t = lin ? lin + ' ' + p : p; if (lin && t.length > 7) { linhas.push(lin); lin = p; } else lin = t; }
-  if (lin) linhas.push(lin);
-  const largura = c.width * 0.88, alturaMax = c.height * 0.5 / linhas.length;
-  let fs = alturaMax;
-  g.font = '900 ' + fs + 'px -apple-system, Helvetica, Arial, sans-serif';
-  for (const l of linhas) { const w = g.measureText(l).width; if (w > largura) fs = Math.min(fs, alturaMax * largura / w); }
-  g.font = '900 ' + fs + 'px -apple-system, Helvetica, Arial, sans-serif';
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const total = linhas.length * fs * 1.12, y0 = c.height * 0.47 - total / 2 + fs * 0.56;
-  linhas.forEach((l, i) => g.fillText(l, c.width / 2, y0 + i * fs * 1.12));
-  const px = g.getImageData(0, 0, c.width, c.height).data, out = [];
+  const pal = nome.toUpperCase().split(/\s+/).filter(Boolean), linhas = [];
+  for (const p of pal) { const u = linhas[linhas.length - 1]; if (u && linhas.length >= 3) linhas[linhas.length - 1] = u + ' ' + p; else linhas.push(p); }
+  const n = linhas.length, alto = c.height * 0.74, passo = alto / n, hLetra = passo * 0.82, larg = c.width * 0.92;
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  const y0 = (c.height - alto) / 2 - c.height * 0.02;
+  linhas.forEach((l, i) => {   // letra por letra, cada uma na sua casa, com espaço entre elas
+    const m = l.length, casa = Math.min(larg / m, hLetra * 0.62), gap = Math.max(k * 1.1, casa * 0.16), xi = (c.width - casa * m) / 2;
+    const sy = hLetra / 72, yb = y0 + i * passo + (passo + hLetra) / 2;
+    for (let j = 0; j < m; j++) {
+      const ch = l[j]; if (ch === ' ') continue;
+      g.font = '800 100px -apple-system, "Helvetica Neue", Arial, sans-serif';
+      const w = g.measureText(ch).width || 1, sx = Math.min(sy, (casa - gap) / w);
+      g.save(); g.translate(xi + casa * (j + 0.5), yb); g.scale(sx, sy); g.fillText(ch, 0, 0); g.restore();
+    }
+  });
+  const px = g.getImageData(0, 0, c.width, c.height).data, cob = [];
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
     let s = 0;
     for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) s += px[((y * k + dy) * c.width + x * k + dx) * 4];
-    const v = Math.round(s / (k * k)); out.push(v, v, v);
+    cob.push(s / (k * k * 255));
+  }
+  // preto e branco puro
+  const out = [];
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const b = cob[y * cols + x] > 0.4 ? 255 : 0; out.push(b, b, b);
   }
   return out;
 }
@@ -345,7 +354,7 @@ async function prepararMosaico() {
   const nova = sN.slice(), mz = new Array(N).fill(''), ids = [], tinta = [];
   for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) nova[r * n + c] = faixa(r, c);   // camada 1: a Fototeca normal
   const cima = stPx() + 96, topo = Math.max(0, cima + (ultimaF + 1) * t - H);
-  const janela = texto ? Math.max(2, Math.round(NP * 0.3)) : Math.max(2, Math.round(NP * 0.015));
+  const janela = texto ? Math.max(2, Math.round(NP * 0.06)) : Math.max(2, Math.round(NP * 0.015));   // nome escrito: só as mais claras e as mais escuras
   for (let r = primeira; r <= ultimaF; r++) {
     const yc = cima + r * t - topo + t / 2, gy = Math.min(rg - 1, Math.max(0, Math.floor(yc / H * rg)));
     for (let c = 0; c < n; c++) {
@@ -361,7 +370,7 @@ async function prepararMosaico() {
             const cand = porCor(cr, cgc, cb);
             for (let k = 0; k < 8; k++) { id = cand[Math.floor(Math.random() * Math.min(6, cand.length))]; if (id !== esq && id !== cimaId) break; }
           } else {
-            const alvoI = Math.round(v * (NP - 1));
+            const alvoI = texto ? (v > 0.5 ? NP - 1 - janela : janela) : Math.round(v * (NP - 1));
             for (let k = 0; k < 8; k++) {
               const j = Math.min(NP - 1, Math.max(0, alvoI + Math.round((Math.random() * 2 - 1) * janela)));
               id = porLuz[j].id; if (id !== esq && id !== cimaId) break;
