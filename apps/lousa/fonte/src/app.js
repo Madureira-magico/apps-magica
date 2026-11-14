@@ -1,6 +1,6 @@
 // ===== Lousa v1.1 (app nativo) — telas e envio =====
 (function () {
-  const VER = '1.1.2';
+  const VER = '1.1.3';
   const NATIVO = !!window.__NATIVE_APP__;
   const nat = (name, v) => { try { window.webkit.messageHandlers[name].postMessage(v); } catch (e) {} };
   const $ = (s) => document.querySelector(s);
@@ -667,12 +667,12 @@
   // ----- "música" muda que mantém o app acordado; na tela de bloqueio aparece como uma música de verdade -----
   const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252 };
   function musicaMudaUrl() {
-    const rate = 8000, n = rate * MUSICA.secs, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const rate = 8000, n = rate * MUSICA.secs, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
-    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
-    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate, true);
-    v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
-    for (let i = 0; i < n; i++) v.setUint8(44 + i, i % 2 ? 129 : 127);   // inaudível
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, i % 2 ? 1 : -1, true);   // 16 bits, quase zero: inaudível
     return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
   }
   function musicaInfo(audio) {
