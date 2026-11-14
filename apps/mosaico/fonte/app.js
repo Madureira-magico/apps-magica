@@ -368,33 +368,63 @@ function limparNome() {
 }
 
 /* =====================================================================
-   FOTOTECA: grade no canvas, rolar, pinça contínua (como no Mozaic), toque
-   A grade se reorganiza a cada coluna (3, 4, 5 ... 60). Perto do número de
-   colunas do mosaico, as fotinhas formam faixas inclinadas que vão se
-   endireitando até virar o rosto.
+   FOTOTECA: grade no canvas, rolar, pinça contínua, toque
+   Regra de ouro (como no app Fotos): a foto embaixo dos dedos continua embaixo dos dedos.
+   - até ZA colunas: galeria (a grade se reorganiza coluna a coluna)
+   - de ZA a ZB: as duas se misturam suavemente
+   - acima de ZB: o rosto ampliado em volta dos dedos (até o rosto inteiro; depois, efeito elástico)
    ===================================================================== */
 const cv = $('#cv'), ctx = cv.getContext('2d');
 let zoom = +cfg.n0 || 3;        // colunas "contínuas" (3 = fotos grandes, 60 = mosaico)
-let doFim = 0;                  // rolagem a partir do fim (px)
+let doFim = 0;                  // rolagem da galeria a partir do fim (px)
+let ox = 0, oy = 0;             // posição do mosaico ampliado na tela
 let corFundo = '#000';
-const nCols = () => Math.max(1, Math.round(zoom));
+const ZA = 9.5, ZB = 12.5;
+const nCols = () => Math.max(1, Math.ceil(zoom - 0.001));   // sempre enche a largura (nunca sobra faixa vazia)
 const tamFoto = () => W / zoom;
 function sbPx() { return +document.documentElement.dataset.sb || 34; }
 function stPx() { return +document.documentElement.dataset.st || 47; }
-function padBaixo(z) { return (sbPx() + 70) * Math.min(1, Math.max(0, (8 - z) / 3)); }   // some aos poucos
+function padBaixo(z) { return (sbPx() + 70) * Math.min(1, Math.max(0, (8 - z) / 3)); }
 function alturaConteudo() { return stPx() + 96 + Math.ceil(seq.length / nCols()) * tamFoto() + padBaixo(zoom); }
 function rolagemMax() { return Math.max(0, alturaConteudo() - H); }
 function topoRolado() { return Math.max(0, alturaConteudo() - H - doFim); }
 function zMax() { return mos ? mos.cols : (+cfg.colsM || 60); }
-/* mosaico ampliado: a partir de Z1 colunas a pinça mostra o rosto ampliado em volta dos dedos */
-const Z1 = 12;
-let ox = 0, oy = 0;   // deslocamento do mosaico ampliado na tela
-const emMag = () => !!(mos && mos.img && zoom >= Z1);
+const temMag = () => !!(mos && mos.img);
+const mistura = () => temMag() ? Math.min(1, Math.max(0, (zoom - ZA) / (ZB - ZA))) : 0;   // 0 = galeria, 1 = rosto ampliado
+const emMag = () => mistura() >= 1;
 const kAtual = () => mos ? mos.cols / zoom : 1;
 function prenderMag() {
   const k = kAtual();
   if (k >= 1) { ox = Math.min(0, Math.max(W - W * k, ox)); oy = Math.min(0, Math.max(H - H * k, oy)); }
   else { ox = (W - W * k) / 2; oy = (H - H * k) / 2; }   // menor que a tela: fica no meio (efeito elástico)
+}
+
+/* geometria do mosaico parado (rosto inteiro na tela) */
+function geoMos() { const C = mos.cols, t0 = W / C, cima = stPx() + 96; return { C, t0, cima, topo0: Math.max(0, cima + (mos.ultima + 1) * t0 - H) }; }
+/* qual foto está num ponto da tela, e em que parte dela (0..1) */
+function pontoGaleria(x, y) {
+  const n = nCols(), t = tamFoto(), x0 = (W - n * t) / 2, topo = topoRolado(), cima = stPx() + 96;
+  const rr = (y + topo - cima) / t, cc = (x - x0) / t, r = Math.floor(rr), c = Math.floor(cc);
+  return { i: r < 0 || c < 0 || c >= n ? -1 : r * n + c, fx: cc - c, fy: rr - r };
+}
+function pontoMag(x, y) {
+  const g = geoMos(), k = kAtual();
+  const cc = ((x - ox) / k) / g.t0, rr = (((y - oy) / k) - g.cima + g.topo0) / g.t0, r = Math.floor(rr), c = Math.floor(cc);
+  return { i: c < 0 || c >= g.C || r < 0 ? -1 : r * g.C + c, fx: cc - c, fy: rr - r };
+}
+/* põe a foto i da galeria na altura y da tela */
+function galeriaNaFoto(i, fy, y) {
+  if (i < 0) return;
+  const n = nCols(), t = tamFoto(), cima = stPx() + 96, r = Math.floor(i / n);
+  const topo = cima + (r + fy) * t - y;
+  doFim = Math.min(rolagemMax(), Math.max(0, alturaConteudo() - H - topo));
+}
+/* põe a foto i do mosaico ampliado no ponto (x, y) da tela */
+function magNaFoto(i, fx, fy, x, y) {
+  const g = geoMos(), k = kAtual();
+  const r = Math.floor(i / g.C), c = i % g.C;
+  if (i < 0 || r < mos.primeira || r > mos.ultima) { ox = (W - W * k) / 2; oy = H - H * k; prenderMag(); return; }   // fora do rosto: começa embaixo
+  ox = x - (c + fx) * g.t0 * k; oy = y - (g.cima + (r + fy) * g.t0 - g.topo0) * k; prenderMag();
 }
 
 function ajustarTamanho() {
@@ -422,7 +452,7 @@ function bomba() {
   if (fila.length > 1500) { const fora = fila.splice(0, fila.length - 1500); fora.forEach(e => { e.naFila = false; }); }
   while (ativos < 16 && fila.length) {
     const e = fila.pop(); e.naFila = false;
-    if (e.t < relogio - 30000) continue;   // ninguém mais quer
+    if (e.t < relogio - 30000) continue;
     e.carregando = true; ativos++;
     const im = new Image();
     im.onload = () => { e.img = im; e.ok = true; e.carregando = false; ativos--; pedirDesenho(); bomba(); };
@@ -447,8 +477,8 @@ function imagemDoItem(it, pxTela) {
 }
 function corMedia(it) { const v = cores.get(it); return v ? 'rgb(' + v.c[0] + ',' + v.c[1] + ',' + v.c[2] + ')' : 'rgba(128,128,128,.16)'; }
 function espaco(z) { return z <= 3.2 ? 2 : z <= 5.5 ? 1.5 : z <= 15 ? 1 : 0.6; }
-/* quanto o retoque de cor já entrou (0 = fotos normais, 1 = mosaico) */
-function rampa() { if (!mos) return 0; return Math.min(1, Math.max(0, (zoom - 5) / (Z1 - 5))); }
+/* quanto o retoque de cor já entrou na galeria (0 = fotos normais, 1 = cor do rosto) */
+function rampa() { if (!mos) return 0; return Math.min(1, Math.max(0, (zoom - 5) / (ZB - 5))); }
 
 let desenhoPedido = false;
 function pedirDesenho() { if (!desenhoPedido) { desenhoPedido = true; requestAnimationFrame(desenhar); } }
@@ -457,7 +487,9 @@ function desenhar() {
   if (!$('#fototeca').classList.contains('on')) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H);
-  if (emMag()) desenharMag(); else desenharGrade();
+  const b = mistura();
+  if (b < 1) desenharGrade();
+  if (b > 0) { ctx.globalAlpha = b; if (b < 1) { ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H); } desenharMag(); ctx.globalAlpha = 1; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   let f = '';   // sépia / preto e branco entrando aos poucos
   if (mos && cfg.cor !== 'cor') { const a = rampa(); if (a > 0.01) f = cfg.cor === 'sepia' ? 'sepia(' + (0.9 * a).toFixed(2) + ')' : 'grayscale(' + a.toFixed(2) + ')'; }
@@ -466,41 +498,31 @@ function desenhar() {
 
 function desenharGrade() {
   const n = nCols(), t = tamFoto(), g = espaco(zoom), sel = emSelecao;
-  const x0 = (W - n * t) / 2;                    // grade centrada enquanto a pinça está entre duas colunas
+  const x0 = (W - n * t) / 2;
   const topo = topoRolado(), cima = stPx() + 96;
   const r0 = Math.max(0, Math.floor((topo - cima) / t)), r1 = Math.min(Math.ceil(seq.length / n) - 1, Math.floor((H + topo - cima) / t));
   const pxTela = t * DPR;
-  // mosaico parado no número certo de colunas: uma imagem só, nítida
-  const exato = mos && mos.img && mos.img.naturalWidth && n === mos.cols && Math.abs(zoom - n) < 0.02 && mos.seq === seq;
-  let mosTopo = 0;
-  if (exato) { mosTopo = cima + mos.primeira * t - topo; ctx.imageSmoothingEnabled = true; ctx.drawImage(mos.img, x0, mosTopo, n * t, mos.linhas * t); }
   const a = mos && mos.seq === seq ? (+cfg.reforco) * Math.pow(rampa(), 1.2) : 0;
   const lado = t - g;
   for (let r = r0; r <= r1; r++) {
-    if (exato && r >= mos.primeira && r < mos.primeira + mos.linhas) continue;
     const y = cima + r * t - topo;
     for (let c = 0; c < n; c++) {
       const i = r * n + c; if (i >= seq.length) break;
-      const x = x0 + c * t, it = seq[i], larg = c === n - 1 ? t : lado;
-      if (!it) { continue; }
+      const x = x0 + c * t, it = seq[i];
+      if (!it || x > W || x + t < 0) continue;
       const im = imagemDoItem(it, pxTela);
-      if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, larg, lado); }
-      else { ctx.fillStyle = corMedia(it); ctx.fillRect(x, y, larg, lado); }
-      if (a > 0.01) {   // retoque de cor: cada fotinha leva a cor do pedaço do rosto onde ela fica no mosaico
+      if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, lado, lado); }
+      else { ctx.fillStyle = corMedia(it); ctx.fillRect(x, y, lado, lado); }
+      if (a > 0.01) {   // cada fotinha leva a cor do pedaço do rosto onde ela fica no mosaico
         const k = (i - mos.ini) * 3;
-        if (k >= 0 && k < mos.tintaIdx.length) { ctx.fillStyle = 'rgba(' + mos.tintaIdx[k] + ',' + mos.tintaIdx[k + 1] + ',' + mos.tintaIdx[k + 2] + ',' + a.toFixed(3) + ')'; ctx.fillRect(x, y, larg, lado); }
+        if (k >= 0 && k < mos.tintaIdx.length) { ctx.fillStyle = 'rgba(' + mos.tintaIdx[k] + ',' + mos.tintaIdx[k + 1] + ',' + mos.tintaIdx[k + 2] + ',' + a.toFixed(3) + ')'; ctx.fillRect(x, y, lado, lado); }
       }
-      if (sel && selecionados.has(i)) desenharMarca(x, y, larg, lado);
+      if (sel && selecionados.has(i)) desenharMarca(x, y, lado, lado);
     }
-  }
-  if (exato && g > 0) {   // linhas finas entre as fotinhas
-    ctx.fillStyle = corFundo;
-    for (let c = 1; c < n; c++) ctx.fillRect(x0 + c * t - g, mosTopo, g, mos.linhas * t);
-    for (let r = 1; r <= mos.linhas; r++) ctx.fillRect(0, mosTopo + r * t - g, W, g);
   }
 }
 function desenharMag() {
-  const C = mos.cols, t0 = W / C, k = kAtual(), cima = stPx() + 96, topo0 = Math.max(0, cima + (mos.ultima + 1) * t0 - H);
+  const { C, t0, cima, topo0 } = geoMos(), k = kAtual();
   const yR = r => cima + r * t0 - topo0;
   const X = x => x * k + ox, Y = y => y * k + oy;
   const g = espaco(zoom) * Math.min(1, k);
@@ -508,7 +530,7 @@ function desenharMag() {
     ctx.imageSmoothingEnabled = true;
     const y0 = Y(yR(mos.primeira)), alt = mos.linhas * t0 * k;
     ctx.drawImage(mos.img, X(0), y0, W * k, alt);
-    if (g > 0.3) {   // linhas finas entre as fotinhas
+    if (g > 0.3) {
       ctx.fillStyle = corFundo;
       for (let c = 1; c < C; c++) ctx.fillRect(X(c * t0) - g, y0, g, alt);
       for (let r = 1; r <= mos.linhas; r++) ctx.fillRect(X(0), Y(yR(mos.primeira + r)) - g, W * k, g);
@@ -518,6 +540,7 @@ function desenharMag() {
   const a = +cfg.reforco, lado = t0 * k - g, pxTela = t0 * k * DPR;
   const c0 = Math.max(0, Math.floor((-ox / k) / t0)), c1 = Math.min(C - 1, Math.floor(((W - ox) / k) / t0));
   const r0 = Math.max(mos.primeira, Math.floor(((-oy / k) - cima + topo0) / t0)), r1 = Math.min(mos.ultima, Math.floor((((H - oy) / k) - cima + topo0) / t0));
+  const alpha0 = ctx.globalAlpha;
   for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
     const cel = (r - mos.primeira) * C + c, id = mos.ids[cel];
     if (!id) continue;
@@ -525,7 +548,7 @@ function desenharMag() {
     const im = imagemDoItem(id, pxTela);
     if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, lado, lado); }
     else { ctx.fillStyle = corMedia(id); ctx.fillRect(x, y, lado, lado); }
-    if (a > 0.01) { ctx.fillStyle = 'rgba(' + mos.tinta[cel * 3] + ',' + mos.tinta[cel * 3 + 1] + ',' + mos.tinta[cel * 3 + 2] + ',' + a + ')'; ctx.fillRect(x, y, lado, lado); }
+    if (a > 0.01) { ctx.globalAlpha = alpha0 * a; ctx.fillStyle = 'rgb(' + mos.tinta[cel * 3] + ',' + mos.tinta[cel * 3 + 1] + ',' + mos.tinta[cel * 3 + 2] + ')'; ctx.fillRect(x, y, lado, lado); ctx.globalAlpha = alpha0; }
   }
 }
 function desenharMarca(x, y, w, h) {
@@ -535,27 +558,28 @@ function desenharMarca(x, y, w, h) {
   ctx.beginPath(); ctx.moveTo(cx - r * .45, cy); ctx.lineTo(cx - r * .1, cy + r * .38); ctx.lineTo(cx + r * .48, cy - r * .35); ctx.stroke();
 }
 
-/* toque, rolagem e pinça */
-const toques = { modo: '', y0: 0, x0: 0, f0: 0, t0: 0, d0: 0, z0: 0, vel: 0, ultY: 0, ultT: 0, moveu: 0, inercia: 0 };
-function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+/* muda o zoom mantendo a foto embaixo dos dedos (mx, my) */
 function aplicarZoom(z, mx, my) {
-  const tVelho = tamFoto(), antes = emMag(), kAnt = kAtual();
+  if (mx == null) { mx = W / 2; my = H / 2; }
+  const zAnt = zoom, bAnt = mistura();
+  const pg = pontoGaleria(mx, my);
+  const pm = temMag() && zAnt >= ZA ? pontoMag(mx, my) : null;
   zoom = Math.min(mos ? zMax() * 1.35 : zMax() * 1.06, Math.max(2.6, z));
-  if (emMag()) {
-    if (mx == null) { mx = W / 2; my = H / 2; }
-    const k = kAtual();
-    if (!antes) { ox = mx - mx * k; oy = my - my * k; }          // entrou agora: amplia em volta dos dedos
-    else { const rx = (mx - ox) / kAnt, ry = (my - oy) / kAnt; ox = mx - rx * k; oy = my - ry * k; }
-    prenderMag(); doFim = 0;
+  const b = mistura();
+  // de onde vem a "foto embaixo dos dedos": da imagem que estava mais forte
+  const ref = bAnt >= 0.5 && pm ? pm : pg;
+  if (b < 1) galeriaNaFoto(ref.i, ref.fy, my);
+  if (b > 0) {
+    if (zAnt >= ZA && pm) { const k = kAtual(), kA = mos.cols / zAnt, rx = (mx - ox) / kA, ry = (my - oy) / kA; ox = mx - rx * k; oy = my - ry * k; prenderMag(); }
+    else magNaFoto(ref.i, ref.fx, ref.fy, mx, my);
     if (emSelecao) sairSelecao();
-  } else {
-    doFim = zoom >= 10 ? 0 : doFim * tamFoto() / tVelho;   // a grade continua presa embaixo
-    doFim = Math.min(rolagemMax(), Math.max(0, doFim));
   }
 }
+const toques = { modo: '', y0: 0, x0: 0, f0: 0, t0: 0, d0: 0, z0: 0, vel: 0, ultY: 0, ultT: 0, moveu: 0, inercia: 0, mx: 0, my: 0 };
+function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
 cv.addEventListener('touchstart', e => {
   e.preventDefault(); cancelAnimationFrame(toques.inercia); toques.inercia = 0;
-  if (e.touches.length >= 2) { toques.modo = 'pinca'; toques.d0 = dist(e.touches[0], e.touches[1]); toques.z0 = zoom; toques.zAnt = zoom; }
+  if (e.touches.length >= 2) { toques.modo = 'pinca'; toques.d0 = dist(e.touches[0], e.touches[1]); toques.z0 = zoom; }
   else if (e.touches.length === 1 && toques.modo !== 'pinca') {
     const p = e.touches[0];
     toques.modo = 'toque'; toques.x0 = p.clientX; toques.y0 = p.clientY; toques.f0 = doFim; toques.t0 = performance.now(); toques.ox0 = ox; toques.oy0 = oy;
@@ -566,7 +590,8 @@ cv.addEventListener('touchmove', e => {
   e.preventDefault();
   if (toques.modo === 'pinca' && e.touches.length >= 2) {
     const d = dist(e.touches[0], e.touches[1]); if (!d || !toques.d0) return;
-    aplicarZoom(toques.z0 * toques.d0 / d, (e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2);
+    toques.mx = (e.touches[0].clientX + e.touches[1].clientX) / 2; toques.my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    aplicarZoom(toques.z0 * toques.d0 / d, toques.mx, toques.my);
     pedirDesenho();
   } else if ((toques.modo === 'toque' || toques.modo === 'rolar') && e.touches.length === 1) {
     const p = e.touches[0], dy = p.clientY - toques.y0;
@@ -593,20 +618,22 @@ cv.addEventListener('touchend', e => {
 cv.addEventListener('touchcancel', () => { if (toques.modo === 'pinca') soltouPinca(); toques.modo = ''; });
 document.addEventListener('gesturestart', e => e.preventDefault());
 
-/* soltou a pinça: fica onde está (encaixa numa coluna inteira); perto do mosaico, encaixa no mosaico */
+/* soltou a pinça: fica onde está; nunca para no meio da mistura; perto do fim, encaixa no rosto inteiro */
 function soltouPinca() {
-  if (emMag()) {
-    if (kAtual() < 1.25) animarZoom(zMax());   // perto do fim (ou menor que a tela): encaixa no rosto inteiro
-    return;                                   // no meio: fica onde soltou
+  const mx = toques.mx || W / 2, my = toques.my || H / 2;
+  if (temMag() && zoom >= ZA) {
+    if (kAtual() < 1.25) animarZoom(zMax(), mx, my);
+    else if (zoom < ZB) animarZoom(zoom - ZA > ZB - zoom ? ZB : ZA - 0.5, mx, my);
+    return;
   }
-  if (zoom < 3) animarZoom(3); else animarZoom(Math.round(zoom));
+  if (zoom < 3) animarZoom(3, mx, my);
 }
-function animarZoom(alvo) {
-  const z0 = zoom, t0 = performance.now(), dur = 280;
+function animarZoom(alvo, mx, my) {
+  const z0 = zoom, t0 = performance.now(), dur = 260;
   (function passo() {
     const k = Math.min(1, (performance.now() - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-    aplicarZoom(z0 + (alvo - z0) * e); pedirDesenho();
-    if (k < 1) requestAnimationFrame(passo); else { zoom = alvo; if (emMag()) prenderMag(); pedirDesenho(); }
+    aplicarZoom(z0 + (alvo - z0) * e, mx, my); pedirDesenho();
+    if (k < 1) requestAnimationFrame(passo);
   })();
 }
 function inercia(v) {
@@ -618,16 +645,7 @@ function inercia(v) {
   })();
 }
 let ultimoToque = 0;
-function itemNoPonto(x, y) {
-  if (emMag()) {
-    const C = mos.cols, t0 = W / C, k = kAtual(), cima = stPx() + 96, topo0 = Math.max(0, cima + (mos.ultima + 1) * t0 - H);
-    const c = Math.floor(((x - ox) / k) / t0), r = Math.floor((((y - oy) / k) - cima + topo0) / t0);
-    return c >= 0 && c < C && r >= 0 ? r * C + c : -1;
-  }
-  const n = nCols(), t = tamFoto(), x0 = (W - n * t) / 2, topo = topoRolado(), cima = stPx() + 96;
-  const r = Math.floor((y + topo - cima) / t), c = Math.floor((x - x0) / t);
-  return r < 0 || c < 0 || c >= n ? -1 : r * n + c;
-}
+function itemNoPonto(x, y) { return (mistura() >= 0.5 ? pontoMag(x, y) : pontoGaleria(x, y)).i; }
 function tocou(x, y) {
   const i = itemNoPonto(x, y);
   if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); pedirDesenho(); } return; }
