@@ -323,7 +323,8 @@ async function prepararMosaico() {
   if (sN.length % n) sN = new Array(n - sN.length % n).fill('').concat(sN);   // última linha sempre cheia
   const N = sN.length;
   if (!N) return;
-  const ultima = Math.floor((N - 1) / n), primeira = Math.max(0, ultima - rowsVis + 1), linhas = ultima - primeira + 1;
+  const k00 = +cfg.n0 || 3, G = Math.ceil(H / (W / k00)) + 1;   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
+  const ultima = Math.floor((N - 1) / n), ultimaF = Math.max(0, ultima - G), primeira = Math.max(0, ultimaF - rowsVis + 1), linhas = ultimaF - primeira + 1;
   const rg = Math.ceil(H / t);
   let alvo = [];
   if (atual.tipo === 'rosto' && atual.arq) { try { alvo = await nat.call('grade', { nome: atual.arq, cols: n, rows: rg, enq: cfg.enq, real: 'real.jpg' }); } catch (_) { alvo = []; } }
@@ -343,9 +344,9 @@ async function prepararMosaico() {
   const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + (c - cS); return j >= 0 && j < M ? seqNormal[j] : ''; };
   const nova = sN.slice(), mz = new Array(N).fill(''), ids = [], tinta = [];
   for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) nova[r * n + c] = faixa(r, c);   // camada 1: a Fototeca normal
-  const cima = stPx() + 96, topo = Math.max(0, cima + (ultima + 1) * t - H);
+  const cima = stPx() + 96, topo = Math.max(0, cima + (ultimaF + 1) * t - H);
   const janela = texto ? Math.max(2, Math.round(NP * 0.3)) : Math.max(2, Math.round(NP * 0.015));
-  for (let r = primeira; r <= ultima; r++) {
+  for (let r = primeira; r <= ultimaF; r++) {
     const yc = cima + r * t - topo + t / 2, gy = Math.min(rg - 1, Math.max(0, Math.floor(yc / H * rg)));
     for (let c = 0; c < n; c++) {
       const idx = r * n + c, cel = gy * n + c, v = V[cel] == null ? 0 : V[cel];

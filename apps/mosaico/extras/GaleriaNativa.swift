@@ -17,6 +17,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let tinta = UIImageView()
     private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
     private let cobre = UIView()             // esconde as fotos de cima da cabeça quando o rosto aparece
+    private let cobreBaixo = UIView()        // e as de baixo do rosto (a primeira tela)
     private var naFace = false
     private var xTravado: CGFloat?
     private let magImg = UIImageView()
@@ -95,6 +96,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         plano.addSubview(tintaFaixa)
         cobre.isUserInteractionEnabled = false
         plano.addSubview(cobre)
+        cobreBaixo.isUserInteractionEnabled = false
+        plano.addSubview(cobreBaixo)
         vista.addSubview(zoomer)
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
@@ -263,6 +266,10 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         cobre.frame = CGRect(x: -W, y: -H * 4, width: W * 3, height: H * 4 + CGFloat(primeira) * t)
         cobre.backgroundColor = vista.backgroundColor
         cobre.isHidden = !temMos
+        let fimRosto = CGFloat(primeira + linhasMos) * t
+        cobreBaixo.frame = CGRect(x: -W, y: fimRosto, width: W * 3, height: max(0, CGFloat(linhas) * t - fimRosto) + H * 4)
+        cobreBaixo.backgroundColor = vista.backgroundColor
+        cobreBaixo.isHidden = !temMos
         tinta.isHidden = !temMos
         tintaFaixa.isHidden = !temMos
         magImg.isHidden = !temMos
@@ -329,7 +336,10 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let ins = zoomer.contentInset
         return CGPoint(x: CGFloat(cS) * t0 * smax, y: max(-ins.top, plano.bounds.height * smax - H + ins.bottom))
     }
-    private func offsetRosto() -> CGPoint { CGPoint(x: -zoomer.contentInset.left, y: plano.bounds.height - H) }
+    private func offsetRosto() -> CGPoint {   // rosto inteiro na tela (ele fica acima da primeira tela)
+        let fim = temMos ? CGFloat(primeira + linhasMos) * t0 : plano.bounds.height
+        return CGPoint(x: -zoomer.contentInset.left, y: fim - H)
+    }
     func scrollViewWillBeginZooming(_ s: UIScrollView, with v: UIView?) {
         evento(["tipo": "gZoom"])
         trilho = false
@@ -389,6 +399,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
         tintaFaixa.alpha = 0
         cobre.alpha = temMos ? suave(0.55 * CGFloat(C), 0.95 * CGFloat(C), v) : 0
+        cobreBaixo.alpha = cobre.alpha
         let face = temMos && v >= CGFloat(C) * 0.97
         if face != naFace { naFace = face; evento(["tipo": "gFace", "on": face]) }
         if corModo != "cor" && ramp > 0 {
