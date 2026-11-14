@@ -1,6 +1,6 @@
 // ===== Lousa v1.1 (app nativo) — telas e envio =====
 (function () {
-  const VER = '1.1';
+  const VER = '1.1.1';
   const NATIVO = !!window.__NATIVE_APP__;
   const nat = (name, v) => { try { window.webkit.messageHandlers[name].postMessage(v); } catch (e) {} };
   const $ = (s) => document.querySelector(s);
@@ -82,6 +82,7 @@
 
   // ---------- lousa ----------
   const board = new LousaBLE.Board(log);
+  if (NATIVO) board.dataMode = 'fast';   // no app, o próprio iPhone controla o ritmo (sem perder dados)
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   let stKind = '', lastOkAt = 0;
   function setStatus(kind, text) {
@@ -240,7 +241,7 @@
   }))).then(list => { const o = {}; list.forEach(x => { if (x) o[x[0]] = x[1]; }); if (Object.keys(o).length === 4) Lousa.setSuits(o); else log('Naipes desenhados não carregaram — usando os padrão'); });
   const _wf = waitFonts; waitFonts = () => Promise.all([_wf(), suitsReady]);
   let pending = null, running = false, underPx = null;
-  function clearBoard(cb) { send('clear', {}, 'lousa limpa', null, cb); }
+  function clearBoard(cb) { send('clear', {}, 'lousa limpa', null, cb, ''); }
   // cb(estado, p): 'start' | 'prog' (0..1) | 'ok' | 'bad' | 'skip'
   async function send(kind, data, label, extra, cb, short) {
     await waitFonts();
@@ -254,6 +255,7 @@
     log('Desenho "' + label + '" pronto em ' + Math.round(performance.now() - t0) + ' ms (' + comp.length + ' bytes)');
     if (pending && pending.cb) pending.cb('skip');
     pending = { comp, label, cb, short: short == null ? label : short };
+    incoming(pending.short);
     if (!running) runQueue();
   }
   async function runQueue() {
@@ -281,6 +283,7 @@
         } catch (e) {
           lastErr = e;
           log('Tentativa ' + a + '/3 falhou: ' + LousaBLE.errStr(e));
+          if (board.dataMode !== 'resp' && /parou de pedir|recusou/.test(LousaBLE.errStr(e))) { board.dataMode = 'resp'; log('Voltando para o envio seguro (mais lento)'); }
           if (a < 3) { bar(0, 'bad', 'Não enviou — tentando de novo'); await sleep(1000); }
         }
       }
@@ -762,7 +765,7 @@
     canal = 'lsa' + Array.from(r).map(x => (x % 36).toString(36)).join('');
     try { localStorage.setItem('lousa.canal', canal); } catch (e) {}
   }
-  let ably = null, ch = null, presT = null;
+  let ably = null, ch = null, presT = null, rxIn = false;
   const live = () => !!(ably && ch && ably.connection.state === 'connected');
   function rxShow(kind, text) {
     $('#chipRx').className = 'chip sm' + (opt.rx ? '' : ' hide') + (kind ? ' ' + kind : '');
@@ -791,16 +794,20 @@
     rxShow('busy', 'conectando…');
     try {
       ably = AblyPubSub.createClient({ key: ABLY_KEY, clientId: 'magico', echoMessages: false });
-      ch = ably.channels.get('lousa:' + canal);
+      ch = ably.channels.get('relogio:lousa-' + canal);   // a chave do Ably só aceita canais "relogio:…"
       ably.connection.on(stc => {
         if (!opt.rx) return;
         if (stc.current === 'connected') {
-          rxShow('ok', 'pronto para receber');
-          try { ch.presence.enter(info()).catch(e => log('Assistente: presença ' + LousaBLE.errStr(e))); } catch (e) {}
-          log('Assistente: conectado');
+          rxShow('busy', 'entrando no canal…');
+          log('Assistente: conectado à internet');
+          try {
+            ch.presence.enter(info()).then(() => { rxIn = true; rxShow('ok', 'pronto para receber'); log('Assistente: no canal, pronto para receber'); },
+              e => { rxIn = false; rxShow('bad', 'canal recusado'); log('Assistente: presença ' + LousaBLE.errStr(e)); });
+          } catch (e) { rxShow('bad', 'canal recusado'); }
         } else if (stc.current === 'connecting') rxShow('busy', 'conectando…');
         else rxShow('bad', stc.current === 'disconnected' ? 'sem internet — tentando' : stc.current);
       });
+      ch.on(cs => { if (!opt.rx) return; if (cs.current === 'failed' || cs.current === 'suspended' || cs.current === 'detached') { rxIn = false; rxShow('bad', 'fora do canal — tentando'); log('Assistente: canal ' + cs.current + (cs.reason ? ' — ' + LousaBLE.errStr(cs.reason) : '')); } else if (cs.current === 'attached' && rxIn) rxShow('ok', 'pronto para receber'); });
       ch.subscribe('cmd', msg => {
         if (msg.timestamp && Date.now() - msg.timestamp > 30000) return;     // pedido velho: ignora
         onCmd(msg.data || {});
@@ -810,7 +817,7 @@
   function rxClose() {
     if (ch) { try { ch.presence.leave().catch(() => {}); } catch (e) {} }
     if (ably) { try { ably.close(); } catch (e) {} }
-    ably = null; ch = null;
+    ably = null; ch = null; rxIn = false;
   }
   function stPub(id, s, extra) { try { if (ch) ch.publish('st', Object.assign({ id, s }, extra || {})).catch(() => {}); } catch (e) {} }
   function onCmd(d) {
@@ -868,9 +875,15 @@
   function showFake() { fakeItem = ''; tickFake(); clearInterval(fakeT); fakeT = setInterval(tickFake, 1000); $('#fake').classList.add('show'); updateCam(); }
   function hideFake() { $('#fake').classList.remove('show'); clearInterval(fakeT); }
   // chegou na lousa: mostra ao lado da data e a câmera fica laranja (some depois do tempo escolhido)
-  function arrived(short) {
-    fakeItem = short || ''; tickFake();
+  // chegou no iPhone (assistente, Post-It ou daqui): já aparece ao lado da data
+  function incoming(short) {
     clearTimeout(itemT);
+    if (short) { fakeItem = short; tickFake(); }
+  }
+  // a lousa recebeu: câmera laranja; os dois somem juntos depois do tempo escolhido
+  function arrived(short) {
+    if (short) fakeItem = short;
+    tickFake(); clearTimeout(itemT);
     camFlash('got');
     if (opt.gotSecs) itemT = setTimeout(() => { fakeItem = ''; tickFake(); }, opt.gotSecs * 1000);
   }

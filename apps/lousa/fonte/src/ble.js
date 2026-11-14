@@ -164,7 +164,7 @@
   Board.prototype.writeData = async function (buf) {
     if (!this.ctrl || !this.data) throw new Error('A lousa desconectou no meio');
     const p = this.data.properties || {};
-    if (this.dataMode !== 'resp' && p.writeWithoutResponse && this.data.writeValueWithoutResponse) {
+    if (this.dataMode !== 'resp' && (p.writeWithoutResponse || !this.data.properties) && this.data.writeValueWithoutResponse) {
       try { return await this.data.writeValueWithoutResponse(buf); }
       catch (e) { this.log('Envio sem resposta falhou (' + e.message + '), tentando com resposta'); this.dataMode = 'resp'; }
     }
@@ -192,7 +192,7 @@
     if (since < 1500) await new Promise(r => setTimeout(r, 1500 - since));
     this.busy = true;
     try {
-      const r1 = await this.request([0x01], 0x01);
+      const r1 = await this.request([0x01], 0x01, 3000);
       const blockSize = r1[1] | (r1[2] << 8);
       this.log('Tamanho do bloco: ' + blockSize);
       if (!(blockSize > 4)) throw new Error('Tamanho de bloco inválido: ' + blockSize);

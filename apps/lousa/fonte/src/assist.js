@@ -20,6 +20,7 @@
   const sz = (k) => ((main && main.sz && main.sz[k]) || 100) / 100;
   function boardState() {
     if (!live()) return ['bad', 'Sem internet'];
+    if (chErr) return ['bad', chErr];
     if (!main || Date.now() - (main.seen || 0) > 45000) return ['bad', 'Lousa desconectada'];
     if (main.b === 'send' || sending) return ['busy', 'Enviando para a lousa…'];
     if (main.b === 'ok') return ['ok', 'Lousa conectada'];
@@ -48,21 +49,21 @@
   }
 
   // ---------- Ably ----------
-  let ably = null, ch = null, sending = null, sendT = null;
+  let ably = null, ch = null, sending = null, sendT = null, chErr = '';
   const live = () => !!(ably && ably.connection.state === 'connected');
   function readPresence() {
     if (!ch) return;
     ch.presence.get().then(list => {
       const m = (list || []).find(x => x.clientId === 'magico');
       if (m) { main = Object.assign({}, m.data || {}, { seen: Date.now() }); refreshPreview(); } else main = null;
-      drawState();
-    }).catch(() => {});
+      chErr = ''; drawState();
+    }).catch(e => { chErr = 'Erro no canal'; drawState(); });
   }
   function open() {
     if (!canal) { $('#txtBoard').textContent = 'Abra pelo link que o mágico mandou'; return; }
     if (!window.AblyPubSub) { setTimeout(open, 3000); return; }
     ably = AblyPubSub.createClient({ key: ABLY_KEY, clientId: me, echoMessages: false });
-    ch = ably.channels.get('lousa:' + canal);
+    ch = ably.channels.get('relogio:lousa-' + canal);   // a chave do Ably só aceita canais "relogio:…"
     ably.connection.on(() => { drawState(); if (live()) readPresence(); });
     ch.presence.subscribe(m => {
       if (m.clientId !== 'magico') return;

@@ -15,6 +15,8 @@ final class PonteBluetooth: NSObject, CBCentralManagerDelegate, CBPeripheralDele
     private var faltaDescobrir: [UUID: Int] = [:]
     private var escrevendo: [String: [Int]] = [:]
     private var avisando: [String: [Int]] = [:]
+    // fila do envio rápido (sem resposta): só manda quando o iPhone avisa que tem espaço, para não perder pedaços
+    private var filaRapida: [UUID: [(dados: Data, ch: CBCharacteristic, req: Int)]] = [:]
 
     // procura (para escolher o aparelho)
     private var procura: (req: Int, filtros: [[String: Any]], todos: Bool)?
@@ -78,8 +80,15 @@ final class PonteBluetooth: NSObject, CBCentralManagerDelegate, CBPeripheralDele
             if comResposta && ch.properties.contains(.write) {
                 escrevendo[chave(id, ch), default: []].append(req)
                 p.writeValue(dados, for: ch, type: .withResponse)
+            } else if ch.properties.contains(.writeWithoutResponse) {
+                if (filaRapida[id]?.isEmpty ?? true) && p.canSendWriteWithoutResponse {
+                    p.writeValue(dados, for: ch, type: .withoutResponse)
+                    responder(req, valor: true)
+                } else {
+                    filaRapida[id, default: []].append((dados, ch, req))   // espera o iPhone ter espaço
+                }
             } else {
-                p.writeValue(dados, for: ch, type: ch.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse)
+                p.writeValue(dados, for: ch, type: .withResponse)
                 responder(req, valor: true)
             }
         case "notify":
@@ -188,6 +197,7 @@ final class PonteBluetooth: NSObject, CBCentralManagerDelegate, CBPeripheralDele
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
         if let req = conectando.removeValue(forKey: p.identifier) { responder(req, erro: "desconectou") }
         faltaDescobrir[p.identifier] = nil
+        (filaRapida.removeValue(forKey: p.identifier) ?? []).forEach { responder($0.req, erro: "desconectou") }
         rodar("window.__ble&&__ble.desconectou(\(js(p.identifier.uuidString)))")
     }
 
@@ -214,6 +224,15 @@ final class PonteBluetooth: NSObject, CBCentralManagerDelegate, CBPeripheralDele
         guard var l = escrevendo[k], !l.isEmpty else { return }
         let req = l.removeFirst(); escrevendo[k] = l
         if let e = error { responder(req, erro: e.localizedDescription) } else { responder(req, valor: true) }
+    }
+
+    func peripheralIsReady(toSendWriteWithoutResponse p: CBPeripheral) {
+        let id = p.identifier
+        while var fila = filaRapida[id], !fila.isEmpty, p.canSendWriteWithoutResponse {
+            let item = fila.removeFirst(); filaRapida[id] = fila
+            p.writeValue(item.dados, for: item.ch, type: .withoutResponse)
+            responder(item.req, valor: true)
+        }
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateNotificationStateFor ch: CBCharacteristic, error: Error?) {
