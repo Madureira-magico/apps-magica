@@ -13,6 +13,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let plano = UIView()
     private let tiles = TilesMosaico()
     private let tinta = UIImageView()
+    private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
+    private var xTravado: CGFloat?
     private let magImg = UIImageView()
     private let corCamada = CALayer()
     private var toque: UITapGestureRecognizer!
@@ -72,6 +74,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.scrollsToTop = false
         zoomer.bouncesZoom = true
         zoomer.alwaysBounceVertical = true
+        zoomer.alwaysBounceHorizontal = false
+        zoomer.bounces = true
         zoomer.decelerationRate = .normal
         zoomer.addSubview(plano)
         plano.addSubview(tiles)
@@ -80,6 +84,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         plano.addSubview(tinta)
         magImg.contentMode = .scaleToFill
         plano.addSubview(magImg)
+        tintaFaixa.layer.magnificationFilter = .nearest
+        tintaFaixa.isUserInteractionEnabled = false
+        plano.addSubview(tintaFaixa)
         vista.addSubview(zoomer)
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
@@ -166,11 +173,12 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             if v != mosV || img != mosImg || magImg.image == nil {
                 mosImg = img; mosV = v
                 magImg.image = UIImage(contentsOfFile: urlArq(img).path)
-                tinta.image = imagemTinta()
+                tinta.image = imagemTinta(false)
+                tintaFaixa.image = imagemTinta(true)
             }
         } else if m["mos"] != nil {
             mosIds = []; mosTinta = []; mosCols = 0; mosV = ""
-            magImg.image = nil; tinta.image = nil
+            magImg.image = nil; tinta.image = nil; tintaFaixa.image = nil
         }
         let selAntes = selecao ? selecionados : []
         if let c = m["cfg"] as? [String: Any] {
@@ -224,7 +232,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let faixa = CGRect(x: 0, y: CGFloat(primeira) * t, width: W, height: CGFloat(linhasMos) * t)
         tinta.frame = faixa
         magImg.frame = faixa
+        tintaFaixa.frame = faixa
         tinta.isHidden = !temMos
+        tintaFaixa.isHidden = !temMos
         magImg.isHidden = !temMos
         zoomer.contentSize = plano.frame.size
         zoomer.contentInset = UIEdgeInsets(top: cima, left: 0, bottom: sb + 70, right: 0)
@@ -241,16 +251,20 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func irParaFim() {
         let cs = zoomer.contentSize, ins = zoomer.contentInset
         let y = max(-ins.top, cs.height - H + ins.bottom)
-        let x: CGFloat = 0
+        let x = CGFloat(cS) * t0 * zoomer.zoomScale
         zoomer.contentOffset = CGPoint(x: x, y: y)
     }
 
     /// imagem pequenina com 1 ponto de cor por foto (a cor do rosto), esticada sem borrar
-    private func imagemTinta() -> UIImage? {
+    private var cS: Int { max(0, (C - Int(n0)) / 2) }
+    private func imagemTinta(_ soFaixa: Bool) -> UIImage? {
         guard mosCols > 0, linhasMos > 0, mosTinta.count >= 3 else { return nil }
         let w = mosCols, h = linhasMos
         var px = [UInt8](repeating: 0, count: w * h * 4)
+        let c0 = max(0, (w - Int(n0)) / 2), c1 = c0 + Int(n0)
         for cel in 0..<(w * h) where cel * 3 + 2 < mosTinta.count {
+            let c = cel % w
+            if soFaixa && (c < c0 || c >= c1) { continue }
             px[cel * 4] = mosTinta[cel * 3]; px[cel * 4 + 1] = mosTinta[cel * 3 + 1]; px[cel * 4 + 2] = mosTinta[cel * 3 + 2]; px[cel * 4 + 3] = 255
         }
         guard let prov = CGDataProvider(data: Data(px) as CFData),
@@ -282,11 +296,12 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var dadosTrilho: (p: CGPoint, sf: CGPoint, ss: CGPoint, smax: CGFloat)?
     private func offsetInicio(_ smax: CGFloat) -> CGPoint {
         let ins = zoomer.contentInset
-        return CGPoint(x: 0, y: max(-ins.top, plano.bounds.height * smax - H + ins.bottom))
+        return CGPoint(x: CGFloat(cS) * t0 * smax, y: max(-ins.top, plano.bounds.height * smax - H + ins.bottom))
     }
     private func offsetRosto() -> CGPoint { CGPoint(x: -zoomer.contentInset.left, y: plano.bounds.height - H) }
     func scrollViewWillBeginZooming(_ s: UIScrollView, with v: UIView?) {
         trilho = false
+        xTravado = nil
         guard temMos else { return }
         let smax = s.maximumZoomScale, oi = offsetInicio(smax), o = s.contentOffset
         let noInicio = abs(s.zoomScale - smax) < smax * 0.01 && abs(o.x - oi.x) < 6 && abs(o.y - oi.y) < 6
@@ -310,7 +325,13 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.isScrollEnabled = false
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetRosto() }
     }
-    func scrollViewDidScroll(_ s: UIScrollView) {}
+    /// arrastar só para cima e para baixo (como no app Fotos); de lado só a pinça mexe
+    func scrollViewWillBeginDragging(_ s: UIScrollView) { if !s.isZooming { xTravado = s.contentOffset.x } }
+    func scrollViewDidScroll(_ s: UIScrollView) {
+        if let x = xTravado, !s.isZooming, !ajustando, s.contentOffset.x != x {
+            ajustando = true; s.contentOffset.x = x; ajustando = false
+        }
+    }
     private func centralizar() {   // afastou demais: o rosto fica no meio enquanto volta
         let largura = plano.frame.width
         let dx = max(0, (W - largura) / 2)
@@ -326,6 +347,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         CATransaction.begin(); CATransaction.setDisableActions(true)
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
+        tintaFaixa.alpha = 0.8 * pow(ramp, 1.2)
         if corModo != "cor" && ramp > 0 {
             corCamada.frame = vista.bounds
             corCamada.backgroundColor = corModo == "sepia" ? UIColor(red: 0.44, green: 0.30, blue: 0.16, alpha: 1).cgColor : UIColor.gray.cgColor

@@ -312,7 +312,8 @@ async function prepararMosaico() {
   const porCor = (!texto && cfg.cor === 'cor' && NP) ? indiceCores(P) : null;
   // faixa da esquerda (3 colunas): as MESMAS fotos, no mesmo lugar, da Fototeca normal que o público já viu
   const k0 = +cfg.n0 || 3, M = seqNormal.length, uN = Math.floor((M - 1) / k0);
-  const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + c; return j >= 0 && j < M ? seqNormal[j] : ''; };
+  const cS = Math.floor((n - k0) / 2);   // no meio, para sumir dentro do rosto
+  const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + (c - cS); return j >= 0 && j < M ? seqNormal[j] : ''; };
   const nova = sN.slice(), ids = [], tinta = [];
   const cima = stPx() + 96, topo = Math.max(0, cima + (ultima + 1) * t - H);
   const janela = texto ? Math.max(2, Math.round(NP * 0.3)) : Math.max(2, Math.round(NP * 0.015));
@@ -324,7 +325,7 @@ async function prepararMosaico() {
       const cr = Math.min(255, Math.round((alvo[cel * 3] || 0) * kk)), cgc = Math.min(255, Math.round((alvo[cel * 3 + 1] || 0) * kk)), cb = Math.min(255, Math.round((alvo[cel * 3 + 2] || 0) * kk));
       let id = '';
       if (idx < N) {
-        if (c < k0) { id = faixa(r, c); nova[idx] = id; }
+        if (c >= cS && c < cS + k0) { id = faixa(r, c); nova[idx] = id; }
         else if (!NP) id = sN[idx];
         else {
           const esq = c > 0 ? nova[idx - 1] : '', cimaId = idx - n >= 0 ? nova[idx - n] : '';
@@ -345,7 +346,7 @@ async function prepararMosaico() {
       if (porCor) tinta.push(cr, cgc, cb); else { const g = Math.round(v * 255); tinta.push(g, g, g); }
     }
   }
-  for (let r = 0; r < primeira; r++) for (let c = 0; c < k0; c++) nova[r * n + c] = faixa(r, c);
+  for (let r = 0; r < primeira; r++) for (let c = cS; c < cS + k0; c++) nova[r * n + c] = faixa(r, c);
   const px = Math.max(8, Math.min(64, Math.round(t * DPR)));
   const versao = Date.now();
   try {
