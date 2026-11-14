@@ -84,7 +84,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
         vista.layer.addSublayer(corCamada)
-        tiles.carregar = { [weak self] id, px in self?.imagem(id, px) }
+        tiles.carregar = { [weak self] id, px, q in self?.imagem(id, px, q) }
         webView.insertSubview(vista, at: 0)
 
         capa.frame = webView.bounds
@@ -211,6 +211,11 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
 
     private func montarPlano() {
+        // segura a imagem antiga na tela enquanto a nova se desenha (sem piscar branco)
+        if ligada, !vista.isHidden, plano.bounds.width > 0, let foto = vista.snapshotView(afterScreenUpdates: false) {
+            vista.addSubview(foto)
+            UIView.animate(withDuration: 0.25, delay: 0.45, options: []) { foto.alpha = 0 } completion: { _ in foto.removeFromSuperview() }
+        }
         let t = t0
         tiles.dados = TilesMosaico.Dados(seq: seq, mos: mosIds, ini: ini, cols: C, linhas: linhas, t0: t)
         zoomer.zoomScale = 1
@@ -224,12 +229,13 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.contentSize = plano.frame.size
         zoomer.contentInset = UIEdgeInsets(top: cima, left: 0, bottom: sb + 70, right: 0)
         zoomer.minimumZoomScale = 1
-        zoomer.maximumZoomScale = CGFloat(C) / max(1, min(CGFloat(C), n0))
+        zoomer.maximumZoomScale = max(1.2, CGFloat(C) / max(1, min(CGFloat(C), n0)))
+        if let p = zoomer.pinchGestureRecognizer, p.view !== capa { capa.addGestureRecognizer(p) }   // a pinça sempre na camada de toques
         tiles.setNeedsDisplay()
     }
     private func posicaoInicial() {
         travado = false
-        zoomer.setZoomScale(CGFloat(C) / max(1, min(CGFloat(C), n0)), animated: false)
+        zoomer.setZoomScale(min(zoomer.maximumZoomScale, CGFloat(C) / max(1, min(CGFloat(C), n0))), animated: false)
         irParaFim()
     }
     private func irParaFim() {
@@ -257,18 +263,52 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     // MARK: zoom
     func viewForZooming(in s: UIScrollView) -> UIView? { plano }
     func scrollViewDidZoom(_ s: UIScrollView) {
-        centralizar(); atualizar()
+        centralizar()
+        if trilho, let t = dadosTrilho, s.zoomScale >= 1 {
+            // caminho fixo entre as fotos do começo e o rosto inteiro: desliza junto com a pinça, sem pulo
+            let u = min(1, max(0, log(s.zoomScale) / log(max(1.0001, t.smax))))
+            let sx = t.sf.x + (t.ss.x - t.sf.x) * u, sy = t.sf.y + (t.ss.y - t.sf.y) * u
+            ajustando = true
+            s.contentOffset = CGPoint(x: t.p.x * s.zoomScale - sx, y: t.p.y * s.zoomScale - sy)
+            ajustando = false
+        }
+        atualizar()
         if travado && s.zoomScale > s.minimumZoomScale * 1.01 { travado = false; zoomer.isScrollEnabled = ligada && ativa }
     }
     /// rosto inteiro na tela: fica parado (só a pinça para aproximar funciona)
     private var travado = false
+    private var trilho = false
+    private var ajustando = false
+    private var dadosTrilho: (p: CGPoint, sf: CGPoint, ss: CGPoint, smax: CGFloat)?
+    private func offsetInicio(_ smax: CGFloat) -> CGPoint {
+        let ins = zoomer.contentInset
+        return CGPoint(x: 0, y: max(-ins.top, plano.bounds.height * smax - H + ins.bottom))
+    }
+    private func offsetRosto() -> CGPoint { CGPoint(x: -zoomer.contentInset.left, y: plano.bounds.height - H) }
+    func scrollViewWillBeginZooming(_ s: UIScrollView, with v: UIView?) {
+        trilho = false
+        guard temMos else { return }
+        let smax = s.maximumZoomScale, oi = offsetInicio(smax), o = s.contentOffset
+        let noInicio = abs(s.zoomScale - smax) < smax * 0.01 && abs(o.x - oi.x) < 6 && abs(o.y - oi.y) < 6
+        guard travado || noInicio else { return }
+        let ins = zoomer.contentInset
+        let q = CGPoint(x: W / 2, y: (ins.top + H - ins.bottom) / 2)                  // meio da tela no começo
+        let p = CGPoint(x: (oi.x + q.x) / smax, y: (oi.y + q.y) / smax)               // esse ponto na imagem
+        let of = offsetRosto()
+        dadosTrilho = (p, CGPoint(x: p.x - of.x, y: p.y - of.y), q, smax)
+        trilho = true
+    }
     func scrollViewDidEndZooming(_ s: UIScrollView, with v: UIView?, atScale e: CGFloat) {
+        let eraTrilho = trilho
+        trilho = false
+        if eraTrilho && e >= s.maximumZoomScale * 0.99 {
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetInicio(s.maximumZoomScale) }
+            return
+        }
         guard temMos, e <= s.minimumZoomScale * 1.01 else { return }
         travado = true
         zoomer.isScrollEnabled = false
-        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
-            self.zoomer.contentOffset = CGPoint(x: -self.zoomer.contentInset.left, y: self.zoomer.contentSize.height - self.H)
-        }
+        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetRosto() }
     }
     func scrollViewDidScroll(_ s: UIScrollView) {}
     private func centralizar() {   // afastou demais: o rosto fica no meio enquanto volta
@@ -337,13 +377,37 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
 
     // MARK: fotos (chamado pelos pedaços, fora da linha principal)
-    func imagem(_ id: String, _ px: CGFloat) -> CGImage? {
+    private var pendentes = Set<String>(), falhas = Set<String>()
+    private let travaPend = NSLock()
+    private let filaImg: OperationQueue = { let q = OperationQueue(); q.maxConcurrentOperationCount = 4; q.qualityOfService = .userInitiated; return q }()
+    /// devolve na hora a melhor foto que já tem (a miniatura do disco é instantânea) e busca a nítida por trás
+    func imagem(_ id: String, _ px: CGFloat, _ q: CGRect) -> CGImage? {
         let s = id.hasPrefix("arq:") ? 256 : (px <= 90 ? 64 : (px <= 300 ? 256 : 512))
         let k = "\(id)|\(s)" as NSString
         if let g = cache.object(forKey: k)?.img { return g }
-        guard let im = carregar(id, s) else { return nil }
-        cache.setObject(Caixa(im), forKey: k, cost: im.width * im.height * 4)
-        return im
+        if s == 64 || id.hasPrefix("arq:") {
+            guard let im = carregar(id, s) else { return nil }
+            cache.setObject(Caixa(im), forKey: k, cost: im.width * im.height * 4)
+            return im
+        }
+        travaPend.lock()
+        let novo = !falhas.contains(k as String) && pendentes.insert(k as String).inserted
+        travaPend.unlock()
+        if novo {
+            filaImg.addOperation { [weak self] in
+                guard let self = self else { return }
+                let im = self.carregar(id, s)
+                if let im = im { self.cache.setObject(Caixa(im), forKey: k, cost: im.width * im.height * 4) }
+                self.travaPend.lock(); self.pendentes.remove(k as String); if im == nil { self.falhas.insert(k as String) }; self.travaPend.unlock()
+                if im == nil { return }
+                DispatchQueue.main.async { self.tiles.setNeedsDisplay(q) }
+            }
+        }
+        if s == 512, let g = cache.object(forKey: "\(id)|256" as NSString)?.img { return g }
+        if let g = cache.object(forKey: "\(id)|64" as NSString)?.img { return g }
+        guard let mini = carregar(id, 64) else { return nil }
+        cache.setObject(Caixa(mini), forKey: "\(id)|64" as NSString, cost: mini.width * mini.height * 4)
+        return mini
     }
     private func carregar(_ id: String, _ s: Int) -> CGImage? {
         if id.hasPrefix("arq:") {
@@ -404,7 +468,7 @@ final class TilesMosaico: UIView {
         get { trava.lock(); defer { trava.unlock() }; return _marcas }
         set { trava.lock(); _marcas = newValue; trava.unlock() }
     }
-    var carregar: ((String, CGFloat) -> CGImage?)?
+    var carregar: ((String, CGFloat, CGRect) -> CGImage?)?
     override class var layerClass: AnyClass { CATiledLayerRapido.self }
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -434,7 +498,7 @@ final class TilesMosaico: UIView {
                 let id = (m >= 0 && m < d.mos.count && !d.mos[m].isEmpty) ? d.mos[m] : d.seq[i]
                 let q = CGRect(x: CGFloat(c) * d.t0, y: CGFloat(r) * d.t0, width: lado, height: lado)
                 if id.isEmpty { continue }
-                if let im = carregar?(id, lado * escala) {
+                if let im = carregar?(id, lado * escala, q) {
                     ctx.saveGState()
                     ctx.translateBy(x: q.minX, y: q.maxY); ctx.scaleBy(x: 1, y: -1)
                     ctx.interpolationQuality = .medium
