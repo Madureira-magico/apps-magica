@@ -6,6 +6,7 @@ import Vision
 import CoreImage
 import AVFoundation
 import Speech
+import MediaPlayer
 
 /// Parte do iPhone só do app Mosaico.
 /// Recados da página (window.webkit.messageHandlers.mz.postMessage({cmd: ...}) devolve uma resposta):
@@ -63,8 +64,11 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         galeria.urlArq = { [weak self] n in self?.arq(n) ?? URL(fileURLWithPath: "/") }
         galeria.evento = { [weak self] d in self?.evento(d) }
         galeria.instalar(em: webView)
+        volume.aviso = { [weak self] in self?.evento(["tipo": "volume"]) }
+        volume.instalar(em: webView)
     }
     private let galeria = GaleriaNativa()
+    private let volume = VolumeEspiao()
 
     /// Tira a barrinha "∧ ∨ OK" que o iPhone põe em cima do teclado (o Notas falso tem a própria barra).
     private func esconderBarraDoTeclado(_ webView: WKWebView) {
@@ -206,7 +210,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
 
     private func soImagens() -> PHFetchOptions {
         let o = PHFetchOptions()
-        o.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        o.predicate = NSPredicate(format: "mediaType == %d AND (mediaSubtypes & %d) == 0", PHAssetMediaType.image.rawValue, PHAssetMediaSubtype.photoScreenshot.rawValue)   // sem prints de tela
         o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
         return o
     }
@@ -705,6 +709,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         pedidoVoz = nil
         tarefaVoz = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        volume.ativar()
         if avisar { evento(["tipo": "vozFim"]) }
     }
 
@@ -764,5 +769,44 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             tarefa.didReceive(d)
             tarefa.didFinish()
         }
+    }
+}
+
+
+/// Botão de volume para cima (sem o aviso de volume do iPhone aparecer): avisa a página a cada toque,
+/// e repete enquanto o botão fica apertado.
+final class VolumeEspiao: NSObject {
+    private let vv = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
+    private var obs: NSKeyValueObservation?
+    private var ajustando = false
+    var aviso: () -> Void = {}
+    func instalar(em v: UIView) {
+        vv.alpha = 0.01
+        vv.isUserInteractionEnabled = false
+        v.addSubview(vv)
+        ativar()
+        obs = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.old, .new]) { [weak self] _, ch in
+            guard let n = ch.newValue, let o = ch.oldValue else { return }
+            DispatchQueue.main.async {
+                guard let self = self, !self.ajustando else { return }
+                if n > o || n >= 0.999 { self.aviso() }
+                self.centralizar()
+            }
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(ativar), name: UIApplication.didBecomeActiveNotification, object: nil)
+    }
+    @objc func ativar() {
+        let s = AVAudioSession.sharedInstance()
+        if s.category != .playAndRecord && s.category != .record { try? s.setCategory(.ambient, options: [.mixWithOthers]) }
+        try? s.setActive(true)
+        centralizar()
+    }
+    /// deixa o volume no meio para o botão continuar avisando (no máximo ele para de mudar)
+    private func centralizar() {
+        let v = AVAudioSession.sharedInstance().outputVolume
+        guard v > 0.85 || v < 0.1, let sl = vv.subviews.compactMap({ $0 as? UISlider }).first else { return }
+        ajustando = true
+        sl.value = 0.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.ajustando = false }
     }
 }

@@ -14,6 +14,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let tiles = TilesMosaico()
     private let tinta = UIImageView()
     private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
+    private let cobre = UIView()             // esconde as fotos de cima da cabeça quando o rosto aparece
+    private var naFace = false
     private var xTravado: CGFloat?
     private let magImg = UIImageView()
     private let corCamada = CALayer()
@@ -87,6 +89,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tintaFaixa.layer.magnificationFilter = .nearest
         tintaFaixa.isUserInteractionEnabled = false
         plano.addSubview(tintaFaixa)
+        cobre.isUserInteractionEnabled = false
+        plano.addSubview(cobre)
         vista.addSubview(zoomer)
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
@@ -244,6 +248,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tinta.frame = faixa
         magImg.frame = faixa
         tintaFaixa.frame = faixa
+        cobre.frame = CGRect(x: -W, y: -H * 4, width: W * 3, height: H * 4 + CGFloat(primeira) * t)
+        cobre.backgroundColor = vista.backgroundColor
+        cobre.isHidden = !temMos
         tinta.isHidden = !temMos
         tintaFaixa.isHidden = !temMos
         magImg.isHidden = !temMos
@@ -311,6 +318,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
     private func offsetRosto() -> CGPoint { CGPoint(x: -zoomer.contentInset.left, y: plano.bounds.height - H) }
     func scrollViewWillBeginZooming(_ s: UIScrollView, with v: UIView?) {
+        evento(["tipo": "gZoom"])
         trilho = false
         xTravado = nil
         guard temMos else { return }
@@ -359,6 +367,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
         tintaFaixa.alpha = 0.92 * suave(0.35 * CGFloat(C), 0.9 * CGFloat(C), v)
+        cobre.alpha = temMos ? suave(0.55 * CGFloat(C), 0.95 * CGFloat(C), v) : 0
+        let face = temMos && v >= CGFloat(C) * 0.97
+        if face != naFace { naFace = face; evento(["tipo": "gFace", "on": face]) }
         if corModo != "cor" && ramp > 0 {
             corCamada.frame = vista.bounds
             corCamada.backgroundColor = corModo == "sepia" ? UIColor(red: 0.44, green: 0.30, blue: 0.16, alpha: 1).cgColor : UIColor.gray.cgColor

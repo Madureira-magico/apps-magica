@@ -18,7 +18,38 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 .tela{position:fixed;inset:0;display:none}
 .tela.on{display:block}
 svg{display:block}
-#inicio{background:#000}
+#inicio{background:#000;overflow:hidden}
+#iniFundo{position:absolute;inset:0;background:#000 center/cover no-repeat}
+#iniGrade{position:absolute;inset:0}
+.ic{position:absolute;transition:transform .12s,filter .12s}
+.ic img{display:block;width:100%;height:100%;border-radius:22.5%;object-fit:cover}
+.ic .nm{position:absolute;left:-16px;right:-16px;text-align:center;font:500 12px -apple-system,system-ui;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px}
+.ic .bd{position:absolute;right:-8px;top:-8px;min-width:24px;height:24px;border-radius:12px;background:#ff3b30;color:#fff;font:500 15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;padding:0 7px;box-sizing:border-box}
+.ic.toque{transform:scale(.88);filter:brightness(.75)}
+#iniDock{position:absolute;left:10px;right:10px;border-radius:36px;background:rgba(255,255,255,.2);-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8);display:none}
+#iniBusca{position:absolute;left:50%;transform:translateX(-50%);padding:5px 13px;border-radius:15px;background:rgba(255,255,255,.22);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);font:500 13px -apple-system,system-ui;color:#fff;display:flex;gap:5px;align-items:center}
+.bordaBaixo{position:absolute;left:0;right:0;bottom:0;height:26px;z-index:60}
+#aSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:10px}
+#aSlots .sl{aspect-ratio:1;border-radius:6px;background:var(--cel2);display:flex;align-items:center;justify-content:center;color:var(--fg2);font-size:22px;position:relative;overflow:hidden}
+#aSlots .sl img{width:100%;height:100%;object-fit:cover}
+#aSlots .sl.esc{outline:3px solid var(--azul);outline-offset:-3px}
+#aSlots .sl.bebe{font-size:12px;font-weight:600;background:repeating-linear-gradient(45deg,var(--cel2),var(--cel2) 6px,transparent 6px,transparent 12px)}
+#aSlots .sl i{position:absolute;left:4px;top:3px;font-style:normal;font-size:10px;color:#fff;text-shadow:0 0 3px #000}
+.indice{margin:14px 16px 0;background:var(--cel);border-radius:12px;overflow:hidden}
+.indice .it{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 14px;font-size:16px;border-bottom:.5px solid var(--linha)}
+.indice .it:last-child{border-bottom:0}
+.indice .it b{width:29px;height:29px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex:none}
+.indice .it span{flex:1}
+.indice .it:after{content:'›';color:var(--fg2);font-size:22px}
+.painel{margin:14px 16px 0;background:var(--cel);border-radius:12px;padding:12px 14px}
+.painel .tt{font-size:20px;font-weight:700;margin-bottom:8px}
+.painel .pl{display:flex;justify-content:space-between;font-size:15px;padding:4px 0}
+.painel .pl em{font-style:normal;font-weight:600}
+.painel .pl em.v{color:#34c759}.painel .pl em.a{color:#ff9500}
+#ajustes.dentro .sec{display:none}#ajustes.dentro .sec.on{display:block}
+#ajustes.dentro .indice,#ajustes.dentro .painel{display:none}
+#ajustes.dentro .sec h3{display:none}
+#ajustes:not(.dentro) .sec{display:none}
 #inicio .vazio{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:15px;text-align:center;padding:30px}
 #fototeca{background:var(--bg);touch-action:none}
 html.galNat.transp,html.galNat.transp body,html.galNat #fototeca{background:transparent!important}
@@ -149,11 +180,12 @@ body:not(.claro) .nok{color:#000}
 </head>
 <body>
 
-<div class="tela" id="inicio"><canvas id="cvIni" style="position:absolute;inset:0;width:100%;height:100%"></canvas><div class="vazio" id="inicioVazio">Escolha o print da sua tela de início nos ajustes</div></div>
+<div class="tela" id="inicio"><div id="iniFundo"></div><div id="iniGrade"></div><div id="iniBusca"><svg width="12" height="12" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg> Buscar</div><div id="iniDock"></div><div class="vazio" id="inicioVazio">Escolha o papel de parede e os ícones nos ajustes</div></div>
 
 <div class="tela" id="fototeca">
   <canvas id="cv"></canvas>
   <div id="real"></div>
+  <div class="bordaBaixo"></div>
   <div class="fade-top"></div>
   <div class="cab">
     <div class="titulo" id="titulo"><b id="tituloTxt">Fototeca</b><small id="contagem">0 Itens</small></div>
@@ -225,66 +257,68 @@ body:not(.claro) .nok{color:#000}
 <div class="tela" id="marcar"><div class="aviso"><span id="mMsg"></span><br><button class="bt cinza" id="mPula">Pular</button><button class="bt verm" id="mSai">Sair</button></div></div>
 
 <div class="tela" id="ajustes">
-  <div class="acab"><b>Ajustes</b><button id="aFecha">Fechar</button></div>
+  <div class="acab"><button id="aVolta" style="visibility:hidden">‹ Ajustes</button><b id="aTit">Ajustes</b><button id="aFecha">Fechar</button></div>
+  <div class="painel" id="aPainel"></div>
+  <div class="indice" id="aIndice"></div>
 
-  <div class="sec"><h3>Famoso desta apresentação</h3><div class="caixa">
-    <div class="lin">Atual<span class="r" id="aAtual">—</span></div>
-    <div class="lin"><input type="text" id="aNome" placeholder="Digite um nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt" id="aUsar">Usar</button></div>
-    <div class="lin"><button class="bt cinza" id="aLimpar">Limpar</button><span class="r" id="aEstado"></span></div>
-  </div><div class="nota">Formas de pegar o nome: Notas falso, lupa, Inject, câmera (toque no botão redondo do meio, embaixo) e microfone (lixeira da foto da piada). Para espiar o nome: segure o botão redondo do meio.</div></div>
+  <div class="sec" data-ic="🎩" data-cor="#5856d6"><h3>Apresentação</h3><div class="caixa">
+    <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
+    <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
+  </div><div class="nota">Espiar o nome: segure o botão redondo do meio. Câmera: toque nele. Microfone: lixeira da foto da piada.</div></div>
 
-  <div class="sec"><h3>Receber pelo Inject</h3><div class="caixa">
+  <div class="sec" data-ic="📡" data-cor="#007aff"><h3>Receber pelo Inject</h3><div class="caixa">
     <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aInj"><span></span></label></div>
     <div class="lin">ID do Inject<input type="text" id="aInjId" inputmode="numeric" placeholder="13579"></div>
     <div class="lin">Intermediário<input type="text" id="aWk" placeholder="https://….workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
     <div class="lin">Última<span class="r" id="aInjUlt">—</span></div>
   </div><div class="nota">O mesmo ID e o mesmo intermediário que você usa no app Listas.</div></div>
 
-  <div class="sec"><h3>Mosaico</h3><div class="caixa">
-    <div class="lin">Colunas<select id="aCols"><option>40</option><option>45</option><option>50</option><option>55</option><option>60</option><option>65</option><option>70</option></select></div>
+  <div class="sec" data-ic="▦" data-cor="#ff9500"><h3>Mosaico</h3><div class="caixa">
+    <div class="lin">Colunas<select id="aCols"><option>25</option><option>30</option><option>35</option><option>40</option><option>45</option><option>50</option><option>55</option><option>60</option><option>65</option><option>70</option></select></div>
     <div class="lin">Cor<select id="aCor"><option value="cor">Colorido</option><option value="sepia">Sépia</option><option value="pb">Preto e branco</option></select></div>
     <div class="lin">Reforço do rosto<input type="range" id="aRef" min="0" max="0.7" step="0.05"><span class="r" id="aRefV" style="margin-left:6px;min-width:38px"></span></div>
     <div class="lin">Enquadramento<select id="aEnq"><option value="perto">Rosto de perto</option><option value="cabelo">Rosto e cabelo</option><option value="inteira">Foto inteira</option></select></div>
-    <div class="lin">Só pessoas e paisagens<label class="chave"><input type="checkbox" id="aFiltro"><span></span></label></div>
     <div class="lin">Bolinha quando pronto<label class="chave"><input type="checkbox" id="aAviso"><span></span></label></div>
     <div class="lin">Vibrar quando pronto<label class="chave"><input type="checkbox" id="aVib"><span></span></label></div>
     <div class="lin">Foto real no final<label class="chave"><input type="checkbox" id="aReal"><span></span></label></div>
-  </div><div class="nota">Foto real: com o mosaico na tela, toque duas vezes e ele vai virando a foto de verdade (dois toques de novo para voltar).</div></div>
+  </div><div class="nota">Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
 
-  <div class="sec"><h3>Fotos do começo da Fototeca</h3><div class="caixa" id="aAbert"></div>
-  <div class="nota">Escolha até 63 fotos (3 telas), na ordem em que tocar nelas. Elas ficam guardadas no app, em boa qualidade, e são sempre as primeiras que aparecem quando a Fototeca abre. A foto da piada entra no meio delas.</div></div>
+  <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="caixa"><div id="aSlots"></div>
+    <div class="lin"><button class="bt cinza" id="aSlotsVarias">Preencher vazios</button><button class="bt cinza" id="aSlotsLimpar" style="margin-left:auto">Limpar</button></div>
+    <div class="lin">Colunas ao abrir<select id="aN0"><option value="3">3</option><option value="5">5</option></select></div>
+  </div><div class="nota">A primeira tela da Fototeca. Toque num quadrado para escolher a foto; toque numa foto e depois em outro quadrado para trocar de lugar. Quadrado vazio recebe uma foto automática.</div></div>
 
-  <div class="sec"><h3>Foto da piada</h3><div class="caixa">
+  <div class="sec" data-ic="👶" data-cor="#ff2d55"><h3>Foto da piada</h3><div class="caixa">
     <div class="lin">Usar<select id="aPiada"><option value="bebes">Bebês (escolhe sozinho pelo famoso)</option><option value="fixa">Foto fixa</option></select></div>
   </div>
   <div class="caixa" style="margin-top:10px"><div class="grade4" id="aBebes"></div></div>
   <div class="caixa" style="margin-top:10px" id="aFixas"></div>
-  <div class="nota">A foto da piada fica no meio da tela quando a Fototeca abre. Na lixeira dela, o toque é camuflado: liga o microfone (vibra) e você fala o nome. Bebês: um toque num canto da tela troca o bebê (em cima à esquerda = 1, em cima à direita = 2, embaixo à esquerda = 3, embaixo à direita = 4).</div></div>
+  <div class="nota">Lixeira da foto da piada: liga o microfone. Trocar o bebê: um toque num canto da tela (em cima à esquerda = 1, em cima à direita = 2, embaixo à esquerda = 3, embaixo à direita = 4).</div></div>
 
-  <div class="sec"><h3>Famosos</h3><div class="caixa">
+  <div class="sec" data-ic="★" data-cor="#ffcc00"><h3>Famosos</h3><div class="caixa">
     <div class="lin"><span class="estado" id="aFamEst">—</span><button class="bt" id="aBaixar" style="margin-left:auto">Baixar fotos</button></div>
     <div class="lin">Mostrar<select id="aFamFiltro"><option value="">Todos</option><option value="sembebe">Sem bebê marcado</option><option value="semfoto">Sem foto</option></select></div>
     <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
   </div>
   <div class="caixa" id="listaFam" style="margin-top:10px"></div>
-  <div class="nota">Os botões 1 a 4 marcam qual bebê combina com cada famoso. Toque na miniatura para trocar a foto por uma da sua galeria.</div></div>
+  <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div></div>
 
-  <div class="sec"><h3>Fotos da galeria</h3><div class="caixa">
+  <div class="sec" data-ic="◉" data-cor="#8e8e93"><h3>Fotos da galeria</h3><div class="caixa">
     <div class="lin">Usar<select id="aOrigem"><option value="">Todas as fotos</option></select></div>
     <div class="lin">Preparar para o mosaico<select id="aLimite"><option value="3000">3.000 mais recentes</option><option value="5000">5.000 mais recentes</option><option value="8000">8.000 mais recentes</option><option value="12000">12.000 mais recentes</option></select></div>
     <div class="lin"><span class="estado" id="aAnalise">—</span><button class="bt cinza" id="aReanalisar" style="margin-left:auto">Atualizar</button></div>
     <div class="lin"><span class="estado" id="aTirados">—</span><button class="bt cinza" id="aDevolver" style="margin-left:auto">Devolver todas</button></div>
-  </div><div class="nota">Na primeira vez o app olha cada foto (leva alguns minutos com o app aberto). Fotos que estão só no iCloud ficam de fora do mosaico. "Tiradas do app" são as que você apagou pela lixeira ou por Selecionar: somem só do app, nunca do iPhone.</div></div>
+  </div><div class="nota">Fotos tiradas pela lixeira ou por Selecionar somem só do app, nunca do iPhone.</div></div>
 
-  <div class="sec"><h3>Tela de início</h3><div class="caixa">
-    <div class="lin">Abrir o app em<select id="aAbrir"><option value="fototeca">Fototeca</option><option value="inicio">Tela de início (print)</option></select></div>
-    <div class="lin"><button class="bt cinza" id="aPrint">Escolher print</button><button class="bt cinza" id="aMarcar" style="margin-left:auto">Marcar ícones</button></div>
-  </div><div class="nota">Tire um print da sua tela de início e escolha aqui. Depois marque onde ficam os ícones Fotos, Notas e Ajustes.</div></div>
+  <div class="sec" data-ic="▢" data-cor="#30b0c7"><h3>Tela de início</h3><div class="caixa">
+    <div class="lin">Abrir o app em<select id="aAbrir"><option value="fototeca">Fototeca</option><option value="inicio">Tela de início</option></select></div>
+    <div class="lin">Papel de parede<button class="bt cinza" id="aFundo" style="margin-left:auto">Escolher</button></div>
+    <div class="lin">Ícones<span class="r" id="aIcN"></span><button class="bt cinza" id="aIcones">Escolher</button></div>
+  </div><div class="nota">Escolha os ícones de uma vez, tocando na ordem: Ajustes, Notas, Tempo, Relógio, Amazon, Fotos, Mapas, Mail, Telefone, Calculadora, Contatos, FaceTime, WhatsApp, YouTube, X, Carteira, Casa, Livros, Instagram, Spotify, Notion, Messenger, ChatGPT, Câmera (e mais 4 para a barra de baixo, se quiser). Para voltar da Fototeca ou das Notas à tela de início: deslize de baixo para cima a partir da borda.</div></div>
 
-  <div class="sec"><h3>Aparência</h3><div class="caixa">
+  <div class="sec" data-ic="◐" data-cor="#636366"><h3>Aparência</h3><div class="caixa">
     <div class="lin">Tema<select id="aTema"><option value="auto">Automático (igual ao iPhone)</option><option value="escuro">Escuro</option><option value="claro">Claro</option></select></div>
-    <div class="lin">Colunas ao abrir<select id="aN0"><option value="3">3</option><option value="5">5</option></select></div>
-  </div><div class="nota">Para abrir estes ajustes: segure o dedo no título "Fototeca" (1 segundo) ou dê três toques rápidos nele.</div></div>
+  </div><div class="nota">Abrir estes ajustes: ícone Ajustes da tela de início, ou segure o título "Fototeca" por 1 segundo.</div></div>
   <div style="height:80px"></div>
 </div>
 

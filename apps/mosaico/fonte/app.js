@@ -35,9 +35,19 @@ const cfg = Object.assign({
   piada: 'bebes', bebe: 0, bebes: [false, false, false, false], fixas: [], fixa: 0, tirados: [], abert: [], ver: 1, v: 2
 }, guarda.get('cfg', {}));
 if (!Array.isArray(cfg.abert)) cfg.abert = [];
-const MAX_ABERT = 63;
+if (!Array.isArray(cfg.slots) || cfg.slots.length !== 18) {   // 18 posições da primeira tela (6 linhas x 3), de cima para baixo
+  const ant = cfg.abert.slice(-17); cfg.slots = new Array(18).fill(null);
+  let k = 17; for (let j = ant.length - 1; j >= 0 && k >= 0; j--, k--) { if (k === slotBebe()) k--; if (k >= 0) cfg.slots[k] = ant[j]; }
+}
+if (!Array.isArray(cfg.icones)) cfg.icones = [];
+cfg.filtro = true;
 const tokAbert = a => 'arq:abert/' + a.id + '.jpg';
-const abertDe = it => (typeof it === 'string' && it.startsWith('arq:abert/')) ? cfg.abert.find(a => tokAbert(a) === it) : null;
+const abertDe = it => (typeof it === 'string' && it.startsWith('arq:abert/')) ? cfg.slots.find(a => a && tokAbert(a) === it) : null;
+function slotBebe() {   // em qual dos 18 quadrados entra a foto da piada
+  const t = (innerWidth || 390) / 3, pb = (typeof sbPx === 'function' ? sbPx() : 34) + 70;
+  const k = Math.max(0, Math.round(((innerHeight || 844) / 2 - pb) / t - 0.5));
+  return k <= 5 ? (5 - k) * 3 + 1 : -1;
+}
 function srcMini(it) { return it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : String(it).startsWith('arq:') ? URLS.arq(it.slice(4), cfg.ver) : URLS.mini(it); }
 if ((cfg.v || 1) < 2) {   // vindo da versão 1.0
   Object.assign(cfg, { colsM: 60, cor: 'cor', reforco: 0.4, limite: 8000, tema: 'auto', enq: 'perto', filtro: true, aviso: true,
@@ -152,9 +162,18 @@ function indiceBebe(total) {
   return Math.min(total - 1, linha * n + Math.floor(n / 2));
 }
 function montarSeq() {
-  const s = tirados.size ? base.filter(id => !tirados.has(id)) : base.slice();
-  for (const a of cfg.abert) s.push(tokAbert(a));   // fotos do começo: sempre as mesmas, guardadas no app
-  if (arqPiada()) s.splice(indiceBebe(s.length + 1), 0, '#piada');
+  let s = base.filter(id => !tirados.has(id) && !(cores.get(id) && cores.get(id).ok === false));   // só fotos boas (sem prints, documentos…)
+  if ((+cfg.n0 || 3) === 3) {
+    // primeira tela: 18 posições fixas; vazias recebem as fotos mais recentes; a piada no lugar marcado
+    const sb = slotBebe(), cauda = new Array(18);
+    for (let k = 17; k >= 0; k--) {
+      const a = cfg.slots[k];
+      if (k === sb && arqPiada()) cauda[k] = '#piada';
+      else if (a) cauda[k] = tokAbert(a);
+      else cauda[k] = s.length ? s.pop() : '';
+    }
+    s = s.slice(s.length % 3).concat(cauda);
+  } else if (arqPiada()) s.splice(indiceBebe(s.length + 1), 0, '#piada');
   seqNormal = s;
   seq = (mos && mos.seq) ? mos.seq : seqNormal;
   $('#contagem').textContent = s.length + ' Itens';
@@ -172,6 +191,7 @@ if (atual) atual.pronto = false;
 function estado(t, cls) { const e = $('#aEstado'); if (e) { e.textContent = t; e.className = 'r ' + (cls || ''); } }
 function mostrarAtual() {
   const e = $('#aAtual'); if (e) e.textContent = atual ? atual.nome + (atual.tipo === 'texto' ? ' (nome escrito)' : '') : '—';
+  if (typeof desenharInicio === 'function' && $('#iniGrade')) desenharInicio();
   $('#ponto').classList.toggle('on', !!(cfg.aviso && atual && atual.pronto && mos));
 }
 
@@ -374,7 +394,7 @@ prepararMosaico.vez = 0;
 
 function limparNome() {
   preparo++; prepararMosaico.vez++;
-  atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on');
+  atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on'); $('#real').style.opacity = 0;
   if (zoom > 5) irAoNivel(5);
   mostrarAtual(); estado(''); pedirDesenho(); enviarGaleria();
 }
@@ -724,13 +744,13 @@ function tocouNativo(i, noMosaico) {
   if (i < 0 || i >= seq.length || !seq[i]) return;
   setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, noMosaico && cfg.fotoReal ? 330 : 0);
 }
-function alternarReal() { if (!cfg.fotoReal || !atual || atual.tipo !== 'rosto' || !mos) return; $('#real').classList.toggle('on'); }
+function alternarReal() { if (!cfg.fotoReal || !podeReal()) return; realTrava = !realTrava; if (realTrava) { selSegura = false; ultVol = 0; realP = Math.max(realP, 0.001); } animarReal(); if (realTrava) { const sobe = () => { if (realTrava && realP < 1) { realP = Math.min(1, realP + 0.02); $('#real').style.opacity = realP; requestAnimationFrame(sobe); } }; sobe(); } }
 
 /* ---------- galeria nativa (Fototeca feita pelo próprio iPhone) ---------- */
 let nativo = false, envioPedido = false, zerarGal = true;
 function zonasGal() {
   const z = [];
-  for (const s of ['#titulo', '#bOrdem', '#bSel', '#aba', '#meio', '#lupa', '#barraSel .redondo', '#barraSel .aba', '.canto']) {
+  for (const s of ['#titulo', '#bOrdem', '#bSel', '#aba', '#meio', '#lupa', '#barraSel .redondo', '#barraSel .aba', '.canto', '#fototeca .bordaBaixo']) {
     $$(s).forEach(el => { const r = el.getBoundingClientRect(); if (r.width && r.height) z.push([r.left, r.top, r.width, r.height]); });
   }
   return z;
@@ -818,7 +838,7 @@ $('#bCanc').addEventListener('click', () => {
    SELECIONAR e tirar fotos do app (nunca do iPhone)
    ===================================================================== */
 let emSelecao = false; const selecionados = new Set();
-$('#bSel').addEventListener('click', () => { if (emSelecao) sairSelecao(); else entrarSelecao(); });
+$('#bSel').addEventListener('click', () => { if (!emSelecao && podeReal()) return; if (emSelecao) sairSelecao(); else entrarSelecao(); });
 function entrarSelecao() {
   if (zoom > 5) irAoNivel(5);
   emSelecao = true; selecionados.clear(); $('#fototeca').classList.add('selecao');
@@ -838,9 +858,9 @@ function tirarDoApp(ids) {
   const ab = ids.filter(id => abertDe(id));
   if (ab.length) {
     for (const id of ab) { nat.call('apagar', { nome: id.slice(4) }).catch(() => {}); }
-    cfg.abert = cfg.abert.filter(a => !ab.includes(tokAbert(a))); salvar();
+    cfg.slots = cfg.slots.map(a => a && ab.includes(tokAbert(a)) ? null : a); salvar();
     if (mos) mos.seq = mos.seq.filter(id => !ab.includes(id));
-    montarSeq(); if (atual) prepararMosaico(); desenharAbert();
+    montarSeq(); if (atual) prepararMosaico(); desenharSlots();
   }
   ids = ids.filter(id => id && id !== '#piada' && !String(id).startsWith('arq:'));
   if (!ids.length) return;
@@ -1082,9 +1102,32 @@ async function ligarVoz() {
 }
 const PALAVRAS_SOBRA = new Set(('o a os as e é de da do dos das um uma esse essa este esta isso aqui ai aí olha olhe então entao era foi ' +
   'ele ela the bebe bebê desenhado desenhada desenho quando pequeno pequena com meses mes foto ne né tá ta que quem').split(' ').map(semAcento));
+/* foto real: segurar o volume (ou Selecionar) com o rosto inteiro na tela */
+let naFace = false, revelado = false, ultVol = 0, selSegura = false, realP = 0, realTrava = false, realT = 0, realLoop = 0;
+function podeReal() { return !!(naFace && atual && atual.tipo === 'rosto' && comMosaico()); }
+function passoReal(t) {
+  const dt = realT ? Math.min(0.1, (t - realT) / 1000) : 0; realT = t;
+  const segura = podeReal() && (selSegura || performance.now() - ultVol < 420);
+  if (segura) { realP = Math.min(1, realP + dt / 2.4); if (realP >= 1 && cfg.fotoReal) realTrava = true; }
+  else if (!realTrava) realP = Math.max(0, realP - dt / 0.8);
+  if (!podeReal() && !realTrava) realP = 0;
+  const r = $('#real'); r.style.transition = 'none'; r.style.opacity = realP;
+  if (realP > 0 || segura) realLoop = requestAnimationFrame(passoReal); else { realLoop = 0; realT = 0; }
+}
+function animarReal() { if (!realLoop) { realT = 0; realLoop = requestAnimationFrame(passoReal); } }
+function saiuDasFotos() {   // depois de mostrar o rosto inteiro, ao sair das Fotos começa tudo do zero
+  realTrava = false; realP = 0; $('#real').style.opacity = 0;
+  if (revelado) { revelado = false; limparNome(); }
+}
+$('#bSel').addEventListener('touchstart', () => { if (podeReal()) { selSegura = true; animarReal(); } }, { passive: true });
+$('#bSel').addEventListener('touchend', () => { selSegura = false; }, { passive: true });
+$('#bSel').addEventListener('touchcancel', () => { selSegura = false; }, { passive: true });
 window.__mzEvento = ev => {
   if (!ev || !ev.tipo) return;
   if (ev.tipo === 'gTap') { tocouNativo(ev.i, !!ev.noMosaico); return; }
+  if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) revelado = true; if (!naFace) animarReal(); return; }
+  if (ev.tipo === 'gZoom') { realTrava = false; selSegura = false; animarReal(); return; }
+  if (ev.tipo === 'volume') { if (telaAtual === 'fototeca' && podeReal()) { ultVol = performance.now(); animarReal(); } return; }
   if (ev.tipo === 'texto' && camLigada) {
     const linhas = (ev.linhas || []).filter(l => l && l.t);
     let f = acharFamosoEm(linhas.map(l => l.t).join(' '));
@@ -1127,7 +1170,7 @@ function enviarNota() {   // ✓ amarelo: esconde o teclado e manda o nome
 }
 function fecharNotas() {
   enviarNota();
-  mostrar(telaAnterior || (cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca'));
+  mostrar(telaAnterior || (cfg.abrir === 'inicio' && temInicio() ? 'inicio' : 'fototeca'));
 }
 $('#nVolta').addEventListener('click', fecharNotas);
 $('#nOk').addEventListener('click', enviarNota);
@@ -1152,53 +1195,68 @@ function pontos(n, foto) {
 /* =====================================================================
    TELA DE INÍCIO (print) e marcação dos ícones
    ===================================================================== */
-function aplicarPrint() {
-  const c = $('#cvIni');
-  $('#inicioVazio').style.display = cfg.temPrint ? 'none' : 'flex';
-  $('#marcar').style.backgroundImage = cfg.temPrint ? 'url("' + URLS.arq('inicio/print.jpg', cfg.ver) + '")' : '';
-  if (!cfg.temPrint) { c.width = 1; c.height = 1; return; }
-  const im = new Image();
-  im.onload = () => {
-    c.width = Math.round(W * DPR); c.height = Math.round(H * DPR);
-    const g = c.getContext('2d'), k = Math.max(c.width / im.naturalWidth, c.height / im.naturalHeight);
-    const w = im.naturalWidth * k, h = im.naturalHeight * k, x = (c.width - w) / 2, y = (c.height - h) / 2;
-    g.drawImage(im, x, y, w, h);
-    const faixa = Math.round((stPx() + 2) * DPR), srcY = (faixa + 3 * DPR - y) / k;
-    g.drawImage(im, 0, srcY, im.naturalWidth, 1, x, 0, w, faixa);   // apaga a hora/bateria do print
-  };
-  im.src = URLS.arq('inicio/print.jpg', cfg.ver);
+const NOMES_IC = ['Ajustes', 'Notas', 'Tempo', 'Relógio', 'Amazon', 'Fotos', 'Mapas', 'Mail', 'Telefone', 'Calculadora', 'Contatos', 'FaceTime',
+  'WhatsApp', 'YouTube', 'X', 'Carteira', 'Casa', 'Livros', 'Instagram', 'Spotify', 'Notion', 'Messenger', 'ChatGPT', 'Câmera'];
+const IC_AJUSTES = 0, IC_NOTAS = 1, IC_FOTOS = 5, IC_INSTA = 18;
+function temInicio() { return !!(cfg.temFundo || cfg.icones.length); }
+function geoIcone(k) {   // grade de 4 colunas igual à do iPhone
+  const lado = Math.round(W * 0.155), m = W * 0.068, gx = (W - 2 * m - 4 * lado) / 3, passo = Math.round(W * 0.262);
+  if (k >= 24) { const d = k - 24; return { x: m + d * (lado + gx), y: H - Math.max(sbPx(), 20) - lado - 16, lado, doca: true }; }
+  return { x: m + (k % 4) * (lado + gx), y: stPx() + 14 + Math.floor(k / 4) * passo, lado };
 }
+function desenharInicio() {
+  $('#inicioVazio').style.display = temInicio() ? 'none' : 'flex';
+  $('#iniFundo').style.backgroundImage = cfg.temFundo ? 'url("' + URLS.arq('inicio/fundo.jpg', cfg.ver) + '")' : '';
+  let h = '';
+  cfg.icones.forEach((a, k) => {
+    if (k >= 28) return;
+    const g = geoIcone(k), nome = k === IC_INSTA && atual ? atual.nome : (NOMES_IC[k] || '');
+    h += '<div class="ic" data-k="' + k + '" style="left:' + g.x + 'px;top:' + g.y + 'px;width:' + g.lado + 'px;height:' + g.lado + 'px">'
+      + '<img src="' + URLS.arq('icones/' + a.id + '.jpg', cfg.ver) + '">'
+      + (g.doca ? '' : '<div class="nm" style="top:' + (g.lado + 5) + 'px">' + esc(nome) + '</div>')
+      + (k === IC_INSTA && atual ? '<div class="bd">1</div>' : '') + '</div>';
+  });
+  $('#iniGrade').innerHTML = h;
+  const doca = cfg.icones.length > 24, g = geoIcone(24), d = $('#iniDock'), b = $('#iniBusca');
+  d.style.display = doca ? 'block' : 'none';
+  if (doca) { d.style.top = (g.y - 15) + 'px'; d.style.height = (g.lado + 30) + 'px'; }
+  b.style.display = cfg.icones.length ? 'flex' : 'none';
+  b.style.top = ((doca ? g.y - 15 : H - Math.max(sbPx(), 20) - 20) - 42) + 'px';
+}
+function centroIcone(k) { const g = geoIcone(k); return { x: (g.x + g.lado / 2) / W, y: (g.y + g.lado / 2) / H }; }
 $('#inicio').addEventListener('click', e => {
-  const z = cfg.zonas || {}, x = e.clientX / W, y = e.clientY / H;
-  const perto = p => p && Math.abs(p.x - x) * W < 38 && Math.abs(p.y - y) * H < 40;
-  if (perto(z.fotos)) abrirDoIcone('fototeca', z.fotos);
-  else if (perto(z.notas)) abrirDoIcone('notas', z.notas);
-  else if (perto(z.ajustes)) abrirAjustes();
-  else if (!cfg.temPrint) abrirAjustes();
+  const ic = e.target.closest('.ic');
+  if (!temInicio()) { abrirAjustes(); return; }
+  if (!ic) return;
+  const k = +ic.dataset.k;
+  ic.classList.add('toque'); setTimeout(() => ic.classList.remove('toque'), 160);
+  if (k === IC_AJUSTES) abrirAjustes();
+  else if (k === IC_NOTAS) abrirDoIcone('notas', centroIcone(k));
+  else if (k === IC_FOTOS) abrirDoIcone('fototeca', centroIcone(k));
 });
 function abrirDoIcone(qual, p) {
   const el = qual === 'notas' ? $('#notas') : $('#fototeca');
   el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
   el.style.transition = 'none'; el.style.transform = 'scale(.12)'; el.style.opacity = '0.3';
-  if (qual === 'notas') abrirNotas(); else mostrar('fototeca', true);
+  if (qual === 'notas') abrirNotas(); else { $('#busca').classList.remove('on'); mostrar('fototeca', true); }
   requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'transform .34s cubic-bezier(.2,.9,.25,1), opacity .2s'; el.style.transform = 'none'; el.style.opacity = '1'; }));
 }
-let passoMarca = 0;
-const PASSOS = [['fotos', 'Toque no meio do ícone Fotos'], ['notas', 'Toque no meio do ícone Notas'], ['ajustes', 'Toque no meio do ícone Ajustes (abre estes ajustes escondidos)']];
-function iniciarMarcar() {
-  if (!cfg.temPrint) { toast('Escolha o print primeiro'); return; }
-  passoMarca = 0; cfg.zonas = cfg.zonas || {}; $$('#marcar .alvo').forEach(p => p.remove());
-  mostrar('marcar', true); $('#mMsg').textContent = PASSOS[0][1];
+/* deslizar de baixo para cima (a partir da borda): volta à tela de início falsa */
+function voltarInicio() {
+  if (!temInicio()) return;
+  const qual = telaAtual, el = $('#' + qual), p = centroIcone(qual === 'notas' ? IC_NOTAS : IC_FOTOS);
+  if (qual === 'notas') { $('#ntexto').blur(); enviarNota(); }
+  el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
+  el.style.transition = 'transform .3s cubic-bezier(.3,.6,.3,1), opacity .3s'; el.style.transform = 'scale(.12)'; el.style.opacity = '0';
+  if (nativo && qual === 'fototeca') nat.call('galeria', { on: false }).catch(() => {});
+  setTimeout(() => { mostrar('inicio'); el.style.transition = 'none'; el.style.transform = 'none'; el.style.opacity = '1'; saiuDasFotos(); }, 300);
 }
-function proximaMarca() { passoMarca++; if (passoMarca >= PASSOS.length) { salvar(); mostrar('ajustes', true); toast('Ícones marcados'); return; } $('#mMsg').textContent = PASSOS[passoMarca][1]; }
-$('#marcar').addEventListener('click', e => {
-  if (e.target.closest('.aviso')) return;
-  cfg.zonas[PASSOS[passoMarca][0]] = { x: e.clientX / W, y: e.clientY / H };
-  const p = document.createElement('div'); p.className = 'alvo'; p.style.left = e.clientX + 'px'; p.style.top = e.clientY + 'px'; $('#marcar').appendChild(p);
-  vibrar('leve'); proximaMarca();
-});
-$('#mPula').addEventListener('click', proximaMarca);
-$('#mSai').addEventListener('click', () => { salvar(); mostrar('ajustes', true); });
+for (const sel of ['#fototeca .bordaBaixo', '#notas']) {
+  let y0 = -1;
+  const el = $(sel);
+  el.addEventListener('touchstart', e => { const t = e.touches[0]; y0 = t.clientY > H - 30 ? t.clientY : -1; }, { passive: true });
+  el.addEventListener('touchend', e => { const t = e.changedTouches[0]; if (y0 > 0 && y0 - t.clientY > 60) voltarInicio(); y0 = -1; }, { passive: true });
+}
 
 /* =====================================================================
    TELAS
@@ -1215,10 +1273,32 @@ function mostrar(id, guardaAnterior) {
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
   if (id === 'fototeca') pedirDesenho();
 }
-function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); encherAjustes(); }
+function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); menuInicio(); encherAjustes(); }
+/* menu no estilo dos Ajustes do iPhone: painel + lista de seções que abrem numa página */
+function menuInicio() {
+  const aj = $('#ajustes'); aj.classList.remove('dentro'); $$('#ajustes .sec').forEach(x => x.classList.remove('on'));
+  $('#aTit').textContent = 'Ajustes'; $('#aVolta').style.visibility = 'hidden'; aj.scrollTop = 0;
+  const pronto = !!(atual && atual.pronto && mos), sl = cfg.slots.filter(Boolean).length;
+  const l = (t, v, c) => '<div class="pl"><span>' + t + '</span><em class="' + (c || '') + '">' + v + '</em></div>';
+  $('#aPainel').innerHTML = '<div class="tt">' + (pronto ? 'Pronto para apresentar' : 'Mosaico') + '</div>'
+    + l('Famoso', atual ? esc(atual.nome) : '—')
+    + l('Mosaico', pronto ? 'Pronto ✓' : atual ? 'Montando…' : '—', pronto ? 'v' : atual ? 'a' : '')
+    + l('Fotos da galeria', base.length ? base.length.toLocaleString('pt-BR') + ' ✓' : 'Sem acesso', base.length ? 'v' : 'a')
+    + l('Primeira tela', sl + ' de 17 fotos', sl ? 'v' : 'a')
+    + l('Tela de início', temInicio() ? 'Pronta ✓' : 'Falta configurar', temInicio() ? 'v' : 'a')
+    + l('Internet', navigator.onLine ? 'Ligada ✓' : 'Sem internet', navigator.onLine ? 'v' : 'a');
+  $('#aIndice').innerHTML = $$('#ajustes .sec').map((x, i) => '<div class="it" data-i="' + i + '"><b style="background:' + (x.dataset.cor || '#8e8e93') + '">' + (x.dataset.ic || '•') + '</b><span>' + x.querySelector('h3').textContent + '</span></div>').join('');
+}
+$('#aIndice').addEventListener('click', e => {
+  const it = e.target.closest('.it'); if (!it) return;
+  const x = $$('#ajustes .sec')[+it.dataset.i];
+  $('#ajustes').classList.add('dentro'); x.classList.add('on');
+  $('#aTit').textContent = x.querySelector('h3').textContent; $('#aVolta').style.visibility = 'visible'; $('#ajustes').scrollTop = 0;
+});
+$('#aVolta').addEventListener('click', menuInicio);
 $('#aFecha').addEventListener('click', () => {
   salvar();
-  const volta = telaAnterior && telaAnterior !== 'ajustes' && telaAnterior !== 'marcar' ? telaAnterior : (cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');
+  const volta = telaAnterior && telaAnterior !== 'ajustes' && telaAnterior !== 'marcar' ? telaAnterior : (cfg.abrir === 'inicio' && temInicio() ? 'inicio' : 'fototeca');
   mostrar(volta);
 });
 function aplicarTema() {
@@ -1238,7 +1318,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-  $('#aEnq').value = cfg.enq; $('#aFiltro').checked = !!cfg.filtro; $('#aAviso').checked = !!cfg.aviso;
+  $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots(); $('#aIcN').textContent = cfg.icones.length ? cfg.icones.length + ' ' : '';
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); $('#aPiada').value = cfg.piada;
   if (!analisando) mostrarAnalise(1, 1);
@@ -1283,27 +1363,34 @@ $('#aFixas').addEventListener('click', async e => {
   else if (a === 'tirar' && confirm('Tirar a foto "' + cfg.fixas[i].nome + '"?')) { nat.call('apagar', { nome: 'piada/' + cfg.fixas[i].id + '.jpg' }).catch(() => {}); cfg.fixas.splice(i, 1); if (cfg.fixa >= cfg.fixas.length) cfg.fixa = 0; }
   salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
 });
-function desenharAbert() {
-  const e = $('#aAbert'); if (!e) return;
-  e.innerHTML = '<div class="lin"><span style="flex:1">' + cfg.abert.length + ' de ' + MAX_ABERT + ' fotos</span>'
-    + (cfg.abert.length < MAX_ABERT ? '<button class="bt" data-a="add">Escolher</button>' : '')
-    + (cfg.abert.length ? ' <button class="bt" data-a="limpar">Limpar</button>' : '') + '</div>'
-    + (cfg.abert.length ? '<div class="miniGrade">' + cfg.abert.map(a => '<img src="' + URLS.arq('abert/' + a.id + '.jpg', cfg.ver) + '">').join('') + '</div>' : '');
+/* primeira tela da Fototeca: 18 posições */
+let slotEsc = -1;
+function desenharSlots() {
+  const e = $('#aSlots'); if (!e) return;
+  const sb = slotBebe();
+  e.innerHTML = cfg.slots.map((a, k) => k === sb ? '<div class="sl bebe" data-k="' + k + '">Piada</div>'
+    : '<div class="sl' + (k === slotEsc ? ' esc' : '') + '" data-k="' + k + '"><i>' + (Math.floor(k / 3) + 1) + '</i>' + (a ? '<img src="' + URLS.arq('abert/' + a.id + '.jpg', cfg.ver) + '">' : '+') + '</div>').join('');
 }
-$('#aAbert').addEventListener('click', async e => {
-  const a = e.target.dataset.a; if (!a) return;
-  if (a === 'add') {
-    try {
-      const r = await nat.call('escolherVarias', { pasta: 'abert', max: MAX_ABERT - cfg.abert.length });
-      if (Array.isArray(r) && r.length) { cfg.abert = cfg.abert.concat(r).slice(0, MAX_ABERT); cfg.ver++; salvar(); montarSeq(); if (atual) prepararMosaico(); }
-    } catch (_) {}
-  } else if (a === 'limpar' && confirm('Tirar as ' + cfg.abert.length + ' fotos do começo?')) {
-    for (const x of cfg.abert) nat.call('apagar', { nome: 'abert/' + x.id + '.jpg' }).catch(() => {});
-    cfg.abert = []; salvar(); montarSeq(); if (atual) prepararMosaico();
+function slotsMudaram() { cfg.ver++; salvar(); desenharSlots(); montarSeq(); if (atual) prepararMosaico(); }
+async function escolherParaSlots(lista) {
+  try {
+    const r = await nat.call('escolherVarias', { pasta: 'abert', max: lista.length });
+    if (Array.isArray(r) && r.length) { r.forEach((a, n) => { if (n < lista.length) cfg.slots[lista[n]] = a; }); slotsMudaram(); }
+  } catch (_) {}
+}
+$('#aSlots').addEventListener('click', e => {
+  const c = e.target.closest('[data-k]'); if (!c) return; const k = +c.dataset.k;
+  if (k === slotBebe()) return;
+  if (slotEsc >= 0) {
+    if (slotEsc === k) { if (cfg.slots[k] && confirm('Tirar esta foto?')) { nat.call('apagar', { nome: 'abert/' + cfg.slots[k].id + '.jpg' }).catch(() => {}); cfg.slots[k] = null; } slotEsc = -1; slotsMudaram(); return; }
+    const t = cfg.slots[k]; cfg.slots[k] = cfg.slots[slotEsc]; cfg.slots[slotEsc] = t; slotEsc = -1; slotsMudaram(); return;
   }
-  desenharAbert();
+  if (cfg.slots[k]) { slotEsc = k; desenharSlots(); return; }
+  escolherParaSlots([k]);
 });
-desenharAbert();
+$('#aSlotsVarias').addEventListener('click', () => { const sb = slotBebe(), v = []; cfg.slots.forEach((a, k) => { if (!a && k !== sb) v.push(k); }); if (v.length) escolherParaSlots(v); else toast('Todos os quadrados já têm foto'); });
+$('#aSlotsLimpar').addEventListener('click', () => { if (!confirm('Tirar as fotos da primeira tela?')) return; for (const a of cfg.slots) if (a) nat.call('apagar', { nome: 'abert/' + a.id + '.jpg' }).catch(() => {}); cfg.slots = new Array(18).fill(null); slotEsc = -1; slotsMudaram(); });
+desenharSlots();
 function desenharListaFam() {
   atualizarContaFam();
   if (telaAtual !== 'ajustes') return;
@@ -1351,7 +1438,6 @@ $('#aBaixar').addEventListener('click', async () => {
   baixandoTodos = false; $('#aBaixar').textContent = 'Baixar fotos'; desenharListaFam();
   toast('Fotos dos famosos atualizadas');
 });
-$('#aUsar').addEventListener('click', () => { const v = $('#aNome').value.trim(); if (v) { definirNome(v, 'ajustes'); $('#aNome').value = ''; $('#aNome').blur(); } });
 $('#aLimpar').addEventListener('click', limparNome);
 $('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
 $('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
@@ -1363,7 +1449,6 @@ const refazer = () => { salvar(); if (atual) prepararMosaico(); };
 $('#aCols').addEventListener('change', e => { cfg.colsM = +e.target.value; refazer(); });
 $('#aCor').addEventListener('change', e => { cfg.cor = e.target.value; refazer(); });
 $('#aEnq').addEventListener('change', e => { cfg.enq = e.target.value; refazer(); });
-$('#aFiltro').addEventListener('change', e => { cfg.filtro = e.target.checked; refazer(); });
 $('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%'; });
 $('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
@@ -1372,10 +1457,15 @@ $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salv
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });
 $('#aTema').addEventListener('change', e => { cfg.tema = e.target.value; salvar(); aplicarTema(); });
 $('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; zoom = cfg.n0; doFim = 0; enviarGaleria(true); salvar(); montarSeq(); if (atual) prepararMosaico(); });
-$('#aPrint').addEventListener('click', async () => {
-  try { const r = await nat.call('escolher', { nome: 'inicio/print.jpg', rosto: false }); if (r && r.ok) { cfg.temPrint = true; cfg.ver++; salvar(); aplicarPrint(); iniciarMarcar(); } } catch (_) {}
+$('#aFundo').addEventListener('click', async () => {
+  try { const r = await nat.call('escolher', { nome: 'inicio/fundo.jpg', rosto: false }); if (r && r.ok) { cfg.temFundo = true; cfg.ver++; salvar(); desenharInicio(); } } catch (_) {}
 });
-$('#aMarcar').addEventListener('click', iniciarMarcar);
+$('#aIcones').addEventListener('click', async () => {
+  try {
+    const r = await nat.call('escolherVarias', { pasta: 'icones', max: 28 });
+    if (Array.isArray(r) && r.length) { for (const a of cfg.icones) nat.call('apagar', { nome: 'icones/' + a.id + '.jpg' }).catch(() => {}); cfg.icones = r; cfg.ver++; salvar(); desenharInicio(); $('#aIcN').textContent = r.length + ' '; }
+  } catch (_) {}
+});
 
 /* =====================================================================
    INJECT (o mesmo intermediário do app Listas)
@@ -1410,7 +1500,7 @@ function iniciarInject() {
   };
   passo();
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { iniciarInject(); if (nat.tem) carregarFotos(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saiuDasFotos(); return; } iniciarInject(); if (nat.tem) carregarFotos(); });
 
 /* =====================================================================
    INÍCIO
@@ -1422,9 +1512,9 @@ async function testarNativo() {
 }
 function iniciar() {
   testarNativo();
-  ajustarTamanho(); aplicarTema(); aplicarPrint();
+  ajustarTamanho(); aplicarTema(); desenharInicio();
   zoom = +cfg.n0 || 3;
-  mostrar(cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');
+  mostrar(cfg.abrir === 'inicio' && temInicio() ? 'inicio' : 'fototeca');
   mostrarAtual();
   carregarFotos().then(async () => { if (atual) { await prepararMosaico(); if (atual) pontos(3, atual.tipo === 'rosto'); } });
   iniciarInject();

@@ -215,6 +215,9 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     override var preferredStatusBarStyle: UIStatusBarStyle { barraEscura ? .darkContent : .lightContent }
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
     override var prefersHomeIndicatorAutoHidden: Bool { esconderIndicador }
+    /// o primeiro gesto de baixo para cima fica com o app (usado para voltar à tela de início falsa)
+    private let adiarBaixo = (Bundle.main.object(forInfoDictionaryKey: "AdiarGestoBaixo") as? Bool) ?? false
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { adiarBaixo ? .bottom : [] }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { deitado ? .landscape : .portrait }
 }
 
