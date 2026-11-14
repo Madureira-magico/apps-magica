@@ -9,6 +9,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
 
     // MARK: peças
     let vista = UIView()
+    private let capa = CapaToques()                      // por cima da página: recebe os gestos direto
     private let rolador = UIScrollView()
     private let camadas = [CALayer(), CALayer()]          // dois níveis da grade (para dissolver)
     private let magBox = UIView()                         // rosto ampliado
@@ -95,17 +96,27 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         rolador.isScrollEnabled = false
         vista.addSubview(rolador)
         webView.insertSubview(vista, at: 0)
-        // os gestos ficam na página (que está por cima); a página só perde os toques fora dos botões dela
-        webView.addGestureRecognizer(rolador.panGestureRecognizer)
+        // camada invisível por cima da página: pega os gestos direto (sem a página atrasar);
+        // nos botões da página (título, barra de baixo, cantos...) ela deixa o toque passar
+        capa.frame = webView.bounds
+        capa.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        capa.backgroundColor = .clear
+        capa.isHidden = true
+        capa.deixar = { [weak self] p in
+            guard let s = self, s.ligada, s.ativa else { return false }
+            return !s.zonas.contains { $0.contains(p) }
+        }
+        webView.addSubview(capa)
+        capa.addGestureRecognizer(rolador.panGestureRecognizer)
         pinca = UIPinchGestureRecognizer(target: self, action: #selector(pincou(_:)))
         pinca.delegate = self
         pinca.isEnabled = false
-        webView.addGestureRecognizer(pinca)
+        capa.addGestureRecognizer(pinca)
         toque = UITapGestureRecognizer(target: self, action: #selector(tocou(_:)))
         toque.delegate = self
         toque.isEnabled = false
         toque.cancelsTouchesInView = false
-        webView.addGestureRecognizer(toque)
+        capa.addGestureRecognizer(toque)
         let l = CADisplayLink(target: self, selector: #selector(quadro))
         l.add(to: .main, forMode: .common)
         l.isPaused = true
@@ -149,6 +160,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             w.scrollView.backgroundColor = .clear
         }
         vista.isHidden = !on
+        capa.isHidden = !on
+        if let w = web { w.bringSubviewToFront(capa) }
         pinca.isEnabled = on && ativa
         toque.isEnabled = on && ativa
         rolador.isScrollEnabled = on && ativa
@@ -607,6 +620,15 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         return UIGraphicsImageRenderer(size: CGSize(width: lado, height: lado), format: f).image { _ in
             im.draw(in: CGRect(x: (lado - w) / 2, y: (lado - h) / 2, width: w, height: h))
         }.cgImage
+    }
+}
+
+/// Camada transparente que só fica com os toques fora dos botões da página.
+final class CapaToques: UIView {
+    var deixar: (CGPoint) -> Bool = { _ in false }
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard !isHidden, deixar(point) else { return nil }
+        return self
     }
 }
 
