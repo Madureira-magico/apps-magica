@@ -77,11 +77,20 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #ver.limpo .vcab,#ver.limpo .vrod{opacity:0;pointer-events:none}
 #ver.limpo{background:#000}
 #notas{background:var(--bg);z-index:6}
-.ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 12px}
-.ncab .vid{color:#e5b100}
-#ntexto{position:absolute;left:0;right:0;top:calc(var(--st) + 76px);bottom:0;padding:6px 20px;background:none;border:0;outline:0;resize:none;
-  color:var(--fg);font:400 17px/1.35 -apple-system,system-ui,sans-serif;caret-color:#e5b100;-webkit-user-select:text;user-select:text}
-.ndata{position:absolute;left:0;right:0;top:calc(var(--st) + 56px);text-align:center;color:var(--fg2);font-size:13px}
+.ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 16px;z-index:2}
+.ndir{display:flex;align-items:center;gap:10px}
+.npil{height:46px;border-radius:23px;display:flex;align-items:center;gap:16px;padding:0 16px 0 18px;color:var(--fg)}
+.pts{display:flex;gap:5px}
+.pts i{width:6px;height:6px;border-radius:50%;background:#a1a1a6;transition:background .3s}
+.pts i.on{background:#ffcc00}
+.nok{width:52px;height:52px;border-radius:50%;background:#ffcc00;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+body:not(.claro) .nok{color:#000}
+.ndata{position:absolute;left:0;right:0;top:calc(var(--st) + 66px);text-align:center;color:var(--fg2);font-size:13px}
+#ntexto{position:absolute;left:0;right:0;top:calc(var(--st) + 92px);bottom:0;padding:4px 22px 140px;outline:0;overflow-y:auto;
+  color:var(--fg);font:400 17px/1.35 -apple-system,system-ui,sans-serif;caret-color:#ffcc00;-webkit-user-select:text;user-select:text;white-space:pre-wrap;word-break:break-word}
+#ntexto::first-line{font-size:28px;font-weight:700;line-height:1.25}
+#nferr{position:fixed;left:12px;right:12px;height:50px;border-radius:25px;display:none;align-items:center;justify-content:space-around;color:var(--fg);z-index:7}
+#nferr.on{display:flex}
 #marcar{z-index:40;background:#000 center/cover no-repeat}
 #marcar .aviso{position:absolute;left:12px;right:12px;top:calc(var(--st) + 10px);background:rgba(0,0,0,.78);color:#fff;border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.35}
 #marcar .aviso button{margin-top:8px;margin-right:6px}
@@ -178,10 +187,25 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 </div>
 
 <div class="tela" id="notas">
-  <div class="ncab"><div class="pilula vid" id="nVolta" style="padding:0 14px 0 10px;gap:4px"><svg width="12" height="20" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg>Notas</div>
-  <div class="pilula vid" id="nOk" style="font-weight:600">OK</div></div>
+  <div class="ncab">
+    <div class="circ vid" id="nVolta"><svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg></div>
+    <div class="ndir">
+      <div class="circ vid"><svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3L3 7l4 4"/><path d="M3 7h10a6 6 0 0 1 0 12H8"/></svg></div>
+      <div class="npil vid"><svg width="20" height="24" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg><span class="pts" id="pts"><i></i><i></i><i></i></span></div>
+      <div class="nok" id="nOk"><svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5l6 6L20 2.5"/></svg></div>
+    </div>
+  </div>
   <div class="ndata" id="nData"></div>
-  <textarea id="ntexto" autocapitalize="sentences" autocorrect="off" spellcheck="false"></textarea>
+  <div id="ntexto" contenteditable="true" autocapitalize="sentences" autocorrect="off" spellcheck="false"></div>
+  <div id="nferr" class="vid">
+    <span style="font-size:19px">Aa</span>
+    <svg width="24" height="22" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="4" cy="5" r="2.6"/><circle cx="4" cy="16" r="2.6"/><path d="M10 5h12M10 16h12"/></svg>
+    <svg width="24" height="20" viewBox="0 0 24 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1.5" y="1.5" width="21" height="17" rx="2.5"/><path d="M1.5 7.5h21M1.5 13h21M9 7.5v11"/></svg>
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 11l-6.5 6.5a3.2 3.2 0 0 1-4.5-4.5L12 5a2.2 2.2 0 0 1 3 3l-7.5 7.5"/></svg>
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 2l-6 18h12z"/><path d="M7 12h6"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6"/><path d="M17 2l3 3-8 8H9v-3z"/></svg>
+  </div>
 </div>
 
 <div class="tela" id="marcar"><div class="aviso"><span id="mMsg"></span><br><button class="bt cinza" id="mPula">Pular</button><button class="bt verm" id="mSai">Sair</button></div></div>

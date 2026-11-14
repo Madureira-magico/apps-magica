@@ -57,6 +57,22 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     func ligar(_ webView: WKWebView, tela: UIViewController) {
         web = webView
         self.tela = tela
+        esconderBarraDoTeclado(webView)
+    }
+
+    /// Tira a barrinha "∧ ∨ OK" que o iPhone põe em cima do teclado (o Notas falso tem a própria barra).
+    private func esconderBarraDoTeclado(_ webView: WKWebView) {
+        guard let alvo = webView.scrollView.subviews.first(where: { String(describing: type(of: $0)).hasPrefix("WKContent") }),
+              let base = object_getClass(alvo) else { return }
+        let nomeNovo = String(cString: class_getName(base)) + "_SemBarra"
+        var nova: AnyClass? = NSClassFromString(nomeNovo)
+        if nova == nil, let n = objc_allocateClassPair(base, nomeNovo, 0) {
+            let bloco: @convention(block) (AnyObject) -> AnyObject? = { _ in nil }
+            class_addMethod(n, NSSelectorFromString("inputAccessoryView"), imp_implementationWithBlock(bloco), "@@:")
+            objc_registerClassPair(n)
+            nova = n
+        }
+        if let n = nova { object_setClass(alvo, n) }
     }
 
     // MARK: pastas
