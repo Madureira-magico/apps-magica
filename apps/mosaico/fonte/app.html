@@ -66,7 +66,7 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #ver{background:var(--bg);z-index:5;touch-action:none}
 #ver .palco{position:absolute;inset:0;overflow:hidden}
 #ver .fx{position:absolute;top:0;bottom:0;width:100%;display:flex;align-items:center;justify-content:center}
-#ver .fx img{max-width:100%;max-height:100%;object-fit:contain;display:block;pointer-events:none;transition:transform .35s ease,opacity .35s ease}
+#ver .fx img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;transition:transform .35s ease,opacity .35s ease}
 #ver .fx img.indo{transform:translate(30%,60%) scale(.05);opacity:0}
 #ver .vcab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;transition:opacity .2s}
 #ver .vdata{text-align:center;font-size:15px;font-weight:600;line-height:19px;text-shadow:0 1px 6px rgba(0,0,0,.3)}
@@ -74,7 +74,15 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #ver .vrod{position:absolute;left:16px;right:16px;bottom:max(calc(var(--sb) - 6px),10px);display:flex;gap:10px;transition:opacity .2s}
 #ver .vrod .barra{flex:1;height:54px;border-radius:27px;display:flex;align-items:center;justify-content:space-around;color:var(--fg)}
 #ver .vrod .barra>*{padding:10px}
-#ver.limpo .vcab,#ver.limpo .vrod{opacity:0;pointer-events:none}
+#ver.limpo .vcab,#ver.limpo .vrod,#ver.limpo .tiraCx{opacity:0;pointer-events:none}
+#ver .tiraCx{position:absolute;left:0;right:0;bottom:calc(max(calc(var(--sb) - 6px),10px) + 64px);height:46px;overflow:hidden;transition:opacity .2s}
+#tira{display:flex;gap:2px;align-items:center;height:46px;transition:transform .25s ease}
+#tira img{width:26px;height:40px;object-fit:cover;flex:none;border-radius:2px}
+#tira img.atual{width:46px;height:46px;margin:0 6px}
+#voo{position:fixed;inset:0;z-index:60;display:none;pointer-events:none}
+#vooFundo{position:absolute;inset:0;background:var(--bg)}
+#vooCx{position:absolute;overflow:hidden}
+#vooCx img{width:100%;height:100%;object-fit:cover;display:block}
 #ver.limpo{background:#000}
 #notas{background:var(--bg);z-index:6}
 .ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 16px;z-index:2}
@@ -178,10 +186,12 @@ body:not(.claro) .nok{color:#000}
     <div class="vdata" id="vData"></div>
     <div class="circ vid"><svg width="22" height="6" viewBox="0 0 22 6" fill="currentColor"><circle cx="3" cy="3" r="2.4"/><circle cx="11" cy="3" r="2.4"/><circle cx="19" cy="3" r="2.4"/></svg></div>
   </div>
+  <div class="tiraCx"><div id="tira"></div></div>
   <div class="vrod"><div class="barra vid">
     <svg width="22" height="26" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg>
     <svg width="26" height="24" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 22S2 15.5 2 8.5A5.5 5.5 0 0 1 13 5a5.5 5.5 0 0 1 11 3.5C24 15.5 13 22 13 22z"/></svg>
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 11v6" stroke-linecap="round"/><circle cx="12" cy="7.3" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <svg width="24" height="22" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h12M18 5h4M2 11h4M10 11h12M2 17h10M16 17h6"/><circle cx="16" cy="5" r="2"/><circle cx="8" cy="11" r="2"/><circle cx="14" cy="17" r="2"/></svg>
     <div id="vLixo"><svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg></div>
   </div></div>
 </div>
@@ -271,6 +281,7 @@ body:not(.claro) .nok{color:#000}
   <div style="height:80px"></div>
 </div>
 
+<div id="voo"><div id="vooFundo"></div><div id="vooCx"><img id="vooImg"></div></div>
 <div id="toast"></div>
 
 <script type="text/plain" id="dadosFamosos">/*FAMOSOS*/</script>

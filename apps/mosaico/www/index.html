@@ -66,7 +66,7 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #ver{background:var(--bg);z-index:5;touch-action:none}
 #ver .palco{position:absolute;inset:0;overflow:hidden}
 #ver .fx{position:absolute;top:0;bottom:0;width:100%;display:flex;align-items:center;justify-content:center}
-#ver .fx img{max-width:100%;max-height:100%;object-fit:contain;display:block;pointer-events:none;transition:transform .35s ease,opacity .35s ease}
+#ver .fx img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;transition:transform .35s ease,opacity .35s ease}
 #ver .fx img.indo{transform:translate(30%,60%) scale(.05);opacity:0}
 #ver .vcab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;transition:opacity .2s}
 #ver .vdata{text-align:center;font-size:15px;font-weight:600;line-height:19px;text-shadow:0 1px 6px rgba(0,0,0,.3)}
@@ -74,7 +74,15 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #ver .vrod{position:absolute;left:16px;right:16px;bottom:max(calc(var(--sb) - 6px),10px);display:flex;gap:10px;transition:opacity .2s}
 #ver .vrod .barra{flex:1;height:54px;border-radius:27px;display:flex;align-items:center;justify-content:space-around;color:var(--fg)}
 #ver .vrod .barra>*{padding:10px}
-#ver.limpo .vcab,#ver.limpo .vrod{opacity:0;pointer-events:none}
+#ver.limpo .vcab,#ver.limpo .vrod,#ver.limpo .tiraCx{opacity:0;pointer-events:none}
+#ver .tiraCx{position:absolute;left:0;right:0;bottom:calc(max(calc(var(--sb) - 6px),10px) + 64px);height:46px;overflow:hidden;transition:opacity .2s}
+#tira{display:flex;gap:2px;align-items:center;height:46px;transition:transform .25s ease}
+#tira img{width:26px;height:40px;object-fit:cover;flex:none;border-radius:2px}
+#tira img.atual{width:46px;height:46px;margin:0 6px}
+#voo{position:fixed;inset:0;z-index:60;display:none;pointer-events:none}
+#vooFundo{position:absolute;inset:0;background:var(--bg)}
+#vooCx{position:absolute;overflow:hidden}
+#vooCx img{width:100%;height:100%;object-fit:cover;display:block}
 #ver.limpo{background:#000}
 #notas{background:var(--bg);z-index:6}
 .ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 16px;z-index:2}
@@ -178,10 +186,12 @@ body:not(.claro) .nok{color:#000}
     <div class="vdata" id="vData"></div>
     <div class="circ vid"><svg width="22" height="6" viewBox="0 0 22 6" fill="currentColor"><circle cx="3" cy="3" r="2.4"/><circle cx="11" cy="3" r="2.4"/><circle cx="19" cy="3" r="2.4"/></svg></div>
   </div>
+  <div class="tiraCx"><div id="tira"></div></div>
   <div class="vrod"><div class="barra vid">
     <svg width="22" height="26" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg>
     <svg width="26" height="24" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 22S2 15.5 2 8.5A5.5 5.5 0 0 1 13 5a5.5 5.5 0 0 1 11 3.5C24 15.5 13 22 13 22z"/></svg>
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 11v6" stroke-linecap="round"/><circle cx="12" cy="7.3" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <svg width="24" height="22" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h12M18 5h4M2 11h4M10 11h12M2 17h10M16 17h6"/><circle cx="16" cy="5" r="2"/><circle cx="8" cy="11" r="2"/><circle cx="14" cy="17" r="2"/></svg>
     <div id="vLixo"><svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg></div>
   </div></div>
 </div>
@@ -271,6 +281,7 @@ body:not(.claro) .nok{color:#000}
   <div style="height:80px"></div>
 </div>
 
+<div id="voo"><div id="vooFundo"></div><div id="vooCx"><img id="vooImg"></div></div>
 <div id="toast"></div>
 
 <script type="text/plain" id="dadosFamosos">
@@ -876,69 +887,96 @@ prepararMosaico.vez = 0;
 function limparNome() {
   preparo++; prepararMosaico.vez++;
   atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on');
-  if (zoom > 5) aplicarZoom(5);
+  if (zoom > 5) irAoNivel(5);
   mostrarAtual(); estado(''); pedirDesenho();
 }
 
 /* =====================================================================
-   FOTOTECA: grade no canvas, rolar, pinça contínua, toque
-   Regra de ouro (como no app Fotos): a foto embaixo dos dedos continua embaixo dos dedos.
-   - até ZA colunas: galeria (a grade se reorganiza coluna a coluna)
-   - de ZA a ZB: as duas se misturam suavemente
-   - acima de ZB: o rosto ampliado em volta dos dedos (até o rosto inteiro; depois, efeito elástico)
+   FOTOTECA: grade no canvas, rolar, pinça, toque — como o app Fotos
+   Níveis fixos (3, 5, 13 colunas). Durante a pinça a grade cresce/encolhe com os dedos
+   e, entre um nível e outro, as duas grades se dissolvem, sempre presas na foto embaixo dos dedos.
+   Com o mosaico pronto, depois de 13 colunas entra o rosto ampliado (até o rosto inteiro).
    ===================================================================== */
 const cv = $('#cv'), ctx = cv.getContext('2d');
-let zoom = +cfg.n0 || 3;        // colunas "contínuas" (3 = fotos grandes, 60 = mosaico)
-let doFim = 0;                  // rolagem da galeria a partir do fim (px)
-let ox = 0, oy = 0;             // posição do mosaico ampliado na tela
+let zoom = +cfg.n0 || 3;        // colunas "contínuas"
+let doFim = 0;                  // rolagem da grade parada, a partir do fim (px)
+let anc = null;                 // durante a pinça: {i, fx, fy, mx, my} = foto presa embaixo dos dedos
+let ox = 0, oy = 0;             // posição do mosaico ampliado
 let corFundo = '#000';
-const ZA = 9.5, ZB = 12.5;
-const nCols = () => Math.max(1, Math.ceil(zoom - 0.001));   // sempre enche a largura (nunca sobra faixa vazia)
-const tamFoto = () => W / zoom;
+let animZoom = 0;
+const ZM0 = 13, ZM1 = 16.5;     // galeria 13 -> rosto ampliado
+const niveis = () => mos && mos.img ? [3, 5, 13] : [3, 5, 13, 30];
 function sbPx() { return +document.documentElement.dataset.sb || 34; }
 function stPx() { return +document.documentElement.dataset.st || 47; }
-function padBaixo(z) { return (sbPx() + 70) * Math.min(1, Math.max(0, (8 - z) / 3)); }
-function alturaConteudo() { return stPx() + 96 + Math.ceil(seq.length / nCols()) * tamFoto() + padBaixo(zoom); }
-function rolagemMax() { return Math.max(0, alturaConteudo() - H); }
-function topoRolado() { return Math.max(0, alturaConteudo() - H - doFim); }
+const cimaPx = () => stPx() + 96;
+const padNivel = n => n <= 5 ? sbPx() + 70 : 0;
 function zMax() { return mos ? mos.cols : (+cfg.colsM || 60); }
 const temMag = () => !!(mos && mos.img);
-const mistura = () => temMag() ? Math.min(1, Math.max(0, (zoom - ZA) / (ZB - ZA))) : 0;   // 0 = galeria, 1 = rosto ampliado
+const suave = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+const mistura = () => temMag() ? suave(ZM0, ZM1, zoom) : 0;   // 0 = galeria, 1 = rosto ampliado
 const emMag = () => mistura() >= 1;
 const kAtual = () => mos ? mos.cols / zoom : 1;
-function prenderMag() {
-  const k = kAtual();
-  if (k >= 1) { ox = Math.min(0, Math.max(W - W * k, ox)); oy = Math.min(0, Math.max(H - H * k, oy)); }
-  else { ox = (W - W * k) / 2; oy = (H - H * k) / 2; }   // menor que a tela: fica no meio (efeito elástico)
-}
+/* nível de repouso (o mais perto do zoom) */
+function nivelPerto(z) { const L = niveis(); let m = L[0]; for (const v of L) if (Math.abs(Math.log(v / z)) < Math.abs(Math.log(m / z))) m = v; return m; }
+function nivelBase() { const L = niveis(); if (zoom <= L[0]) return L[0]; if (zoom >= L[L.length - 1]) return L[L.length - 1]; return nivelPerto(zoom); }
 
-/* geometria do mosaico parado (rosto inteiro na tela) */
-function geoMos() { const C = mos.cols, t0 = W / C, cima = stPx() + 96; return { C, t0, cima, topo0: Math.max(0, cima + (mos.ultima + 1) * t0 - H) }; }
-/* qual foto está num ponto da tela, e em que parte dela (0..1) */
-function pontoGaleria(x, y) {
-  const n = nCols(), t = tamFoto(), x0 = (W - n * t) / 2, topo = topoRolado(), cima = stPx() + 96;
-  const rr = (y + topo - cima) / t, cc = (x - x0) / t, r = Math.floor(rr), c = Math.floor(cc);
-  return { i: r < 0 || c < 0 || c >= n ? -1 : r * n + c, fx: cc - c, fy: rr - r };
+/* posição da grade de n colunas no zoom atual */
+function layoutNivel(n) {
+  const t = W / zoom, cima = cimaPx(), alt = cima + Math.ceil(seq.length / n) * t + padNivel(n);
+  let x0 = 0, topo;
+  if (anc && anc.i >= 0) {
+    const r = Math.floor(anc.i / n), c = anc.i % n;
+    x0 = anc.mx - (c + anc.fx) * t;
+    if (n * t >= W) x0 = Math.min(0, Math.max(W - n * t, x0)); else x0 = Math.max(0, Math.min(W - n * t, x0));
+    topo = cima + (r + anc.fy) * t - anc.my;
+  } else topo = alt - H - doFim;
+  topo = Math.max(0, Math.min(Math.max(0, alt - H), topo));
+  return { n, t, x0, topo, alt };
 }
+function pontoNaGrade(L, x, y) {
+  const cc = (x - L.x0) / L.t, rr = (y + L.topo - cimaPx()) / L.t, r = Math.floor(rr), c = Math.floor(cc);
+  return { i: r < 0 || c < 0 || c >= L.n ? -1 : r * L.n + c, fx: cc - c, fy: rr - r };
+}
+function geoMos() { const C = mos.cols, t0 = W / C, cima = cimaPx(); return { C, t0, cima, topo0: Math.max(0, cima + (mos.ultima + 1) * t0 - H) }; }
 function pontoMag(x, y) {
   const g = geoMos(), k = kAtual();
   const cc = ((x - ox) / k) / g.t0, rr = (((y - oy) / k) - g.cima + g.topo0) / g.t0, r = Math.floor(rr), c = Math.floor(cc);
   return { i: c < 0 || c >= g.C || r < 0 ? -1 : r * g.C + c, fx: cc - c, fy: rr - r };
 }
-/* põe a foto i da galeria na altura y da tela */
-function galeriaNaFoto(i, fy, y) {
-  if (i < 0) return;
-  const n = nCols(), t = tamFoto(), cima = stPx() + 96, r = Math.floor(i / n);
-  const topo = cima + (r + fy) * t - y;
-  doFim = Math.min(rolagemMax(), Math.max(0, alturaConteudo() - H - topo));
+function prenderMag() {
+  const k = kAtual();
+  if (k >= 1) { ox = Math.min(0, Math.max(W - W * k, ox)); oy = Math.min(0, Math.max(H - H * k, oy)); }
+  else { ox = (W - W * k) / 2; oy = (H - H * k) / 2; }   // menor que a tela: fica no meio (efeito elástico)
 }
-/* põe a foto i do mosaico ampliado no ponto (x, y) da tela */
 function magNaFoto(i, fx, fy, x, y) {
-  const g = geoMos(), k = kAtual();
-  const r = Math.floor(i / g.C), c = i % g.C;
-  if (i < 0 || r < mos.primeira || r > mos.ultima) { ox = (W - W * k) / 2; oy = H - H * k; prenderMag(); return; }   // fora do rosto: começa embaixo
+  const g = geoMos(), k = kAtual(), r = Math.floor(i / g.C), c = i % g.C;
+  if (i < 0 || r < mos.primeira || r > mos.ultima) { ox = (W - W * k) / 2; oy = H - H * k; prenderMag(); return; }
   ox = x - (c + fx) * g.t0 * k; oy = y - (g.cima + (r + fy) * g.t0 - g.topo0) * k; prenderMag();
 }
+/* a foto que está num ponto da tela agora */
+function pontoAgora(x, y) { return mistura() >= 0.5 ? pontoMag(x, y) : pontoNaGrade(layoutNivel(nivelBase()), x, y); }
+/* retângulo de uma foto na tela (para a animação de abrir/fechar) */
+function rectDoItem(i) {
+  let x, y, s;
+  if (mistura() >= 0.5) {
+    const g = geoMos(), k = kAtual(), r = Math.floor(i / g.C), c = i % g.C;
+    if (r < mos.primeira || r > mos.ultima) return null;
+    s = g.t0 * k; x = c * s + ox; y = (g.cima + r * g.t0 - g.topo0) * k + oy;
+  } else {
+    const L = layoutNivel(nivelBase()), r = Math.floor(i / L.n), c = i % L.n;
+    s = L.t; x = L.x0 + c * s; y = cimaPx() + r * s - L.topo;
+  }
+  if (y + s < 0 || y > H || x + s < 0 || x > W) return null;
+  return { x, y, w: s, h: s };
+}
+function garantirVisivel(i) {   // grade parada: rola até a foto aparecer
+  if (mistura() >= 0.5 || anc) return;
+  const n = nivelBase(), L = layoutNivel(n), y = cimaPx() + Math.floor(i / n) * L.t - L.topo;
+  if (y >= cimaPx() - 20 && y + L.t <= H - padNivel(n)) return;
+  const topo = cimaPx() + Math.floor(i / n) * L.t - H / 2 + L.t / 2;
+  doFim = Math.max(0, Math.min(Math.max(0, L.alt - H), L.alt - H - topo));
+}
+function irAoNivel(n) { cancelAnimationFrame(animZoom); anc = null; zoom = n; doFim = 0; pedirDesenho(); }
 
 function ajustarTamanho() {
   W = innerWidth; H = innerHeight;
@@ -991,7 +1029,7 @@ function imagemDoItem(it, pxTela) {
 function corMedia(it) { const v = cores.get(it); return v ? 'rgb(' + v.c[0] + ',' + v.c[1] + ',' + v.c[2] + ')' : 'rgba(128,128,128,.16)'; }
 function espaco(z) { return z <= 3.2 ? 2 : z <= 5.5 ? 1.5 : z <= 15 ? 1 : 0.6; }
 /* quanto o retoque de cor já entrou na galeria (0 = fotos normais, 1 = cor do rosto) */
-function rampa() { if (!mos) return 0; return Math.min(1, Math.max(0, (zoom - 5) / (ZB - 5))); }
+function rampa() { if (!mos) return 0; return Math.min(1, Math.max(0, (zoom - 5) / (ZM0 - 5))); }
 
 let desenhoPedido = false;
 function pedirDesenho() { if (!desenhoPedido) { desenhoPedido = true; requestAnimationFrame(desenhar); } }
@@ -999,46 +1037,57 @@ function desenhar() {
   desenhoPedido = false;
   if (!$('#fototeca').classList.contains('on')) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1; ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H);
   const b = mistura();
-  if (b < 1) desenharGrade();
-  if (b > 0) { ctx.globalAlpha = b; if (b < 1) { ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H); } desenharMag(); ctx.globalAlpha = 1; }
+  if (b < 1) {
+    const L = niveis(), z = Math.min(zoom, ZM0);
+    if (z <= L[0] || z >= L[L.length - 1]) desenharNivel(z <= L[0] ? L[0] : L[L.length - 1], 1);
+    else {
+      let a = L[0], c = L[1];
+      for (let k = 0; k < L.length - 1; k++) if (z >= L[k] && z <= L[k + 1]) { a = L[k]; c = L[k + 1]; }
+      const u = Math.log(z / a) / Math.log(c / a), ab = suave(0.2, 0.8, u);
+      if (ab < 1) desenharNivel(a, 1);
+      if (ab > 0) desenharNivel(c, ab);
+    }
+  }
+  if (b > 0) { ctx.globalAlpha = b; ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H); desenharMag(b); }
+  ctx.globalAlpha = 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   let f = '';   // sépia / preto e branco entrando aos poucos
   if (mos && cfg.cor !== 'cor') { const a = rampa(); if (a > 0.01) f = cfg.cor === 'sepia' ? 'sepia(' + (0.9 * a).toFixed(2) + ')' : 'grayscale(' + a.toFixed(2) + ')'; }
   if (cv.style.filter !== f) cv.style.filter = f;
 }
 
-function desenharGrade() {
-  const n = nCols(), t = tamFoto(), g = espaco(zoom), sel = emSelecao;
-  const x0 = (W - n * t) / 2;
-  const topo = topoRolado(), cima = stPx() + 96;
-  const r0 = Math.max(0, Math.floor((topo - cima) / t)), r1 = Math.min(Math.ceil(seq.length / n) - 1, Math.floor((H + topo - cima) / t));
-  const pxTela = t * DPR;
+function desenharNivel(n, alfa) {
+  const L = layoutNivel(n), t = L.t, g = espaco(zoom), sel = emSelecao, cima = cimaPx();
+  const r0 = Math.max(0, Math.floor((L.topo - cima) / t)), r1 = Math.min(Math.ceil(seq.length / n) - 1, Math.floor((H + L.topo - cima) / t));
+  const pxTela = t * DPR, lado = t - g;
   const a = mos && mos.seq === seq ? (+cfg.reforco) * Math.pow(rampa(), 1.2) : 0;
-  const lado = t - g;
   for (let r = r0; r <= r1; r++) {
-    const y = cima + r * t - topo;
+    const y = cima + r * t - L.topo;
     for (let c = 0; c < n; c++) {
       const i = r * n + c; if (i >= seq.length) break;
-      const x = x0 + c * t, it = seq[i];
+      const x = L.x0 + c * t, it = seq[i];
       if (!it || x > W || x + t < 0) continue;
+      ctx.globalAlpha = alfa;
       const im = imagemDoItem(it, pxTela);
       if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, lado, lado); }
       else { ctx.fillStyle = corMedia(it); ctx.fillRect(x, y, lado, lado); }
       if (a > 0.01) {   // cada fotinha leva a cor do pedaço do rosto onde ela fica no mosaico
         const k = (i - mos.ini) * 3;
-        if (k >= 0 && k < mos.tintaIdx.length) { ctx.fillStyle = 'rgba(' + mos.tintaIdx[k] + ',' + mos.tintaIdx[k + 1] + ',' + mos.tintaIdx[k + 2] + ',' + a.toFixed(3) + ')'; ctx.fillRect(x, y, lado, lado); }
+        if (k >= 0 && k < mos.tintaIdx.length) { ctx.globalAlpha = alfa * a; ctx.fillStyle = 'rgb(' + mos.tintaIdx[k] + ',' + mos.tintaIdx[k + 1] + ',' + mos.tintaIdx[k + 2] + ')'; ctx.fillRect(x, y, lado, lado); }
       }
-      if (sel && selecionados.has(i)) desenharMarca(x, y, lado, lado);
+      if (sel && selecionados.has(i)) { ctx.globalAlpha = 1; desenharMarca(x, y, lado, lado); }
     }
   }
+  ctx.globalAlpha = 1;
 }
-function desenharMag() {
+function desenharMag(alfa) {
   const { C, t0, cima, topo0 } = geoMos(), k = kAtual();
   const yR = r => cima + r * t0 - topo0;
   const X = x => x * k + ox, Y = y => y * k + oy;
   const g = espaco(zoom) * Math.min(1, k);
+  ctx.globalAlpha = alfa;
   if (k <= 1.5 && mos.img.naturalWidth) {
     ctx.imageSmoothingEnabled = true;
     const y0 = Y(yR(mos.primeira)), alt = mos.linhas * t0 * k;
@@ -1053,15 +1102,15 @@ function desenharMag() {
   const a = +cfg.reforco, lado = t0 * k - g, pxTela = t0 * k * DPR;
   const c0 = Math.max(0, Math.floor((-ox / k) / t0)), c1 = Math.min(C - 1, Math.floor(((W - ox) / k) / t0));
   const r0 = Math.max(mos.primeira, Math.floor(((-oy / k) - cima + topo0) / t0)), r1 = Math.min(mos.ultima, Math.floor((((H - oy) / k) - cima + topo0) / t0));
-  const alpha0 = ctx.globalAlpha;
   for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
     const cel = (r - mos.primeira) * C + c, id = mos.ids[cel];
     if (!id) continue;
     const x = X(c * t0), y = Y(yR(r));
+    ctx.globalAlpha = alfa;
     const im = imagemDoItem(id, pxTela);
     if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, lado, lado); }
     else { ctx.fillStyle = corMedia(id); ctx.fillRect(x, y, lado, lado); }
-    if (a > 0.01) { ctx.globalAlpha = alpha0 * a; ctx.fillStyle = 'rgb(' + mos.tinta[cel * 3] + ',' + mos.tinta[cel * 3 + 1] + ',' + mos.tinta[cel * 3 + 2] + ')'; ctx.fillRect(x, y, lado, lado); ctx.globalAlpha = alpha0; }
+    if (a > 0.01) { ctx.globalAlpha = alfa * a; ctx.fillStyle = 'rgb(' + mos.tinta[cel * 3] + ',' + mos.tinta[cel * 3 + 1] + ',' + mos.tinta[cel * 3 + 2] + ')'; ctx.fillRect(x, y, lado, lado); }
   }
 }
 function desenharMarca(x, y, w, h) {
@@ -1071,29 +1120,37 @@ function desenharMarca(x, y, w, h) {
   ctx.beginPath(); ctx.moveTo(cx - r * .45, cy); ctx.lineTo(cx - r * .1, cy + r * .38); ctx.lineTo(cx + r * .48, cy - r * .35); ctx.stroke();
 }
 
-/* muda o zoom mantendo a foto embaixo dos dedos (mx, my) */
-function aplicarZoom(z, mx, my) {
-  if (mx == null) { mx = W / 2; my = H / 2; }
-  const zAnt = zoom, bAnt = mistura();
-  const pg = pontoGaleria(mx, my);
-  const pm = temMag() && zAnt >= ZA ? pontoMag(mx, my) : null;
-  zoom = Math.min(mos ? zMax() * 1.35 : zMax() * 1.06, Math.max(2.6, z));
-  const b = mistura();
-  // de onde vem a "foto embaixo dos dedos": da imagem que estava mais forte
-  const ref = bAnt >= 0.5 && pm ? pm : pg;
-  if (b < 1) galeriaNaFoto(ref.i, ref.fy, my);
-  if (b > 0) {
-    if (zAnt >= ZA && pm) { const k = kAtual(), kA = mos.cols / zAnt, rx = (mx - ox) / kA, ry = (my - oy) / kA; ox = mx - rx * k; oy = my - ry * k; prenderMag(); }
-    else magNaFoto(ref.i, ref.fx, ref.fy, mx, my);
+/* zoom preso na foto anc (embaixo dos dedos) */
+function aplicarZoom(z) {
+  const L = niveis();
+  zoom = Math.min(temMag() ? zMax() * 1.35 : L[L.length - 1] * 1.15, Math.max(L[0] * 0.8, z));
+  if (temMag() && zoom > ZM0) {
+    if (anc) magNaFoto(anc.i, anc.fx, anc.fy, anc.mx, anc.my); else prenderMag();
     if (emSelecao) sairSelecao();
   }
 }
-const toques = { modo: '', y0: 0, x0: 0, f0: 0, t0: 0, d0: 0, z0: 0, vel: 0, ultY: 0, ultT: 0, moveu: 0, inercia: 0, mx: 0, my: 0 };
+function prenderDedos(mx, my) {   // guarda a foto que está embaixo dos dedos agora
+  const p = pontoAgora(mx, my);
+  anc = { i: p.i, fx: p.fx, fy: p.fy, mx, my };
+}
+function soltarAncora() {   // grade parada: converte a posição para a rolagem normal
+  if (!anc) return;
+  if (mistura() < 1) { const n = nivelBase(), z0 = zoom; zoom = n; const L = layoutNivel(n); doFim = Math.max(0, L.alt - H - L.topo); zoom = z0; }
+  anc = null;
+}
+const toques = { modo: '', y0: 0, x0: 0, f0: 0, t0: 0, d0: 0, z0: 0, vel: 0, ultY: 0, ultT: 0, moveu: 0, inercia: 0 };
 function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+function pararAnimacao() { if (animZoom) { cancelAnimationFrame(animZoom); animZoom = 0; } if (fimAnim) { const f = fimAnim; fimAnim = null; f(); } }
+let fimAnim = null;
 cv.addEventListener('touchstart', e => {
   e.preventDefault(); cancelAnimationFrame(toques.inercia); toques.inercia = 0;
-  if (e.touches.length >= 2) { toques.modo = 'pinca'; toques.d0 = dist(e.touches[0], e.touches[1]); toques.z0 = zoom; }
-  else if (e.touches.length === 1 && toques.modo !== 'pinca') {
+  if (e.touches.length >= 2) {
+    pararAnimacao();
+    const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2, my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    prenderDedos(mx, my);
+    toques.modo = 'pinca'; toques.d0 = dist(e.touches[0], e.touches[1]); toques.z0 = zoom;
+  } else if (e.touches.length === 1 && toques.modo !== 'pinca') {
+    pararAnimacao();
     const p = e.touches[0];
     toques.modo = 'toque'; toques.x0 = p.clientX; toques.y0 = p.clientY; toques.f0 = doFim; toques.t0 = performance.now(); toques.ox0 = ox; toques.oy0 = oy;
     toques.ultY = p.clientY; toques.ultT = toques.t0; toques.vel = 0; toques.moveu = 0;
@@ -1103,8 +1160,8 @@ cv.addEventListener('touchmove', e => {
   e.preventDefault();
   if (toques.modo === 'pinca' && e.touches.length >= 2) {
     const d = dist(e.touches[0], e.touches[1]); if (!d || !toques.d0) return;
-    toques.mx = (e.touches[0].clientX + e.touches[1].clientX) / 2; toques.my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-    aplicarZoom(toques.z0 * toques.d0 / d, toques.mx, toques.my);
+    anc.mx = (e.touches[0].clientX + e.touches[1].clientX) / 2; anc.my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    aplicarZoom(toques.z0 * toques.d0 / d);
     pedirDesenho();
   } else if ((toques.modo === 'toque' || toques.modo === 'rolar') && e.touches.length === 1) {
     const p = e.touches[0], dy = p.clientY - toques.y0;
@@ -1116,7 +1173,8 @@ cv.addEventListener('touchmove', e => {
       const agora = performance.now(), dt = Math.max(1, agora - toques.ultT);
       toques.vel = 0.8 * toques.vel + 0.2 * ((p.clientY - toques.ultY) / dt);
       toques.ultY = p.clientY; toques.ultT = agora;
-      doFim = Math.min(rolagemMax(), Math.max(0, toques.f0 + dy));
+      const L = layoutNivel(nivelBase());
+      doFim = Math.min(Math.max(0, L.alt - H), Math.max(0, toques.f0 + dy));
       pedirDesenho();
     }
   }
@@ -1131,34 +1189,36 @@ cv.addEventListener('touchend', e => {
 cv.addEventListener('touchcancel', () => { if (toques.modo === 'pinca') soltouPinca(); toques.modo = ''; });
 document.addEventListener('gesturestart', e => e.preventDefault());
 
-/* soltou a pinça: fica onde está; nunca para no meio da mistura; perto do fim, encaixa no rosto inteiro */
+/* soltou a pinça: encaixa num nível (como o app Fotos); no rosto ampliado fica onde está */
 function soltouPinca() {
-  const mx = toques.mx || W / 2, my = toques.my || H / 2;
-  if (temMag() && zoom >= ZA) {
-    if (kAtual() < 1.25) animarZoom(zMax(), mx, my);
-    else if (zoom < ZB) animarZoom(zoom - ZA > ZB - zoom ? ZB : ZA - 0.5, mx, my);
+  if (temMag() && zoom > ZM0) {
+    if (zoom < ZM1) animarZoom(Math.log(zoom / ZM0) < Math.log(ZM1 / zoom) ? ZM0 : ZM1);
+    else if (kAtual() < 1.25) animarZoom(zMax());
+    else soltarAncora();
     return;
   }
-  if (zoom < 3) animarZoom(3, mx, my);
+  animarZoom(nivelPerto(zoom));
 }
-function animarZoom(alvo, mx, my) {
-  const z0 = zoom, t0 = performance.now(), dur = 260;
+function animarZoom(alvo) {
+  const z0 = zoom, t0 = performance.now(), dur = 300;
+  fimAnim = () => { zoom = alvo; aplicarZoom(alvo); soltarAncora(); pedirDesenho(); };
   (function passo() {
     const k = Math.min(1, (performance.now() - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-    aplicarZoom(z0 + (alvo - z0) * e, mx, my); pedirDesenho();
-    if (k < 1) requestAnimationFrame(passo);
+    aplicarZoom(z0 + (alvo - z0) * e); pedirDesenho();
+    if (k < 1) animZoom = requestAnimationFrame(passo); else { animZoom = 0; const f = fimAnim; fimAnim = null; if (f) f(); }
   })();
 }
 function inercia(v) {
   (function passo() {
     v *= 0.95; if (Math.abs(v) < 0.3) return;
-    const novo = Math.min(rolagemMax(), Math.max(0, doFim + v));
+    const L = layoutNivel(nivelBase());
+    const novo = Math.min(Math.max(0, L.alt - H), Math.max(0, doFim + v));
     if (novo === doFim) return;
     doFim = novo; pedirDesenho(); toques.inercia = requestAnimationFrame(passo);
   })();
 }
 let ultimoToque = 0;
-function itemNoPonto(x, y) { return (mistura() >= 0.5 ? pontoMag(x, y) : pontoGaleria(x, y)).i; }
+function itemNoPonto(x, y) { return pontoAgora(x, y).i; }
 function tocou(x, y) {
   const i = itemNoPonto(x, y);
   if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); pedirDesenho(); } return; }
@@ -1235,7 +1295,7 @@ $('#bCanc').addEventListener('click', () => {
 let emSelecao = false; const selecionados = new Set();
 $('#bSel').addEventListener('click', () => { if (emSelecao) sairSelecao(); else entrarSelecao(); });
 function entrarSelecao() {
-  if (emMag()) aplicarZoom(5);
+  if (zoom > 5) irAoNivel(5);
   emSelecao = true; selecionados.clear(); $('#fototeca').classList.add('selecao');
   $('#bSel').textContent = 'Cancelar'; $('#tituloTxt').textContent = 'Selecionar Itens'; contarSelecao(); pedirDesenho();
 }
@@ -1275,30 +1335,105 @@ function srcGrande(it) {
   if (it === '#piada') return URLS.arq(arqPiada(), cfg.ver);
   return URLS.foto(it, Math.round(Math.max(W, H) * DPR), true);
 }
+function grandeEmCache(it) {   // a maior versão dessa foto que já está carregada
+  if (it === '#piada') return null;
+  let m = null, ms = 0;
+  for (const s of [Math.round(Math.max(W, H) * DPR), 1200, 800, 520, 400, 256]) { const e = IMG.get(it + '|' + s); if (e && e.ok && s > ms) { m = e.img.src; ms = s; } }
+  if (!m) { const e = IMG.get(it + '|m'); if (e && e.ok) m = e.img.src; }
+  return m;
+}
+const preCarga = new Map();
+function preCarregar(i) {   // foto grande das vizinhas, antes de deslizar
+  if (i < 0 || i >= seq.length || !seq[i] || preCarga.has(seq[i])) return;
+  const g = new Image(); g.src = srcGrande(seq[i]); preCarga.set(seq[i], g);
+  if (preCarga.size > 24) preCarga.delete(preCarga.keys().next().value);
+}
 function montarPalco() {
   const p = $('#palco'); p.innerHTML = '';
   for (const d of [-1, 0, 1]) {
     const i = verI + d, el = document.createElement('div'); el.className = 'fx'; el.style.left = (d * 100) + '%';
     if (i >= 0 && i < seq.length && seq[i]) {
       const im = document.createElement('img'); const it = seq[i];
-      if (it !== '#piada') { const pq = IMG.get(it + '|m'); if (pq && pq.ok) im.src = pq.img.src; }
-      const g = new Image(); g.onload = () => { im.src = g.src; }; g.src = srcGrande(it);
+      const pc = preCarga.get(it);
+      if (pc && pc.complete && pc.naturalWidth) im.src = pc.src;
+      else {
+        const c = grandeEmCache(it); if (c) im.src = c;
+        const g = pc || new Image(); g.addEventListener('load', () => { im.src = g.src; }); if (!pc) g.src = srcGrande(it);
+      }
       if (d === 0) im.id = 'imgAtual';
       el.appendChild(im);
     }
     p.appendChild(el);
   }
   p.style.transform = 'translateX(0)';
+  for (const d of [-2, -1, 1, 2]) preCarregar(verI + d);
+  montarTira();
   mostrarData();
 }
+/* faixa de miniaturas embaixo */
+function montarTira() {
+  const t = $('#tira'); if (!t) return;
+  let h = '';
+  for (let i = Math.max(0, verI - 14); i <= Math.min(seq.length - 1, verI + 14); i++) {
+    const it = seq[i]; if (!it) continue;
+    const src = it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it);
+    h += '<img data-i="' + i + '"' + (i === verI ? ' class="atual"' : '') + ' src="' + src + '">';
+  }
+  t.innerHTML = h;
+  const at = t.querySelector('.atual');
+  if (at) t.style.transform = 'translateX(' + (W / 2 - at.offsetLeft - at.offsetWidth / 2) + 'px)';
+}
+$('#tira').addEventListener('click', e => { const im = e.target.closest('[data-i]'); if (im) { verI = +im.dataset.i; montarPalco(); } });
 async function mostrarData() {
   const it = seq[verI], el = $('#vData');
   if (it === '#piada') { el.innerHTML = 'Hoje<small>' + fmtHora.format(new Date(Date.now() - 35 * 60000)) + '</small>'; return; }
   el.innerHTML = '';
   try { const d = await nat.call('info', { id: it }); if (d && d.data && seq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
 }
-function abrirFoto(i) { verI = i; $('#ver').classList.remove('limpo'); mostrar('ver', true); montarPalco(); }
-function fecharFoto() { mostrar('fototeca'); }
+/* abrir e fechar como o app Fotos: a foto cresce a partir da miniatura e volta para ela */
+async function tamanhoFoto(it) {
+  if (it === '#piada') { const im = IMG.get(arqPiada() + '|' + cfg.ver); return im && im.ok ? [im.img.naturalWidth, im.img.naturalHeight] : [3, 4]; }
+  try { const d = await Promise.race([nat.call('info', { id: it }), new Promise(r => setTimeout(() => r(null), 120))]); if (d && d.w) return [d.w, d.h]; } catch (_) {}
+  return [3, 4];
+}
+function encaixe(w, h) { const k = Math.min(W / w, H / h); return { w: w * k, h: h * k, x: (W - w * k) / 2, y: (H - h * k) / 2 }; }
+function voar(de, para, src, fundoDe, fundoPara, fim) {
+  const v = $('#voo'), cx = $('#vooCx'), f = $('#vooFundo');
+  $('#vooImg').src = src || '';
+  v.style.display = 'block';
+  f.style.transition = 'none'; f.style.opacity = fundoDe;
+  cx.style.transition = 'none';
+  Object.assign(cx.style, { left: de.x + 'px', top: de.y + 'px', width: de.w + 'px', height: de.h + 'px', borderRadius: (de.r || 0) + 'px' });
+  cx.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    f.style.transition = 'opacity .32s ease'; f.style.opacity = fundoPara;
+    cx.style.transition = 'left .34s cubic-bezier(.2,.85,.25,1), top .34s cubic-bezier(.2,.85,.25,1), width .34s cubic-bezier(.2,.85,.25,1), height .34s cubic-bezier(.2,.85,.25,1)';
+    Object.assign(cx.style, { left: para.x + 'px', top: para.y + 'px', width: para.w + 'px', height: para.h + 'px' });
+  });
+  setTimeout(() => { if (fim) fim(); setTimeout(() => { v.style.display = 'none'; }, 30); }, 360);
+}
+let abrindo = false;
+async function abrirFoto(i) {
+  if (abrindo) return; abrindo = true;
+  verI = i; const it = seq[i];
+  const de = rectDoItem(i), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
+  const src = grandeEmCache(it) || (it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it));
+  $('#ver').classList.remove('limpo');
+  if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
+  preCarregar(i);
+  voar(de, para, src, 0, 1, () => { mostrar('ver', true); montarPalco(); abrindo = false; });
+}
+async function fecharFoto() {
+  const it = seq[verI], im = $('#imgAtual');
+  const src = im && im.src ? im.src : '';
+  const [fw, fh] = await tamanhoFoto(it), de = encaixe(fw, fh);
+  mostrar('fototeca');
+  garantirVisivel(verI);
+  desenhar();
+  const para = rectDoItem(verI);
+  if (!para || !src) return;
+  voar(de, para, src, 1, 0, null);
+}
 $('#vVolta').addEventListener('click', fecharFoto);
 $('#vLixo').addEventListener('click', () => {
   const it = seq[verI];
