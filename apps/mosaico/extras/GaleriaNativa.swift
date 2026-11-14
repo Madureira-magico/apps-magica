@@ -205,9 +205,19 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         linhas = Int(ceil(Double(seq.count) / Double(max(1, C))))
         let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)"
         if chave != geoChave {
+            // se estava vendo as fotos de perto (3 colunas), continua EXATAMENTE no mesmo lugar depois de trocar
+            let perto = ligada && !geoChave.isEmpty && abs(visiveis - n0) < 0.1
+            let doFim = zoomer.contentSize.height - zoomer.contentOffset.y
             geoChave = chave
-            zerar = true
             montarPlano()
+            if perto && !zerar {
+                let sc = min(zoomer.maximumZoomScale, CGFloat(C) / max(1, min(CGFloat(C), n0)))
+                zoomer.setZoomScale(sc, animated: false)
+                travado = false
+                let ins = zoomer.contentInset, cs = zoomer.contentSize
+                let y = min(max(-ins.top, cs.height - doFim), cs.height - H + ins.bottom)
+                zoomer.contentOffset = CGPoint(x: CGFloat(cS) * t0 * sc, y: y)
+            } else { zerar = true }
         } else {
             // só a seleção mudou: redesenha só essas fotos
             let mudou = selAntes.symmetricDifference(selecao ? selecionados : [])

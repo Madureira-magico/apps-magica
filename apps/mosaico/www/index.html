@@ -883,7 +883,7 @@ async function prepararMosaico() {
   const img = new Image();
   await new Promise(ok => { img.onload = ok; img.onerror = ok; img.src = URLS.arq('mosaico.jpg', versao); });
   if (meu !== prepararMosaico.vez) return;
-  mos = { seq: nova, img, primeira, linhas, cols: n, versao, N, ids, tinta, px, ultima, ini: primeira * n, tintaIdx: tinta };
+  mos = { seq: nova, img, primeira, linhas, cols: n, versao, N, ids, tinta, px, ultima, ini: primeira * n, tintaIdx: tinta, cS, k0, uN, normal: seqNormal.slice() };
   seq = nova;
   atual.pronto = true;
   $('#real').style.backgroundImage = atual.tipo === 'rosto' ? 'url("' + URLS.arq('real.jpg', versao) + '")' : '';
@@ -1373,7 +1373,22 @@ function mostrarTirados() { const e = $('#aTirados'); if (e) e.textContent = 'Fo
 /* =====================================================================
    VISUALIZADOR
    ===================================================================== */
-let verI = 0;
+let verI = 0, vSeq = [];
+/* a foto grande anda na ordem da Fototeca de verdade (a que o público viu), não na ordem do mosaico */
+function comMosaico() { return !!(mos && mos.cS != null && seq === mos.seq); }
+function listaVer() { vSeq = comMosaico() ? mos.normal : seq; }
+function verDeCel(i) {
+  if (!comMosaico()) return i;
+  const r = Math.floor(i / mos.cols), c = i % mos.cols;
+  if (c >= mos.cS && c < mos.cS + mos.k0) { const j = (mos.uN - (mos.ultima - r)) * mos.k0 + (c - mos.cS); if (j >= 0 && j < vSeq.length) return j; }
+  const j = vSeq.indexOf(seq[i]); return j;
+}
+function celDeVer(j) {
+  if (!comMosaico()) return j;
+  if (vSeq[j] !== mos.normal[j]) return -1;
+  const r = mos.ultima - (mos.uN - Math.floor(j / mos.k0)), c = mos.cS + j % mos.k0;
+  return r >= 0 ? r * mos.cols + c : -1;
+}
 const fmtData = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 const fmtHora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 function srcGrande(it) {
@@ -1389,16 +1404,16 @@ function grandeEmCache(it) {   // a maior versão dessa foto que já está carre
 }
 const preCarga = new Map();
 function preCarregar(i) {   // foto grande das vizinhas, antes de deslizar
-  if (i < 0 || i >= seq.length || !seq[i] || preCarga.has(seq[i])) return;
-  const g = new Image(); g.src = srcGrande(seq[i]); preCarga.set(seq[i], g);
+  if (i < 0 || i >= vSeq.length || !vSeq[i] || preCarga.has(vSeq[i])) return;
+  const g = new Image(); g.src = srcGrande(vSeq[i]); preCarga.set(vSeq[i], g);
   if (preCarga.size > 24) preCarga.delete(preCarga.keys().next().value);
 }
 function montarPalco() {
   const p = $('#palco'); p.innerHTML = '';
   for (const d of [-1, 0, 1]) {
     const i = verI + d, el = document.createElement('div'); el.className = 'fx'; el.style.left = (d * 100) + '%';
-    if (i >= 0 && i < seq.length && seq[i]) {
-      const im = document.createElement('img'); const it = seq[i];
+    if (i >= 0 && i < vSeq.length && vSeq[i]) {
+      const im = document.createElement('img'); const it = vSeq[i];
       const pc = preCarga.get(it);
       if (pc && pc.complete && pc.naturalWidth) im.src = pc.src;
       else {
@@ -1419,8 +1434,8 @@ function montarPalco() {
 function montarTira() {
   const t = $('#tira'); if (!t) return;
   let h = '';
-  for (let i = Math.max(0, verI - 14); i <= Math.min(seq.length - 1, verI + 14); i++) {
-    const it = seq[i]; if (!it) continue;
+  for (let i = Math.max(0, verI - 14); i <= Math.min(vSeq.length - 1, verI + 14); i++) {
+    const it = vSeq[i]; if (!it) continue;
     const src = it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it);
     h += '<img data-i="' + i + '"' + (i === verI ? ' class="atual"' : '') + ' src="' + src + '">';
   }
@@ -1430,10 +1445,10 @@ function montarTira() {
 }
 $('#tira').addEventListener('click', e => { const im = e.target.closest('[data-i]'); if (im) { verI = +im.dataset.i; montarPalco(); } });
 async function mostrarData() {
-  const it = seq[verI], el = $('#vData');
+  const it = vSeq[verI], el = $('#vData');
   if (it === '#piada') { el.innerHTML = 'Hoje<small>' + fmtHora.format(new Date(Date.now() - 35 * 60000)) + '</small>'; return; }
   el.innerHTML = '';
-  try { const d = await nat.call('info', { id: it }); if (d && d.data && seq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
+  try { const d = await nat.call('info', { id: it }); if (d && d.data && vSeq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
 }
 /* abrir e fechar como o app Fotos: a foto cresce a partir da miniatura e volta para ela */
 async function tamanhoFoto(it) {
@@ -1460,8 +1475,10 @@ function voar(de, para, src, fundoDe, fundoPara, fim) {
 let abrindo = false;
 async function abrirFoto(i) {
   if (abrindo) return; abrindo = true;
-  verI = i; const it = seq[i];
-  const de = nativo ? await rectNat(i) : rectDoItem(i), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
+  listaVer();
+  const cel = i; i = verDeCel(cel); if (i < 0) { abrindo = false; return; }
+  verI = i; const it = vSeq[i];
+  const de = nativo ? await rectNat(cel) : rectDoItem(cel), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
   const src = grandeEmCache(it) || (it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it));
   $('#ver').classList.remove('limpo');
   if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
@@ -1469,25 +1486,27 @@ async function abrirFoto(i) {
   voar(de, para, src, 0, 1, () => { mostrar('ver', true); montarPalco(); abrindo = false; });
 }
 async function fecharFoto() {
-  const it = seq[verI], im = $('#imgAtual');
+  const it = vSeq[verI], im = $('#imgAtual');
   const src = im && im.src ? im.src : '';
   const [fw, fh] = await tamanhoFoto(it), de = encaixe(fw, fh);
   mostrar('fototeca');
   let para;
-  if (nativo) { await nat.call('galeriaVer', { i: verI }).catch(() => {}); para = await rectNat(verI); }
-  else { garantirVisivel(verI); desenhar(); para = rectDoItem(verI); }
+  const cel = celDeVer(verI);
+  if (cel < 0) return;
+  if (nativo) { await nat.call('galeriaVer', { i: cel }).catch(() => {}); para = await rectNat(cel); }
+  else { garantirVisivel(cel); desenhar(); para = rectDoItem(cel); }
   if (!para || !src) return;
   voar(de, para, src, 1, 0, null);
 }
 $('#vVolta').addEventListener('click', fecharFoto);
 $('#vLixo').addEventListener('click', () => {
-  const it = seq[verI];
+  const it = vSeq[verI];
   if (it === '#piada') { ligarVoz(); return; }   // camuflado: nada muda na tela
   const im = $('#imgAtual'); if (im) im.classList.add('indo');
   setTimeout(() => {
-    tirarDoApp([it]);
-    if (!seq.length) { fecharFoto(); return; }
-    verI = Math.min(verI, seq.length - 1); montarPalco();
+    tirarDoApp([it]); listaVer();
+    if (!vSeq.length) { fecharFoto(); return; }
+    verI = Math.min(verI, vSeq.length - 1); montarPalco();
   }, 360);
 });
 (function () {
@@ -1504,7 +1523,7 @@ $('#vLixo').addEventListener('click', () => {
     p.style.transition = 'transform .25s ease';
     if (!modo && performance.now() - t0 < 300) { $('#ver').classList.toggle('limpo'); return; }
     if (modo === 'lado') {
-      const ir = dx < -60 && verI < seq.length - 1 ? 1 : dx > 60 && verI > 0 ? -1 : 0;
+      const ir = dx < -60 && verI < vSeq.length - 1 ? 1 : dx > 60 && verI > 0 ? -1 : 0;
       p.style.transform = 'translateX(' + (-ir * W) + 'px)';
       if (ir) setTimeout(() => { verI += ir; p.style.transition = 'none'; montarPalco(); }, 250);
     } else if (modo === 'baixo') {
