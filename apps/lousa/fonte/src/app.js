@@ -1,6 +1,6 @@
 // ===== Lousa v1.1 (app nativo) — telas e envio =====
 (function () {
-  const VER = '1.1.1';
+  const VER = '1.1.2';
   const NATIVO = !!window.__NATIVE_APP__;
   const nat = (name, v) => { try { window.webkit.messageHandlers[name].postMessage(v); } catch (e) {} };
   const $ = (s) => document.querySelector(s);
@@ -663,7 +663,41 @@
   if (window.visualViewport) window.visualViewport.addEventListener('resize', reSize);
 
   // ---------- funcionar com a tela apagada (app nativo) ----------
-  bindSw('#optBg', 'bgOn'); $('#optBg').addEventListener('change', () => nat('segundoPlano', !!opt.bgOn));
+  // além do som mudo da casca, a página toca a sua "música" muda (é o que segura o app com a tela apagada, igual ao Relógio)
+  // ----- "música" muda que mantém o app acordado; na tela de bloqueio aparece como uma música de verdade -----
+  const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252 };
+  function musicaMudaUrl() {
+    const rate = 8000, n = rate * MUSICA.secs, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, i % 2 ? 129 : 127);   // inaudível
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  function musicaInfo(audio) {
+    try { document.title = MUSICA.title; } catch (e) {}
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: MUSICA.title, artist: MUSICA.artist, album: '', artwork: [] });
+      const keep = () => { const p = audio.play(); if (p && p.catch) p.catch(() => {}); };   // "pausar" no bloqueio não para o app
+      ['pause', 'stop'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, keep); } catch (e) {} });
+      ['previoustrack', 'nexttrack'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, () => {}); } catch (e) {} });
+      ['seekbackward', 'seekforward', 'seekto'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, null); } catch (e) {} });
+    } catch (e) {}
+  }
+
+  let bgAudio = null;
+  function bgAplicar() {
+    if (!NATIVO) return;
+    nat('segundoPlano', !!opt.bgOn);
+    if (opt.bgOn) {
+      if (!bgAudio) { bgAudio = new Audio(musicaMudaUrl()); bgAudio.loop = true; bgAudio.setAttribute('playsinline', ''); musicaInfo(bgAudio); }
+      const p = bgAudio.play(); if (p && p.catch) p.catch(() => {});
+    } else if (bgAudio) bgAudio.pause();
+  }
+  document.addEventListener('touchend', () => { if (opt.bgOn && bgAudio && bgAudio.paused) bgAplicar(); }, { passive: true });
+  bindSw('#optBg', 'bgOn'); $('#optBg').addEventListener('change', bgAplicar);
   if (!NATIVO) $('#bgRow').classList.add('hide');
   const rnd = () => (Math.random() * 1e9) >>> 0;
   const two = (n) => String(n).padStart(2, '0');
@@ -941,7 +975,7 @@
 
   function startExtras() {
     drawDz(); applyFoto();
-    if (NATIVO) nat('segundoPlano', !!opt.bgOn);
+    bgAplicar();
     postit.setMode(opt.padMode);
     if (opt.padOn) postit.setOn(true);
     drawPad(); drawTrainCount();

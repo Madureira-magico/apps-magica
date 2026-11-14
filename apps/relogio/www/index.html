@@ -272,7 +272,7 @@
     </button>
   </div>
   <div id="diag" class="hide" style="font-size:11px;color:#EF9F27;text-align:center;min-height:14px;word-break:break-word;-webkit-user-select:text;user-select:text"></div>
-  <div class="ver">v2.5</div>
+  <div class="ver">v2.5.1</div>
 </div>
 
 <!-- Tela de configurações -->
@@ -1102,20 +1102,33 @@ $('icones').addEventListener('touchend', e => {
 // ----- funcionar com a tela apagada / em segundo plano (só no app) -----
 // Um som mudo (inaudível) mantém o app acordado com a tela apagada: Bluetooth e internet continuam.
 let bgOn = store.get('bgOn') !== false, bgAudio = null;
-function silencioWav() {
-  const n = 8000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+// ----- "música" muda que mantém o app acordado; na tela de bloqueio aparece como uma música de verdade -----
+const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252 };
+function musicaMudaUrl() {
+  const rate = 8000, n = rate * MUSICA.secs, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
   const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
-  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true);
-  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
-  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, i % 2 ? 1 : -1, true);
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, i % 2 ? 129 : 127);   // inaudível
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+function musicaInfo(audio) {
+  try { document.title = MUSICA.title; } catch (e) {}
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: MUSICA.title, artist: MUSICA.artist, album: '', artwork: [] });
+    const keep = () => { const p = audio.play(); if (p && p.catch) p.catch(() => {}); };   // "pausar" no bloqueio não para o app
+    ['pause', 'stop'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, keep); } catch (e) {} });
+    ['previoustrack', 'nexttrack'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, () => {}); } catch (e) {} });
+    ['seekbackward', 'seekforward', 'seekto'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, null); } catch (e) {} });
+  } catch (e) {}
 }
 function bgAplicar() {
   if (!NATIVO) return;
   try { window.webkit.messageHandlers.segundoPlano.postMessage(!!bgOn); } catch (e) {}
   if (bgOn) {
-    if (!bgAudio) { bgAudio = new Audio(silencioWav()); bgAudio.loop = true; bgAudio.setAttribute('playsinline', ''); }
+    if (!bgAudio) { bgAudio = new Audio(musicaMudaUrl()); bgAudio.loop = true; bgAudio.setAttribute('playsinline', ''); musicaInfo(bgAudio); }
     const p = bgAudio.play(); if (p && p.catch) p.catch(() => {});
   } else if (bgAudio) bgAudio.pause();
 }
