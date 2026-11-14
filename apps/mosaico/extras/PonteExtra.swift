@@ -35,6 +35,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     private var escolhaResposta: Resposta?
     private var escolhaNome = ""
     private var escolhaRosto = false
+    private var escolhaVarias = 0, escolhaPasta = ""
 
     // câmera (leitura de texto)
     private var sessao: AVCaptureSession?
@@ -152,6 +153,8 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             }
         case "escolher":
             escolher(nome: txt("nome"), rosto: (m["rosto"] as? Bool) ?? false, responder)
+        case "escolherVarias":
+            escolherVarias(pasta: txt("pasta"), max: max(1, Int(num("max", 63))), responder)
         case "apagar":
             try? FileManager.default.removeItem(at: arq(txt("nome")))
             responder(true, nil)
@@ -514,10 +517,54 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         }
     }
 
+    /// várias fotos de uma vez (fotos do começo da Fototeca), na ordem em que foram tocadas
+    private func escolherVarias(pasta: String, max: Int, _ r: @escaping Resposta) {
+        DispatchQueue.main.async {
+            guard let t = self.tela, !pasta.isEmpty else { return r(nil, "sem tela") }
+            self.escolhaResposta?(false, nil)
+            self.escolhaResposta = r
+            self.escolhaVarias = max
+            self.escolhaPasta = pasta
+            var conf = PHPickerConfiguration(photoLibrary: .shared())
+            conf.filter = .images
+            conf.selectionLimit = max
+            if #available(iOS 15.0, *) { conf.selection = .ordered }
+            let p = PHPickerViewController(configuration: conf)
+            p.delegate = self
+            t.present(p, animated: true)
+        }
+    }
+    private func salvarVarias(_ res: [PHPickerResult], _ pasta: String, _ r: @escaping Resposta) {
+        if res.isEmpty { return r([[String: Any]](), nil) }
+        let grupo = DispatchGroup(), trava = NSLock()
+        var saida = [[String: Any]?](repeating: nil, count: res.count)
+        let base = Int(Date().timeIntervalSince1970 * 1000)
+        for (k, x) in res.enumerated() {
+            guard x.itemProvider.canLoadObject(ofClass: UIImage.self) else { continue }
+            grupo.enter()
+            _ = x.itemProvider.loadObject(ofClass: UIImage.self) { obj, _ in
+                self.fila.async {
+                    defer { grupo.leave() }
+                    guard let im = obj as? UIImage else { return }
+                    let pronta = self.normalizar(im, maior: 1600)
+                    let id = "a\(base)_\(k)"
+                    guard let jpg = pronta.jpegData(compressionQuality: 0.88), self.gravar(jpg, self.arq("\(pasta)/\(id).jpg")) else { return }
+                    var d: [String: Any] = ["id": id, "w": pronta.size.width * pronta.scale, "h": pronta.size.height * pronta.scale]
+                    if let aid = x.assetIdentifier, let a = PHAsset.fetchAssets(withLocalIdentifiers: [aid], options: nil).firstObject, let c = a.creationDate {
+                        d["data"] = c.timeIntervalSince1970 * 1000
+                    }
+                    trava.lock(); saida[k] = d; trava.unlock()
+                }
+            }
+        }
+        grupo.notify(queue: .main) { r(saida.compactMap { $0 }, nil) }
+    }
+
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
         guard let r = escolhaResposta else { return }
         escolhaResposta = nil
+        if escolhaVarias > 0 { escolhaVarias = 0; return salvarVarias(results, escolhaPasta, r) }
         guard let prov = results.first?.itemProvider, prov.canLoadObject(ofClass: UIImage.self) else { return r(false, nil) }
         let nome = escolhaNome, rosto = escolhaRosto
         _ = prov.loadObject(ofClass: UIImage.self) { obj, _ in

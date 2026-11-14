@@ -32,8 +32,13 @@ const guarda = {
 const cfg = Object.assign({
   abrir: 'fototeca', tema: 'auto', n0: 3, colsM: 60, cor: 'cor', reforco: 0.4, enq: 'perto', filtro: true, aviso: true,
   fotoReal: false, vibrar: true, origem: '', limite: 8000, inj: false, injId: '', wk: '', temPrint: false, zonas: {},
-  piada: 'bebes', bebe: 0, bebes: [false, false, false, false], fixas: [], fixa: 0, tirados: [], ver: 1, v: 2
+  piada: 'bebes', bebe: 0, bebes: [false, false, false, false], fixas: [], fixa: 0, tirados: [], abert: [], ver: 1, v: 2
 }, guarda.get('cfg', {}));
+if (!Array.isArray(cfg.abert)) cfg.abert = [];
+const MAX_ABERT = 63;
+const tokAbert = a => 'arq:abert/' + a.id + '.jpg';
+const abertDe = it => (typeof it === 'string' && it.startsWith('arq:abert/')) ? cfg.abert.find(a => tokAbert(a) === it) : null;
+function srcMini(it) { return it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : String(it).startsWith('arq:') ? URLS.arq(it.slice(4), cfg.ver) : URLS.mini(it); }
 if ((cfg.v || 1) < 2) {   // vindo da versão 1.0
   Object.assign(cfg, { colsM: 60, cor: 'cor', reforco: 0.4, limite: 8000, tema: 'auto', enq: 'perto', filtro: true, aviso: true,
     piada: 'bebes', fixas: cfg.fixas || [], fixa: 0, tirados: cfg.tirados || [], v: 2 });
@@ -148,6 +153,7 @@ function indiceBebe(total) {
 }
 function montarSeq() {
   const s = tirados.size ? base.filter(id => !tirados.has(id)) : base.slice();
+  for (const a of cfg.abert) s.push(tokAbert(a));   // fotos do começo: sempre as mesmas, guardadas no app
   if (arqPiada()) s.splice(indiceBebe(s.length + 1), 0, '#piada');
   seqNormal = s;
   seq = (mos && mos.seq) ? mos.seq : seqNormal;
@@ -829,6 +835,13 @@ $('#selLixo').addEventListener('click', () => {
   sairSelecao();
 });
 function tirarDoApp(ids) {
+  const ab = ids.filter(id => abertDe(id));
+  if (ab.length) {
+    for (const id of ab) { nat.call('apagar', { nome: id.slice(4) }).catch(() => {}); }
+    cfg.abert = cfg.abert.filter(a => !ab.includes(tokAbert(a))); salvar();
+    if (mos) mos.seq = mos.seq.filter(id => !ab.includes(id));
+    montarSeq(); if (atual) prepararMosaico(); desenharAbert();
+  }
   ids = ids.filter(id => id && id !== '#piada' && !String(id).startsWith('arq:'));
   if (!ids.length) return;
   ids.forEach(id => tirados.add(id));
@@ -867,10 +880,12 @@ const fmtData = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long'
 const fmtHora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
 function srcGrande(it) {
   if (it === '#piada') return URLS.arq(arqPiada(), cfg.ver);
+  if (String(it).startsWith('arq:')) return URLS.arq(it.slice(4), cfg.ver);
   return URLS.foto(it, Math.round(Math.max(W, H) * DPR), true);
 }
 function grandeEmCache(it) {   // a maior versão dessa foto que já está carregada
   if (it === '#piada') return null;
+  if (String(it).startsWith('arq:')) return URLS.arq(it.slice(4), cfg.ver);
   let m = null, ms = 0;
   for (const s of [Math.round(Math.max(W, H) * DPR), 1200, 800, 520, 400, 256]) { const e = IMG.get(it + '|' + s); if (e && e.ok && s > ms) { m = e.img.src; ms = s; } }
   if (!m) { const e = IMG.get(it + '|m'); if (e && e.ok) m = e.img.src; }
@@ -893,8 +908,9 @@ function montarPalco() {
       else {
         // na hora: a miniatura (já está no aparelho) no tamanho e lugar exatos da foto; a nítida entra por cima
         const c = grandeEmCache(it);
-        im.src = c || (it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it));
-        if (!c) {
+        im.src = c || srcMini(it);
+        if (!c && tams.has(it)) { const e = encaixe(...tams.get(it)); Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover' }); }
+        else if (!c) {
           im.style.visibility = 'hidden';
           tamanhoFoto(it).then(([fw, fh]) => {
             const e = encaixe(fw, fh);
@@ -921,7 +937,7 @@ function montarTira() {
   let h = '';
   for (let i = Math.max(0, verI - 14); i <= Math.min(vSeq.length - 1, verI + 14); i++) {
     const it = vSeq[i]; if (!it) continue;
-    const src = it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it);
+    const src = srcMini(it);
     h += '<img data-i="' + i + '"' + (i === verI ? ' class="atual"' : '') + ' src="' + src + '">';
   }
   t.innerHTML = h;
@@ -931,12 +947,20 @@ function montarTira() {
 $('#tira').addEventListener('click', e => { const im = e.target.closest('[data-i]'); if (im) { verI = +im.dataset.i; montarPalco(); } });
 async function mostrarData() {
   const it = vSeq[verI], el = $('#vData');
+  const ab = abertDe(it);
+  if (ab) { if (ab.data) { const dt = new Date(ab.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } else el.innerHTML = ''; return; }
   if (it === '#piada') { el.innerHTML = 'Hoje<small>' + fmtHora.format(new Date(Date.now() - 35 * 60000)) + '</small>'; return; }
   el.innerHTML = '';
   try { const d = await nat.call('info', { id: it }); if (d && d.data && vSeq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
 }
 /* abrir e fechar como o app Fotos: a foto cresce a partir da miniatura e volta para ela */
+const tams = new Map();
 async function tamanhoFoto(it) {
+  if (tams.has(it)) return tams.get(it);
+  const t = await tamanhoFoto0(it); if (t[0] && !(t[0] === 3 && t[1] === 4)) tams.set(it, t); return t;
+}
+async function tamanhoFoto0(it) {
+  const ab = abertDe(it); if (ab && ab.w) return [ab.w, ab.h];
   if (it === '#piada') { const im = IMG.get(arqPiada() + '|' + cfg.ver); return im && im.ok ? [im.img.naturalWidth, im.img.naturalHeight] : [3, 4]; }
   try { const d = await Promise.race([nat.call('info', { id: it }), new Promise(r => setTimeout(() => r(null), 120))]); if (d && d.w) return [d.w, d.h]; } catch (_) {}
   return [3, 4];
@@ -964,7 +988,12 @@ async function abrirFoto(i) {
   const cel = i; i = verDeCel(cel); if (i < 0) { abrindo = false; return; }
   verI = i; const it = vSeq[i];
   const de = nativo ? await rectNat(cel) : rectDoItem(cel), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
-  const src = grandeEmCache(it) || (it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it));
+  let src = grandeEmCache(it) || srcMini(it);
+  if (!grandeEmCache(it) && !String(it).startsWith('arq:') && it !== '#piada') {   // espera a foto nítida (no máx. 1/4 s): já chega nítida
+    let g = preCarga.get(it); if (!g) { g = new Image(); g.src = srcGrande(it); preCarga.set(it, g); }
+    if (!(g.complete && g.naturalWidth)) await Promise.race([new Promise(r => { g.addEventListener('load', r); g.addEventListener('error', r); }), new Promise(r => setTimeout(r, 260))]);
+    if (g.complete && g.naturalWidth) src = g.src;
+  }
   $('#ver').classList.remove('limpo');
   if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
   preCarregar(i);
@@ -1241,6 +1270,27 @@ $('#aFixas').addEventListener('click', async e => {
   else if (a === 'tirar' && confirm('Tirar a foto "' + cfg.fixas[i].nome + '"?')) { nat.call('apagar', { nome: 'piada/' + cfg.fixas[i].id + '.jpg' }).catch(() => {}); cfg.fixas.splice(i, 1); if (cfg.fixa >= cfg.fixas.length) cfg.fixa = 0; }
   salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
 });
+function desenharAbert() {
+  const e = $('#aAbert'); if (!e) return;
+  e.innerHTML = '<div class="lin"><span style="flex:1">' + cfg.abert.length + ' de ' + MAX_ABERT + ' fotos</span>'
+    + (cfg.abert.length < MAX_ABERT ? '<button class="bt" data-a="add">Escolher</button>' : '')
+    + (cfg.abert.length ? ' <button class="bt" data-a="limpar">Limpar</button>' : '') + '</div>'
+    + (cfg.abert.length ? '<div class="miniGrade">' + cfg.abert.map(a => '<img src="' + URLS.arq('abert/' + a.id + '.jpg', cfg.ver) + '">').join('') + '</div>' : '');
+}
+$('#aAbert').addEventListener('click', async e => {
+  const a = e.target.dataset.a; if (!a) return;
+  if (a === 'add') {
+    try {
+      const r = await nat.call('escolherVarias', { pasta: 'abert', max: MAX_ABERT - cfg.abert.length });
+      if (Array.isArray(r) && r.length) { cfg.abert = cfg.abert.concat(r).slice(0, MAX_ABERT); cfg.ver++; salvar(); montarSeq(); if (atual) prepararMosaico(); }
+    } catch (_) {}
+  } else if (a === 'limpar' && confirm('Tirar as ' + cfg.abert.length + ' fotos do começo?')) {
+    for (const x of cfg.abert) nat.call('apagar', { nome: 'abert/' + x.id + '.jpg' }).catch(() => {});
+    cfg.abert = []; salvar(); montarSeq(); if (atual) prepararMosaico();
+  }
+  desenharAbert();
+});
+desenharAbert();
 function desenharListaFam() {
   atualizarContaFam();
   if (telaAtual !== 'ajustes') return;

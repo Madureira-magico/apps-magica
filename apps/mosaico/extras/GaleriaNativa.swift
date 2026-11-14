@@ -358,7 +358,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         CATransaction.begin(); CATransaction.setDisableActions(true)
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
-        tintaFaixa.alpha = 0.55 * pow(ramp, 1.2)
+        tintaFaixa.alpha = 0.92 * suave(0.35 * CGFloat(C), 0.9 * CGFloat(C), v)
         if corModo != "cor" && ramp > 0 {
             corCamada.frame = vista.bounds
             corCamada.backgroundColor = corModo == "sepia" ? UIColor(red: 0.44, green: 0.30, blue: 0.16, alpha: 1).cgColor : UIColor.gray.cgColor
@@ -415,7 +415,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let filaImg: OperationQueue = { let q = OperationQueue(); q.maxConcurrentOperationCount = 4; q.qualityOfService = .userInitiated; return q }()
     /// devolve na hora a melhor foto que já tem (a miniatura do disco é instantânea) e busca a nítida por trás
     func imagem(_ id: String, _ px: CGFloat, _ q: CGRect) -> CGImage? {
-        let s = id.hasPrefix("arq:") ? 256 : (px <= 90 ? 64 : (px <= 300 ? 256 : 512))
+        let s = px <= 90 ? 64 : (px <= 300 ? 256 : 512)
         let k = "\(id)|\(s)" as NSString
         if let g = cache.object(forKey: k)?.img { return g }
         if s == 64 || id.hasPrefix("arq:") {
@@ -445,7 +445,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func carregar(_ id: String, _ s: Int) -> CGImage? {
         if id.hasPrefix("arq:") {
             guard let im = UIImage(contentsOfFile: urlArq(String(id.dropFirst(4))).path) else { return nil }
-            return quadrado(im, 256)
+            return quadrado(im, CGFloat(s))
         }
         if s == 64, let im = UIImage(contentsOfFile: urlMini(id).path), let cg = im.cgImage { return cg }
         guard let a = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else {
