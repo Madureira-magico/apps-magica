@@ -1,12 +1,14 @@
 APPS DE MÁGICA — um projeto só para todos os apps de iPhone
 
-apps/         uma pasta para cada app (listas, bola, relogio, lousa)
+apps/         uma pasta para cada app (listas, bola, relogio, lousa, mosaico)
   listas/app.conf   nome do app e identificação
   listas/icone.png  ícone
   listas/www/       o app em si (a mesma página do site)
   listas/extras/    arquivos extras (ex.: clique.mp3), se houver
   lousa/web/        páginas que vão para o site (app do assistente da lousa)
   lousa/fonte/      as peças da Lousa (python3 build.py monta www/ e web/)
+  mosaico/fonte/    a página do Mosaico e a lista de famosos (python3 build.py monta www/)
+  mosaico/extras/   parte do iPhone só do Mosaico (fotos, rosto, mosaico)
 comum/        a "casca" do iPhone, igual para todos os apps
 scripts/      a receita que monta os apps
 .github/      o robô do GitHub que monta tudo a cada envio

@@ -22,6 +22,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     private var querMudo = false
     private let permiteDeitar = (Bundle.main.object(forInfoDictionaryKey: "PermiteDeitar") as? Bool) ?? false
     private var deitado = false
+    private var extra: ExtraDoApp?
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -40,6 +41,11 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         for nome in ["barra", "estilo", "som", "ble", "segundoPlano", "giro"] {
             config.userContentController.add(self, name: nome)
         }
+        // Peça extra só de um app (ex.: apps/mosaico/extras/PonteExtra.swift). Os outros apps não têm e nada muda.
+        if let tipo = NSClassFromString("PonteExtra") as? NSObject.Type, let e = tipo.init() as? ExtraDoApp {
+            extra = e
+            e.instalar(config)
+        }
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.uiDelegate = self
@@ -54,6 +60,7 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
         view = webView
         ponte.webView = webView
         ponte.tela = self
+        extra?.ligar(webView, tela: self)
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -209,6 +216,12 @@ final class WebViewController: UIViewController, WKUIDelegate, WKNavigationDeleg
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { .fade }
     override var prefersHomeIndicatorAutoHidden: Bool { esconderIndicador }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { deitado ? .landscape : .portrait }
+}
+
+/// Peça extra de um app só: uma classe chamada "PonteExtra" (na pasta extras do app) que segue este combinado.
+@objc protocol ExtraDoApp: AnyObject {
+    func instalar(_ config: WKWebViewConfiguration)
+    func ligar(_ webView: WKWebView, tela: UIViewController)
 }
 
 /// Um segundo de "som" baixinho (inaudível), em formato WAV, feito na hora.

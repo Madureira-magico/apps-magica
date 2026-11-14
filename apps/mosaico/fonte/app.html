@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Fotos</title>
+<style>
+:root{
+  --st:env(safe-area-inset-top,47px);--sb:env(safe-area-inset-bottom,34px);
+  --bg:#000;--fg:#fff;--fg2:rgba(255,255,255,.62);--glass:rgba(40,40,44,.55);--glass2:rgba(60,60,66,.6);--azul:#0a84ff;
+  --linha:rgba(255,255,255,.12);--cel:#1c1c1e;--cel2:#2c2c2e;--grupo:#000;
+}
+body.claro{--bg:#fff;--fg:#000;--fg2:rgba(0,0,0,.55);--glass:rgba(245,245,247,.62);--glass2:rgba(235,235,240,.7);--azul:#007aff;
+  --linha:rgba(0,0,0,.12);--cel:#fff;--cel2:#f2f2f7;--grupo:#f2f2f7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,"SF Pro Text",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%}
+.tela{position:fixed;inset:0;display:none}
+.tela.on{display:block}
+svg{display:block}
+/* ---------- tela de início (print) ---------- */
+#inicio{background:#000 center/cover no-repeat}
+#inicio .vazio{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:15px;text-align:center;padding:30px}
+/* ---------- Fototeca ---------- */
+#fototeca{background:var(--bg);touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.fade-top{position:absolute;left:0;right:0;top:0;height:calc(var(--st) + 120px);pointer-events:none;
+  background:linear-gradient(rgba(0,0,0,.72),rgba(0,0,0,.35) 55%,rgba(0,0,0,0));
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);-webkit-mask-image:linear-gradient(#000 45%,transparent);mask-image:linear-gradient(#000 45%,transparent)}
+body.claro .fade-top{background:linear-gradient(rgba(255,255,255,.85),rgba(255,255,255,.4) 55%,rgba(255,255,255,0))}
+.cab{position:absolute;left:0;right:0;top:calc(var(--st) + 2px);padding:0 16px;display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none}
+.titulo{pointer-events:auto}
+.titulo b{display:block;font-size:34px;font-weight:700;letter-spacing:.2px;line-height:41px;text-shadow:0 1px 8px rgba(0,0,0,.25)}
+.titulo small{display:block;font-size:15px;font-weight:600;color:var(--fg2);margin-top:-1px}
+.botoes{display:flex;gap:10px;margin-top:2px;pointer-events:auto}
+.vid{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);
+  border:.5px solid rgba(255,255,255,.14);box-shadow:0 2px 14px rgba(0,0,0,.25)}
+body.claro .vid{border-color:rgba(0,0,0,.06)}
+.circ{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--fg)}
+.pilula{height:46px;border-radius:23px;padding:0 18px;display:flex;align-items:center;font-size:17px;font-weight:500;color:var(--fg)}
+.rodape{position:absolute;left:0;right:0;bottom:max(calc(var(--sb) - 8px),10px);display:flex;align-items:center;gap:10px;padding:0 18px;pointer-events:none}
+.rodape>*{pointer-events:auto}
+.aba{flex:1;height:58px;border-radius:29px;display:flex;align-items:center;gap:14px;padding:0 6px 0 8px;position:relative}
+.aba .sel{display:flex;align-items:center;gap:10px;height:46px;border-radius:23px;padding:0 16px;flex:1;background:rgba(255,255,255,.1);color:var(--azul);font-weight:600;font-size:17px}
+body.claro .aba .sel{background:rgba(0,0,0,.06)}
+.aba .ic2{color:var(--fg);padding:0 10px}
+.redondo{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--fg)}
+.canto{position:absolute;width:46px;height:46px;z-index:30}
+#cTL{left:0;top:0}#cTR{right:0;top:0}#cBL{left:0;bottom:0}#cBR{right:0;bottom:0}
+#real{position:absolute;inset:0;background:#000 center/cover no-repeat;opacity:0;pointer-events:none;transition:opacity 1.6s ease}
+#real.on{opacity:1}
+/* busca */
+#busca{position:absolute;inset:0;background:var(--bg);display:none;z-index:20}
+#busca.on{display:block}
+.bbar{position:absolute;left:0;right:0;top:calc(var(--st) + 6px);display:flex;align-items:center;gap:10px;padding:0 16px}
+.bcampo{flex:1;height:44px;border-radius:22px;display:flex;align-items:center;gap:8px;padding:0 14px;color:var(--fg2)}
+.bcampo input{flex:1;background:none;border:0;outline:0;color:var(--fg);font-size:17px;font-family:inherit;-webkit-user-select:text;user-select:text}
+.bcanc{color:var(--fg);font-size:17px;padding:10px 4px}
+.bmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--fg2);font-size:16px;padding:0 30px}
+.bmsg b{display:block;color:var(--fg);font-size:22px;margin-bottom:6px}
+/* ---------- visualizador ---------- */
+#ver{background:var(--bg);z-index:5;touch-action:none}
+#ver .palco{position:absolute;inset:0;overflow:hidden}
+#ver .fx{position:absolute;top:0;bottom:0;width:100%;display:flex;align-items:center;justify-content:center}
+#ver .fx img{max-width:100%;max-height:100%;object-fit:contain;display:block;pointer-events:none}
+#ver .vcab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;transition:opacity .2s}
+#ver .vdata{text-align:center;font-size:15px;font-weight:600;line-height:19px;text-shadow:0 1px 6px rgba(0,0,0,.3)}
+#ver .vdata small{display:block;font-weight:400;font-size:13px;color:var(--fg2)}
+#ver .vrod{position:absolute;left:16px;right:16px;bottom:max(calc(var(--sb) - 6px),10px);display:flex;gap:10px;transition:opacity .2s}
+#ver .vrod .barra{flex:1;height:54px;border-radius:27px;display:flex;align-items:center;justify-content:space-around;color:var(--fg)}
+#ver.limpo .vcab,#ver.limpo .vrod{opacity:0;pointer-events:none}
+#ver.limpo{background:#000}
+/* ---------- Notas ---------- */
+#notas{background:var(--bg);z-index:6}
+.ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 12px}
+.ncab .vid{color:#e5b100}
+#ntexto{position:absolute;left:0;right:0;top:calc(var(--st) + 66px);bottom:0;padding:6px 20px;background:none;border:0;outline:0;resize:none;
+  color:var(--fg);font:400 17px/1.35 -apple-system,system-ui,sans-serif;caret-color:#e5b100;-webkit-user-select:text;user-select:text}
+.ndata{position:absolute;left:0;right:0;top:calc(var(--st) + 52px);text-align:center;color:var(--fg2);font-size:13px}
+/* ---------- marcar ícones ---------- */
+#marcar{z-index:40;background:#000 center/cover no-repeat}
+#marcar .aviso{position:absolute;left:12px;right:12px;top:calc(var(--st) + 10px);background:rgba(0,0,0,.78);color:#fff;border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.35}
+#marcar .aviso button{margin-top:8px;margin-right:6px}
+#marcar .ponto{position:absolute;width:68px;height:68px;margin:-34px 0 0 -34px;border:3px solid #34c759;border-radius:18px;pointer-events:none}
+/* ---------- Ajustes (escondido) ---------- */
+#ajustes{background:var(--grupo);z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;-webkit-user-select:none}
+.acab{position:sticky;top:0;z-index:2;padding:calc(var(--st) + 6px) 16px 8px;background:var(--grupo);display:flex;align-items:center;justify-content:space-between}
+.acab b{font-size:30px}
+.acab button{font-size:17px;color:var(--azul);background:none;border:0;font-weight:600}
+.sec{margin:18px 16px 0}
+.sec h3{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--fg2);margin:0 0 6px 14px;letter-spacing:.2px}
+.caixa{background:var(--cel);border-radius:12px;overflow:hidden}
+.lin{display:flex;align-items:center;gap:10px;min-height:46px;padding:8px 14px;border-bottom:.5px solid var(--linha);font-size:16px}
+.lin:last-child{border-bottom:0}
+.lin .r{margin-left:auto;color:var(--fg2);text-align:right;font-size:15px}
+.lin input[type=text],.lin input[type=number],.lin select{margin-left:auto;background:var(--cel2);color:var(--fg);border:0;border-radius:8px;padding:8px 10px;font-size:16px;font-family:inherit;max-width:60%;-webkit-user-select:text;user-select:text}
+.lin input[type=text]{flex:1;max-width:none;min-width:0}
+.lin input[type=range]{margin-left:auto;width:48%}
+.lin .bt,.bt{background:var(--azul);color:#fff;border:0;border-radius:9px;padding:8px 12px;font-size:15px;font-weight:600;font-family:inherit}
+.bt.cinza{background:var(--cel2);color:var(--fg)}
+.bt.verm{background:#ff3b30}
+.nota{font-size:13px;color:var(--fg2);margin:6px 14px 0;line-height:1.4}
+.chave{position:relative;width:51px;height:31px;flex:none;margin-left:auto}
+.chave input{opacity:0;position:absolute;inset:0;margin:0;z-index:2}
+.chave span{position:absolute;inset:0;border-radius:16px;background:var(--cel2);transition:.2s}
+.chave span:after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.25);transition:.2s}
+.chave input:checked+span{background:#34c759}
+.chave input:checked+span:after{left:22px}
+.mini{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--cel2);flex:none}
+.estado{font-size:14px;color:var(--fg2)}
+.ok{color:#34c759}.erro{color:#ff453a}
+#listaFam .lin{gap:8px}
+#listaFam .nm{flex:1;min-width:0}
+#listaFam .nm b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#listaFam .nm small{color:var(--fg2);font-size:12px}
+#listaFam select{max-width:96px;font-size:13px;padding:6px}
+.bebes{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.bebes div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;color:var(--fg2);text-align:center}
+.bebes img{width:100%;aspect-ratio:1;border-radius:10px;object-fit:cover;background:var(--cel2)}
+.bebes div.atual img{outline:3px solid #34c759}
+#toast{position:fixed;left:50%;top:calc(var(--st) + 8px);transform:translateX(-50%);background:rgba(30,30,30,.92);color:#fff;padding:8px 14px;border-radius:12px;font-size:14px;z-index:99;display:none;max-width:90%}
+</style>
+</head>
+<body>
+
+<!-- tela de início falsa -->
+<div class="tela" id="inicio"><canvas id="cvIni" style="position:absolute;inset:0;width:100%;height:100%"></canvas><div class="vazio" id="inicioVazio">Escolha o print da sua tela de início nos ajustes</div></div>
+
+<!-- Fototeca -->
+<div class="tela" id="fototeca">
+  <canvas id="cv"></canvas>
+  <div id="real"></div>
+  <div class="fade-top"></div>
+  <div class="cab">
+    <div class="titulo" id="titulo"><b>Fototeca</b><small id="contagem">0 Itens</small></div>
+    <div class="botoes">
+      <div class="circ vid"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h16M6 11h10M9 16h4"/></svg></div>
+      <div class="pilula vid">Selecionar</div>
+    </div>
+  </div>
+  <div class="rodape">
+    <div class="aba vid">
+      <div class="sel"><svg width="30" height="26" viewBox="0 0 30 26" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="20" height="16" rx="3"/><path d="M3 7v13a3 3 0 0 0 3 3h17"/><circle cx="21" cy="7" r="2" fill="currentColor" stroke="none"/><path d="M8 17l5-6 4 4 3-3 6 5"/></svg>Fototeca</div>
+      <div class="ic2"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="9" width="20" height="14" rx="3"/><path d="M6 5h14M9 1.8h8"/></svg></div>
+    </div>
+    <div class="redondo vid" id="lupa"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><path d="M17 17l6 6"/></svg></div>
+  </div>
+  <div class="canto" id="cTL"></div><div class="canto" id="cTR"></div><div class="canto" id="cBL"></div><div class="canto" id="cBR"></div>
+  <div id="busca">
+    <div class="bbar"><div class="bcampo vid"><svg width="18" height="18" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><path d="M17 17l6 6"/></svg><input id="bInput" type="text" placeholder="Pesquisar" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search"></div><div class="bcanc" id="bCanc">Cancelar</div></div>
+    <div class="bmsg" id="bMsg"></div>
+  </div>
+</div>
+
+<!-- visualizador de foto -->
+<div class="tela" id="ver">
+  <div class="palco" id="palco"></div>
+  <div class="vcab">
+    <div class="circ vid" id="vVolta"><svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg></div>
+    <div class="vdata" id="vData"></div>
+    <div class="circ vid"><svg width="22" height="6" viewBox="0 0 22 6" fill="currentColor"><circle cx="3" cy="3" r="2.4"/><circle cx="11" cy="3" r="2.4"/><circle cx="19" cy="3" r="2.4"/></svg></div>
+  </div>
+  <div class="vrod"><div class="barra vid">
+    <svg width="22" height="26" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg>
+    <svg width="26" height="24" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 22S2 15.5 2 8.5A5.5 5.5 0 0 1 13 5a5.5 5.5 0 0 1 11 3.5C24 15.5 13 22 13 22z"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 11v6" stroke-linecap="round"/><circle cx="12" cy="7.3" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg>
+  </div></div>
+</div>
+
+<!-- Notas falso -->
+<div class="tela" id="notas">
+  <div class="ncab"><div class="pilula vid" id="nVolta" style="padding:0 14px 0 10px;gap:4px"><svg width="12" height="20" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg>Notas</div>
+  <div class="pilula vid" id="nOk" style="font-weight:600">OK</div></div>
+  <div class="ndata" id="nData"></div>
+  <textarea id="ntexto" autocapitalize="sentences" autocorrect="off" spellcheck="false"></textarea>
+</div>
+
+<!-- marcar ícones no print -->
+<div class="tela" id="marcar"><div class="aviso"><span id="mMsg"></span><br><button class="bt cinza" id="mPula">Pular</button><button class="bt verm" id="mSai">Sair</button></div></div>
+
+<!-- Ajustes escondidos -->
+<div class="tela" id="ajustes">
+  <div class="acab"><b>Ajustes</b><button id="aFecha">Fechar</button></div>
+
+  <div class="sec"><h3>Famoso desta apresentação</h3><div class="caixa">
+    <div class="lin">Atual<span class="r" id="aAtual">—</span></div>
+    <div class="lin"><input type="text" id="aNome" placeholder="Digite um nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt" id="aUsar">Usar</button></div>
+    <div class="lin"><button class="bt cinza" id="aLimpar">Limpar</button><span class="r" id="aEstado"></span></div>
+  </div><div class="nota">O nome também chega pelo Notas falso, pela lupa da Fototeca ou pelo Inject. Quando o mosaico fica pronto, o celular dá uma vibrada curta.</div></div>
+
+  <div class="sec"><h3>Receber pelo Inject</h3><div class="caixa">
+    <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aInj"><span></span></label></div>
+    <div class="lin">ID do Inject<input type="text" id="aInjId" inputmode="numeric" placeholder="13579"></div>
+    <div class="lin">Intermediário<input type="text" id="aWk" placeholder="https://….workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="lin">Última<span class="r" id="aInjUlt">—</span></div>
+  </div><div class="nota">O mesmo ID e o mesmo intermediário que você usa no app Listas.</div></div>
+
+  <div class="sec"><h3>Fotos da galeria</h3><div class="caixa">
+    <div class="lin">Usar<select id="aOrigem"><option value="">Todas as fotos</option></select></div>
+    <div class="lin">Fotos para o mosaico<select id="aLimite"><option value="1500">1.500 mais recentes</option><option value="3000">3.000 mais recentes</option><option value="5000">5.000 mais recentes</option></select></div>
+    <div class="lin"><span class="estado" id="aAnalise">—</span><button class="bt cinza" id="aReanalisar" style="margin-left:auto">Atualizar</button></div>
+  </div><div class="nota">O app prepara uma miniatura de cada foto (só na primeira vez, leva um minutinho). Fotos que estão só no iCloud ficam de fora do mosaico.</div></div>
+
+  <div class="sec"><h3>Mosaico</h3><div class="caixa">
+    <div class="lin">Colunas no mosaico<select id="aCols"><option>30</option><option>35</option><option>40</option><option>45</option><option>50</option></select></div>
+    <div class="lin">Cor<select id="aCor"><option value="sepia">Sépia</option><option value="pb">Preto e branco</option><option value="cor">Colorido</option></select></div>
+    <div class="lin">Reforço do rosto<input type="range" id="aRef" min="0" max="0.6" step="0.05"><span class="r" id="aRefV" style="margin-left:6px;min-width:38px"></span></div>
+    <div class="lin">Foto real no final<label class="chave"><input type="checkbox" id="aReal"><span></span></label></div>
+    <div class="lin">Vibrar quando pronto<label class="chave"><input type="checkbox" id="aVib"><span></span></label></div>
+  </div><div class="nota">Foto real: com o mosaico na tela, toque duas vezes e o mosaico vai virando a foto de verdade (toque duas vezes de novo para voltar).</div></div>
+
+  <div class="sec"><h3>Bebês</h3><div class="caixa"><div class="bebes" id="aBebes"></div></div>
+  <div class="nota">Toque numa foto para escolher. Na Fototeca, um toque no canto da tela troca o bebê (vibra de leve): em cima à esquerda = 1, em cima à direita = 2, embaixo à esquerda = 3, embaixo à direita = 4. O bebê fica no meio da tela quando a Fototeca abre.</div></div>
+
+  <div class="sec"><h3>Famosos</h3><div class="caixa">
+    <div class="lin"><span class="estado" id="aFamEst">—</span><button class="bt" id="aBaixar" style="margin-left:auto">Baixar fotos</button></div>
+    <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
+  </div>
+  <div class="caixa" id="listaFam" style="margin-top:10px"></div>
+  <div class="nota">"Bebê" escolhe qual foto de bebê aparece com cada famoso. Toque na miniatura para trocar a foto por uma da sua galeria.</div></div>
+
+  <div class="sec"><h3>Tela de início</h3><div class="caixa">
+    <div class="lin">Abrir o app em<select id="aAbrir"><option value="fototeca">Fototeca</option><option value="inicio">Tela de início (print)</option></select></div>
+    <div class="lin"><button class="bt cinza" id="aPrint">Escolher print</button><button class="bt cinza" id="aMarcar" style="margin-left:auto">Marcar ícones</button></div>
+  </div><div class="nota">Tire um print da sua tela de início (sem nenhum app aberto) e escolha aqui. Depois marque onde ficam os ícones Fotos, Notas e Ajustes.</div></div>
+
+  <div class="sec"><h3>Aparência</h3><div class="caixa">
+    <div class="lin">Tema<select id="aTema"><option value="escuro">Escuro</option><option value="claro">Claro</option></select></div>
+    <div class="lin">Colunas ao abrir<select id="aN0"><option value="3">3</option><option value="5">5</option></select></div>
+  </div><div class="nota">Para abrir estes ajustes: segure o dedo 1,5 s no título "Fototeca" ou toque no ícone Ajustes do print.</div></div>
+  <div style="height:80px"></div>
+</div>
+
+<div id="toast"></div>
+
+<script type="text/plain" id="dadosFamosos">/*FAMOSOS*/</script>
+<script>
+'use strict';
+/* =====================================================================
+   MOSAICO — Fototeca falsa em que as fotos formam o rosto do famoso
+   ===================================================================== */
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const DPR = Math.min(3, window.devicePixelRatio || 1);
+let W = innerWidth, H = innerHeight;
+
+/* ---------- ponte com o iPhone ---------- */
+const nat = {
+  tem: !!(window.webkit && webkit.messageHandlers && webkit.messageHandlers.mz),
+  call(cmd, args) {
+    if (!this.tem) return Promise.reject(new Error('fora do app'));
+    return webkit.messageHandlers.mz.postMessage(Object.assign({ cmd }, args || {}));
+  },
+  msg(nome, valor) { try { webkit.messageHandlers[nome].postMessage(valor); } catch (_) {} }
+};
+const URLS = {
+  mini: id => 'mzfoto://mini?id=' + encodeURIComponent(id),
+  foto: (id, s, fit) => 'mzfoto://foto?id=' + encodeURIComponent(id) + '&s=' + s + (fit ? '&m=fit' : ''),
+  arq: (n, v) => 'mzfoto://arq?n=' + encodeURIComponent(n) + (v ? '&v=' + v : '')
+};
+const vibrar = f => nat.call('vibrar', { forca: f || 'leve' }).catch(() => {});
+function toast(t, ms) { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = 'none', ms || 2200); }
+
+/* ---------- configurações guardadas ---------- */
+const guarda = {
+  get(k, p) { try { const v = localStorage.getItem('mz_' + k); return v == null ? p : JSON.parse(v); } catch (_) { return p; } },
+  set(k, v) { try { localStorage.setItem('mz_' + k, JSON.stringify(v)); } catch (_) {} }
+};
+const cfg = Object.assign({
+  abrir: 'fototeca', tema: 'escuro', n0: 3, colsM: 40, cor: 'sepia', reforco: 0.35, fotoReal: false, vibrar: true,
+  origem: '', limite: 3000, inj: false, injId: '', wk: '', temPrint: false, zonas: {}, bebe: 0, bebes: [false, false, false, false], ver: 1
+}, guarda.get('cfg', {}));
+const salvar = () => guarda.set('cfg', cfg);
+
+/* ---------- lista de famosos ---------- */
+const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const maiusculas = s => String(s).toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+const slug = s => semAcento(s).replace(/ /g, '-').slice(0, 60) || 'x';
+function listaPadrao() {
+  return $('#dadosFamosos').textContent.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const [n, w, a] = l.split('|');
+    return { n: n.trim(), w: (w || '').trim(), a: (a || '').split(';').map(x => x.trim()).filter(Boolean), b: -1, f: '', r: null };
+  });
+}
+let famosos = guarda.get('famosos', null);
+if (!Array.isArray(famosos) || !famosos.length) famosos = listaPadrao();
+const salvarFam = () => guarda.set('famosos', famosos);
+function acharFamoso(txt) {
+  const q = semAcento(txt);
+  if (!q) return null;
+  let melhor = null, nota = 9;
+  for (const f of famosos) {
+    const nomes = [f.n, f.w.replace(/\s*\(.*\)$/, ''), ...f.a].map(semAcento).filter(Boolean);
+    for (const nm of nomes) {
+      if (nm === q) return f;
+      const d = distancia(nm, q);
+      const lim = q.length >= 10 ? 2 : q.length >= 5 ? 1 : 0;
+      if (d <= lim && d < nota) { nota = d; melhor = f; }
+    }
+  }
+  return melhor;
+}
+function distancia(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+
+/* =====================================================================
+   FOTOS: lista da galeria, cores médias, sequência mostrada
+   ===================================================================== */
+let base = [];          // ids da galeria (antiga -> recente)
+let cores = new Map();  // id -> [r,g,b]
+let seq = [];           // o que a Fototeca mostra (ids, '#bebe')
+let analisando = false;
+const lum = c => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+
+async function carregarFotos() {
+  let st;
+  try { st = await nat.call('permissao'); } catch (_) { st = 'fora'; }
+  if (st === 'negado') toast('Libere o acesso às fotos em Ajustes do iPhone › Mosaico › Fotos', 6000);
+  try { base = await nat.call('fotos', { album: cfg.origem || '' }); } catch (_) { base = base || []; }
+  montarSeq();
+  analisarFotos();
+}
+
+async function analisarFotos() {
+  if (analisando) return;
+  analisando = true;
+  const lim = Math.max(200, +cfg.limite || 3000);
+  const alvo = base.slice(-lim);
+  for (let i = 0; i < alvo.length; i += 150) {
+    const lote = alvo.slice(i, i + 150);
+    try {
+      const res = await nat.call('analisar', { ids: lote });
+      lote.forEach((id, k) => { if (res[k]) cores.set(id, res[k]); });
+    } catch (_) { break; }
+    mostrarAnalise(Math.min(alvo.length, i + 150), alvo.length);
+  }
+  analisando = false;
+  mostrarAnalise(alvo.length, alvo.length);
+  if (atual && atual.pronto) prepararMosaico();   // refaz com as fotos novas
+}
+function mostrarAnalise(f, t) { const e = $('#aAnalise'); if (e) e.textContent = (f < t ? 'Preparando ' + f + ' de ' + t : cores.size + ' fotos prontas para o mosaico'); }
+
+/* quantos itens aparecem na tela ao abrir (ficam sempre iguais e guardam o bebê) */
+function fixosNoFim() { const n = +cfg.n0 || 3, t = W / n; return n * (Math.ceil(H / t) + 1); }
+function indiceBebe(total) {   // total = quantidade com o bebê; devolve a posição que fica no meio da tela ao abrir
+  const n = +cfg.n0 || 3, t = W / n, pb = padBaixo(n);
+  const k = Math.max(0, Math.round((H / 2 - pb) / t - 0.5));
+  const ultima = Math.floor((total - 1) / n), linha = Math.max(0, ultima - k);
+  return Math.min(total - 1, linha * n + Math.floor(n / 2));
+}
+
+function montarSeq() {
+  const s = base.slice();
+  if (cfg.bebes[cfg.bebe]) {
+    s.splice(indiceBebe(s.length + 1), 0, '#bebe');
+  }
+  seqNormal = s;
+  seq = (mos && mos.seq) ? mos.seq : seqNormal;
+  $('#contagem').textContent = base.length + ' Itens';
+  pedirDesenho();
+}
+let seqNormal = [];
+
+/* =====================================================================
+   ALVO: rosto do famoso (ou o nome escrito) e montagem do mosaico
+   ===================================================================== */
+let atual = guarda.get('atual', null);   // {nome, tipo:'rosto'|'texto', arq, pronto}
+let mos = null;                           // {seq, img, primeira, linhas, cols, versao}
+let preparo = 0;
+
+function estado(t, cls) { const e = $('#aEstado'); if (e) { e.textContent = t; e.className = 'r ' + (cls || ''); } }
+function mostrarAtual() { const e = $('#aAtual'); if (e) e.textContent = atual ? atual.nome + (atual.tipo === 'texto' ? ' (nome escrito)' : '') : '—'; }
+
+async function definirNome(txt, origem) {
+  txt = String(txt || '').replace(/\s+/g, ' ').trim();
+  if (txt.length < 2 || txt.length > 60) return;
+  const meu = ++preparo;
+  const f = acharFamoso(txt);
+  const nome = f ? f.n : maiusculas(txt);
+  if (f && f.b >= 0 && cfg.bebes[f.b]) { cfg.bebe = f.b; salvar(); montarSeq(); }
+  // 1) já deixa pronto com o nome escrito (rápido)
+  atual = { nome, tipo: 'texto', pronto: false, origem };
+  mostrarAtual(); estado('preparando…');
+  await prepararMosaico();
+  if (meu !== preparo) return;
+  // 2) troca pelo rosto, se tiver foto
+  let fam = f;
+  if (fam && fam.f) {
+    let existe = false;
+    try { existe = await nat.call('existe', { nome: fam.f }); } catch (_) {}
+    if (!existe) fam.f = '';
+  }
+  if (!fam || !fam.f) {
+    estado('procurando foto…');
+    const r = await baixarFamoso(fam || { n: nome, w: '', a: [], b: -1, f: '', r: null }, !fam);
+    if (meu !== preparo) return;
+    fam = r;
+  }
+  if (fam && fam.f) {
+    atual = { nome: fam.n, tipo: 'rosto', arq: fam.f, pronto: false, origem };
+    mostrarAtual();
+    await prepararMosaico();
+  }
+  if (meu !== preparo) return;
+  guarda.set('atual', atual);
+  estado(atual.tipo === 'rosto' ? 'pronto ✓' : 'pronto (sem foto: nome escrito)', 'ok');
+  if (cfg.vibrar) vibrar('leve');
+}
+
+/* procura a foto na Wikipédia e guarda só o rosto */
+async function infoWiki(lang, titulo, busca) {
+  const u = 'https://' + lang + '.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=1200&pilicense=any&'
+    + (titulo ? 'titles=' + encodeURIComponent(titulo) : 'generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(busca));
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 9000);
+  try {
+    const r = await fetch(u, { signal: ac.signal, cache: 'no-store' }); const d = await r.json();
+    const pags = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
+    const p = pags.find(x => x.thumbnail && x.thumbnail.source);
+    return p ? p.thumbnail.source : '';
+  } catch (_) { return ''; } finally { clearTimeout(t); }
+}
+async function baixarFamoso(f, novo) {
+  const prop = W / H;
+  const tentativas = [];
+  if (f.w) tentativas.push(['pt', f.w, '']);
+  tentativas.push(['pt', '', f.n], ['en', f.w && !/\(/.test(f.w) ? f.w : '', f.n]);
+  let feito = null;
+  for (const [lang, tit, busca] of tentativas) {
+    const url = await infoWiki(lang, tit, busca);
+    if (!url) continue;
+    const nome = 'famosos/' + slug(f.n) + '.jpg';
+    try {
+      const r = await nat.call('baixarRosto', { url, nome, prop });
+      feito = { arq: nome, rosto: !!(r && r.rosto) };
+      if (feito.rosto) break;
+    } catch (_) {}
+  }
+  if (!feito) { f.r = false; salvarFam(); return null; }
+  f.f = feito.arq; f.r = feito.rosto;
+  if (novo && !famosos.includes(f)) famosos.push(f);
+  salvarFam(); desenharListaFam();
+  return f;
+}
+
+/* desenha o nome em letras e devolve a grade de claridade */
+function gradeTexto(nome, cols, rows) {
+  const k = 8, c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
+  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+  const palavras = nome.toUpperCase().split(' ');
+  const linhas = []; let lin = '';
+  for (const p of palavras) { const t = lin ? lin + ' ' + p : p; if (lin && t.length > 7) { linhas.push(lin); lin = p; } else lin = t; }
+  if (lin) linhas.push(lin);
+  const largura = c.width * 0.88, alturaMax = c.height * 0.5 / linhas.length;
+  let fs = alturaMax;
+  g.font = '900 ' + fs + 'px -apple-system, Helvetica, Arial, sans-serif';
+  for (const l of linhas) { const w = g.measureText(l).width; if (w > largura) fs = Math.min(fs, alturaMax * largura / w); }
+  g.font = '900 ' + fs + 'px -apple-system, Helvetica, Arial, sans-serif';
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const total = linhas.length * fs * 1.12, y0 = c.height * 0.47 - total / 2 + fs * 0.56;
+  linhas.forEach((l, i) => g.fillText(l, c.width / 2, y0 + i * fs * 1.12));
+  const px = g.getImageData(0, 0, c.width, c.height).data, out = [];
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    let s = 0;
+    for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) s += px[((y * k + dy) * c.width + x * k + dx) * 4];
+    const v = Math.round(s / (k * k)); out.push(v, v, v);
+  }
+  return out;
+}
+
+async function prepararMosaico() {
+  if (!atual) return;
+  const meu = ++prepararMosaico.vez;
+  const n = +cfg.colsM || 40, t = W / n;
+  const rowsVis = Math.ceil(H / t) + 1;
+  let sN = seqNormal.slice();
+  if (sN.length < rowsVis * n) sN = new Array(rowsVis * n - sN.length).fill('').concat(sN);   // galeria pequena: repete fotos em cima
+  const N = sN.length;
+  const ultima = Math.floor((N - 1) / n), primeira = Math.max(0, ultima - rowsVis + 1), linhas = ultima - primeira + 1;
+  const rg = Math.ceil(H / t);
+  let alvo = [];
+  if (atual.tipo === 'rosto' && atual.arq) { try { alvo = await nat.call('grade', { nome: atual.arq, cols: n, rows: rg }); } catch (_) { alvo = []; } }
+  if (!alvo || alvo.length < n * rg * 3) { if (atual.tipo === 'rosto') { atual.tipo = 'texto'; } alvo = gradeTexto(atual.nome, n, rg); }
+  if (meu !== prepararMosaico.vez) return;
+  // claridade do alvo, esticada
+  const L = []; for (let i = 0; i < n * rg; i++) L.push(lum([alvo[i * 3], alvo[i * 3 + 1], alvo[i * 3 + 2]]));
+  const ord = L.slice().sort((a, b) => a - b), p2 = ord[Math.floor(ord.length * 0.02)], p98 = ord[Math.floor(ord.length * 0.98)] || 255;
+  const V = L.map(l => { let v = (l - p2) / Math.max(1, p98 - p2); v = Math.min(1, Math.max(0, v)); return atual.tipo === 'rosto' ? v * v * (3 - 2 * v) : v; });
+  // fotos disponíveis em ordem de claridade
+  const P = []; for (const [id, c] of cores) P.push({ id, l: lum(c) });
+  P.sort((a, b) => a.l - b.l);
+  const NP = P.length;
+  const fixos = fixosNoFim();
+  const nova = sN.slice(), ids = [], tinta = [];
+  const cima = stPx() + 96, topo = Math.max(0, cima + (ultima + 1) * t - H);
+  const yTopo = r => cima + r * t - topo;          // posição na tela (rolado até o fim)
+  const janela = atual.tipo === 'texto' ? Math.max(2, Math.round(NP * 0.3)) : Math.max(2, Math.round(NP * 0.015));
+  for (let r = primeira; r <= ultima; r++) {
+    const yc = yTopo(r) + t / 2, gy = Math.min(rg - 1, Math.max(0, Math.floor(yc / H * rg)));
+    for (let c = 0; c < n; c++) {
+      const idx = r * n + c, cel = gy * n + c, v = V[cel] == null ? 0 : V[cel];
+      let id = '';
+      if (idx < N) {
+        if (idx >= N - fixos || !NP) id = sN[idx];
+        else {
+          const alvoI = Math.round(v * (NP - 1));
+          const esq = c > 0 ? nova[idx - 1] : '', cima = idx - n >= 0 ? nova[idx - n] : '';
+          for (let k = 0; k < 8; k++) {
+            const j = Math.min(NP - 1, Math.max(0, alvoI + Math.round((Math.random() * 2 - 1) * janela)));
+            id = P[j].id; if (id !== esq && id !== cima) break;
+          }
+          nova[idx] = id;
+        }
+      }
+      ids.push(id === '#bebe' ? (cfg.bebes[cfg.bebe] ? 'arq:bebes/' + cfg.bebe + '.jpg' : '') : id);
+      const g = Math.round(v * 255); tinta.push(g, g, g);
+    }
+  }
+  const px = Math.max(8, Math.min(96, Math.round(t * DPR)));
+  const versao = Date.now();
+  try {
+    const ok = await nat.call('compor', { ids, cols: n, rows: linhas, px, modo: cfg.cor, alvo: tinta, alfa: +cfg.reforco, saida: 'mosaico.jpg' });
+    if (!ok) throw new Error('não montou');
+  } catch (e) { if (meu === prepararMosaico.vez) estado('erro ao montar: ' + (e.message || e), 'erro'); return; }
+  if (meu !== prepararMosaico.vez) return;
+  const img = new Image();
+  await new Promise(ok => { img.onload = ok; img.onerror = ok; img.src = URLS.arq('mosaico.jpg', versao); });
+  if (meu !== prepararMosaico.vez) return;
+  mos = { seq: nova, img, primeira, linhas, cols: n, versao, N };
+  seq = nova;
+  atual.pronto = true;
+  if (atual.tipo === 'rosto') $('#real').style.backgroundImage = 'url("' + URLS.arq(atual.arq, versao) + '")';
+  pedirDesenho();
+}
+prepararMosaico.vez = 0;
+
+function limparNome() {
+  preparo++; prepararMosaico.vez++;
+  atual = null; mos = null; guarda.set('atual', null); seq = seqNormal; $('#real').classList.remove('on');
+  mostrarAtual(); estado(''); pedirDesenho();
+}
+
+/* =====================================================================
+   FOTOTECA: grade desenhada no canvas, rolar, pinça, toque
+   ===================================================================== */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+function niveis() { const m = +cfg.colsM || 40; return [3, 5, 9, 15, 25, m].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b); }
+let nivel = +cfg.n0 || 3;   // colunas atuais (nível)
+let zoom = nivel;           // colunas "contínuas" durante a pinça
+let doFim = 0;              // distância rolada a partir do fim (px)
+const padCima = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stpx')) || 100;
+function padBaixo(n) { return n <= 5 ? sbPx() + 70 : 0; }
+function sbPx() { return +document.documentElement.dataset.sb || 34; }
+function stPx() { return +document.documentElement.dataset.st || 47; }
+function alturaConteudo(n) { const t = W / n; return stPx() + 96 + Math.ceil(seq.length / n) * t + padBaixo(n); }
+function rolagemMax(n) { return Math.max(0, alturaConteudo(n) - H); }
+function topoRolado(n) { return Math.max(0, alturaConteudo(n) - H - doFim); }   // scrollTop
+
+function ajustarTamanho() {
+  W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  // mede as margens seguras
+  const d = document.createElement('div'); d.style.cssText = 'position:fixed;top:0;height:var(--st);width:1px;visibility:hidden'; document.body.appendChild(d);
+  const st = d.getBoundingClientRect().height; d.style.height = 'var(--sb)'; const sb = d.getBoundingClientRect().height; d.remove();
+  document.documentElement.dataset.st = st || 47; document.documentElement.dataset.sb = sb || 34;
+  pedirDesenho();
+}
+
+/* cache de imagens */
+const IMG = new Map(); let fila = [], ativos = 0, relogio = 0;
+function pegar(chave, url) {
+  let e = IMG.get(chave);
+  if (e) { e.t = ++relogio; if (!e.ok && !e.carregando && !e.erro && !fila.includes(e)) { fila.push(e); bomba(); } return e.ok ? e.img : null; }
+  e = { img: new Image(), ok: false, t: ++relogio, url, chave };
+  IMG.set(chave, e); fila.push(e); bomba(); return null;
+}
+function bomba() {
+  if (fila.length > 600) { const fora = fila.splice(0, fila.length - 600); fora.forEach(e => IMG.delete(e.chave)); }
+  while (ativos < 12 && fila.length) {
+    const e = fila.pop(); e.carregando = true; ativos++;
+    e.img.onload = () => { e.ok = true; e.carregando = false; ativos--; pedirDesenho(); bomba(); };
+    e.img.onerror = () => { e.erro = true; e.carregando = false; ativos--; bomba(); };
+    e.img.src = e.url;
+  }
+  if (IMG.size > 3000) {
+    const v = [...IMG.values()].filter(e => !e.carregando).sort((a, b) => a.t - b.t).slice(0, 800);
+    v.forEach(e => IMG.delete(e.chave));
+  }
+}
+function imagemDoItem(it, n) {
+  if (!it) return null;
+  if (it === '#bebe') return cfg.bebes[cfg.bebe] ? pegar('bebe' + cfg.bebe + '|' + cfg.ver, URLS.arq('bebes/' + cfg.bebe + '.jpg', cfg.ver)) : null;
+  if (n <= 5) {
+    const s = Math.round(W / n * DPR * 1.05 / 40) * 40;
+    const g = pegar(it + '|' + s, URLS.foto(it, s));
+    if (g) return g;
+  }
+  return pegar(it + '|m', URLS.mini(it));
+}
+function espaco(n) { return n <= 3 ? 2 : n <= 5 ? 1.5 : n <= 15 ? 1 : 0.6; }
+
+let desenhoPedido = false;
+function pedirDesenho() { if (!desenhoPedido) { desenhoPedido = true; requestAnimationFrame(desenhar); } }
+function desenhar() {
+  desenhoPedido = false;
+  if (!$('#fototeca').classList.contains('on')) return;
+  const n = nivel, s = n / zoom, t = W / n, g = espaco(n);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = corFundo;
+  ctx.fillRect(0, 0, W, H);
+  // escala em volta do ponto de baixo, no meio
+  ctx.translate(W / 2, H); ctx.scale(s, s); ctx.translate(-W / 2, -H);
+  const topo = topoRolado(n), cima = stPx() + 96;
+  const yMin = H - H / s, yMax = H, xMin = W / 2 - W / 2 / s, xMax = W / 2 + W / 2 / s;
+  const r0 = Math.max(0, Math.floor((yMin + topo - cima) / t)), r1 = Math.min(Math.ceil(seq.length / n) - 1, Math.floor((yMax + topo - cima) / t));
+  const usaMos = mos && mos.img && mos.img.naturalWidth && n === mos.cols && mos.seq === seq;
+  let mosTopo = 0;
+  if (usaMos) {
+    mosTopo = cima + mos.primeira * t - topo;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(mos.img, 0, mosTopo, W, mos.linhas * t);
+  }
+  for (let r = r0; r <= r1; r++) {
+    if (usaMos && r >= mos.primeira && r < mos.primeira + mos.linhas) continue;
+    const y = cima + r * t - topo;
+    for (let c = 0; c < n; c++) {
+      const i = r * n + c; if (i >= seq.length) break;
+      const x = c * t;
+      if (x + t < xMin || x > xMax) continue;
+      const im = imagemDoItem(seq[i], n);
+      const lado = t - g;
+      if (im && im.naturalWidth) {
+        const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h);
+        ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, c === n - 1 ? t : lado, lado);
+      } else {
+        ctx.fillStyle = 'rgba(128,128,128,.16)'; ctx.fillRect(x, y, c === n - 1 ? t : lado, lado);
+      }
+    }
+  }
+  if (usaMos && g > 0) {   // linhas finas entre as fotinhas do mosaico
+    ctx.fillStyle = corFundo;
+    for (let c = 1; c < n; c++) ctx.fillRect(c * t - g, mosTopo, g, mos.linhas * t);
+    for (let r = 1; r <= mos.linhas; r++) ctx.fillRect(0, mosTopo + r * t - g, W, g);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/* toque, rolagem e pinça */
+const toques = { modo: '', y0: 0, x0: 0, f0: 0, t0: 0, d0: 0, z0: 0, vel: 0, ultY: 0, ultT: 0, moveu: 0, inercia: 0 };
+function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+function nivelPerto(z) { const L = niveis(); let m = L[0]; for (const v of L) if (Math.abs(Math.log(v / z)) < Math.abs(Math.log(m / z))) m = v; return m; }
+function trocarNivel(novo) {
+  if (novo === nivel) return;
+  const tVelho = W / nivel, tNovo = W / novo;
+  doFim = novo >= 9 ? 0 : Math.min(rolagemMax(novo), doFim * tNovo / tVelho);
+  nivel = novo;
+}
+cv.addEventListener('touchstart', e => {
+  e.preventDefault(); cancelAnimationFrame(toques.inercia); toques.inercia = 0;
+  if (e.touches.length >= 2) {
+    toques.modo = 'pinca'; toques.d0 = dist(e.touches[0], e.touches[1]); toques.z0 = zoom;
+  } else if (e.touches.length === 1 && toques.modo !== 'pinca') {
+    const p = e.touches[0];
+    toques.modo = 'toque'; toques.x0 = p.clientX; toques.y0 = p.clientY; toques.f0 = doFim; toques.t0 = performance.now();
+    toques.ultY = p.clientY; toques.ultT = toques.t0; toques.vel = 0; toques.moveu = 0;
+  }
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (toques.modo === 'pinca' && e.touches.length >= 2) {
+    const d = dist(e.touches[0], e.touches[1]); if (!d || !toques.d0) return;
+    const L = niveis();
+    zoom = Math.min(L[L.length - 1] * 1.18, Math.max(L[0] * 0.85, toques.z0 * toques.d0 / d));
+    trocarNivel(nivelPerto(zoom));
+    pedirDesenho();
+  } else if ((toques.modo === 'toque' || toques.modo === 'rolar') && e.touches.length === 1) {
+    const p = e.touches[0], dy = p.clientY - toques.y0;
+    toques.moveu = Math.max(toques.moveu, Math.abs(dy), Math.abs(p.clientX - toques.x0));
+    if (toques.moveu > 8) toques.modo = 'rolar';
+    if (toques.modo === 'rolar') {
+      const agora = performance.now(), dt = Math.max(1, agora - toques.ultT);
+      toques.vel = 0.8 * toques.vel + 0.2 * ((p.clientY - toques.ultY) / dt);
+      toques.ultY = p.clientY; toques.ultT = agora;
+      doFim = Math.min(rolagemMax(nivel), Math.max(0, toques.f0 + dy));
+      pedirDesenho();
+    }
+  }
+}, { passive: false });
+cv.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (toques.modo === 'pinca') {
+    if (e.touches.length === 0) { toques.modo = ''; animarZoom(nivelPerto(zoom)); }
+    return;
+  }
+  if (toques.modo === 'toque' && performance.now() - toques.t0 < 400 && toques.moveu < 10) tocou(toques.x0, toques.y0);
+  else if (toques.modo === 'rolar') inercia(toques.vel * 16);
+  toques.modo = '';
+}, { passive: false });
+cv.addEventListener('touchcancel', () => { if (toques.modo === 'pinca') animarZoom(nivelPerto(zoom)); toques.modo = ''; });
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+function animarZoom(alvo) {
+  const z0 = zoom, t0 = performance.now(), dur = 240;
+  trocarNivel(alvo);
+  (function passo() {
+    const k = Math.min(1, (performance.now() - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    zoom = z0 + (alvo - z0) * e; pedirDesenho();
+    if (k < 1) requestAnimationFrame(passo); else { zoom = alvo; pedirDesenho(); }
+  })();
+}
+function inercia(v) {
+  (function passo() {
+    v *= 0.95; if (Math.abs(v) < 0.3) return;
+    const novo = Math.min(rolagemMax(nivel), Math.max(0, doFim + v));
+    if (novo === doFim) return;
+    doFim = novo; pedirDesenho(); toques.inercia = requestAnimationFrame(passo);
+  })();
+}
+let ultimoToque = 0;
+function tocou(x, y) {
+  const agora = performance.now();
+  if (agora - ultimoToque < 320 && nivel === +cfg.colsM) { ultimoToque = 0; alternarReal(); return; }
+  ultimoToque = agora;
+  const n = nivel, t = W / n, topo = topoRolado(n), cima = stPx() + 96;
+  const r = Math.floor((y + topo - cima) / t), c = Math.floor(x / t), i = r * n + c;
+  if (r < 0 || i < 0 || i >= seq.length) return;
+  setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, nivel === +cfg.colsM ? 330 : 0);
+}
+function alternarReal() {
+  if (!cfg.fotoReal || !atual || atual.tipo !== 'rosto' || !mos) return;
+  $('#real').classList.toggle('on');
+}
+
+/* cantos: trocar o bebê */
+[['#cTL', 0], ['#cTR', 1], ['#cBL', 2], ['#cBR', 3]].forEach(([s, k]) => {
+  $(s).addEventListener('touchend', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!cfg.bebes[k]) { vibrar('forte'); return; }
+    cfg.bebe = k; salvar(); montarSeq(); vibrar('leve');
+    if (atual && atual.pronto) prepararMosaico();
+  }, { passive: false });
+});
+
+/* segurar o título: ajustes */
+(function () {
+  let t = 0;
+  const ini = e => { e.preventDefault(); t = setTimeout(() => { t = 0; vibrar('media'); abrirAjustes(); }, 1500); };
+  const fim = () => { if (t) clearTimeout(t); t = 0; };
+  $('#titulo').addEventListener('touchstart', ini, { passive: false });
+  $('#titulo').addEventListener('touchend', fim); $('#titulo').addEventListener('touchmove', fim); $('#titulo').addEventListener('touchcancel', fim);
+})();
+
+/* lupa: busca (o nome digitado vira o famoso) */
+$('#lupa').addEventListener('click', () => { $('#busca').classList.add('on'); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); });
+$('#bInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = $('#bInput').value.trim(); $('#bInput').blur();
+    if (v) { definirNome(v, 'busca'); $('#bMsg').innerHTML = '<b>Nenhum Resultado</b>Não há resultados para “' + v.replace(/[<&>]/g, '') + '”. Tente uma nova pesquisa.'; }
+  }
+});
+$('#bCanc').addEventListener('click', () => {
+  const v = $('#bInput').value.trim(); $('#bInput').blur();
+  if (v && !$('#bMsg').innerHTML) definirNome(v, 'busca');
+  $('#busca').classList.remove('on');
+});
+
+/* =====================================================================
+   VISUALIZADOR
+   ===================================================================== */
+let verI = 0, verX = 0;
+const fmtData = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtHora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function srcGrande(it) {
+  if (it === '#bebe') return URLS.arq('bebes/' + cfg.bebe + '.jpg', cfg.ver);
+  return URLS.foto(it, Math.round(Math.max(W, H) * DPR), true);
+}
+function montarPalco() {
+  const p = $('#palco'); p.innerHTML = '';
+  for (const d of [-1, 0, 1]) {
+    const i = verI + d, el = document.createElement('div'); el.className = 'fx'; el.style.left = (d * 100) + '%';
+    if (i >= 0 && i < seq.length && seq[i]) {
+      const im = document.createElement('img');
+      const it = seq[i];
+      if (it !== '#bebe') { const pq = IMG.get(it + '|m'); if (pq && pq.ok) im.src = pq.img.src; }
+      const g = new Image(); g.onload = () => { im.src = g.src; }; g.src = srcGrande(it);
+      el.appendChild(im);
+    }
+    p.appendChild(el);
+  }
+  p.style.transform = 'translateX(0)';
+  mostrarData();
+}
+async function mostrarData() {
+  const it = seq[verI], el = $('#vData');
+  if (it === '#bebe') { el.innerHTML = 'Hoje<small>' + fmtHora.format(new Date(Date.now() - 35 * 60000)) + '</small>'; return; }
+  el.innerHTML = '';
+  try { const d = await nat.call('info', { id: it }); if (d && d.data && seq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
+}
+function abrirFoto(i) { verI = i; $('#ver').classList.remove('limpo'); mostrar('ver', true); montarPalco(); }
+function fecharFoto() { mostrar('fototeca'); }
+$('#vVolta').addEventListener('click', fecharFoto);
+(function () {
+  const p = $('#palco'); let x0 = 0, y0 = 0, dx = 0, dy = 0, modo = '', t0 = 0;
+  p.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = dy = 0; modo = ''; t0 = performance.now(); p.style.transition = 'none'; }, { passive: true });
+  p.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return; e.preventDefault();
+    dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
+    if (!modo && Math.hypot(dx, dy) > 8) modo = Math.abs(dx) > Math.abs(dy) ? 'lado' : 'baixo';
+    if (modo === 'lado') p.style.transform = 'translateX(' + dx + 'px)';
+    else if (modo === 'baixo' && dy > 0) { p.style.transform = 'translateY(' + dy + 'px) scale(' + Math.max(0.7, 1 - dy / 1200) + ')'; $('#ver').style.background = 'rgba(0,0,0,' + Math.max(0, 1 - dy / 400) + ')'; }
+  }, { passive: false });
+  p.addEventListener('touchend', () => {
+    p.style.transition = 'transform .25s ease';
+    if (!modo && performance.now() - t0 < 300) { $('#ver').classList.toggle('limpo'); return; }
+    if (modo === 'lado') {
+      const ir = dx < -60 && verI < seq.length - 1 ? 1 : dx > 60 && verI > 0 ? -1 : 0;
+      p.style.transform = 'translateX(' + (-ir * W) + 'px)';
+      if (ir) setTimeout(() => { verI += ir; p.style.transition = 'none'; montarPalco(); }, 250);
+    } else if (modo === 'baixo') {
+      $('#ver').style.background = '';
+      if (dy > 110) fecharFoto(); else p.style.transform = 'none';
+    }
+  });
+})();
+
+/* =====================================================================
+   NOTAS FALSO
+   ===================================================================== */
+function abrirNotas() {
+  $('#ntexto').value = '';
+  const d = new Date(); $('#nData').textContent = fmtData.format(d) + ' às ' + fmtHora.format(d);
+  mostrar('notas', true);
+  setTimeout(() => $('#ntexto').focus(), 250);
+}
+function fecharNotas() {
+  const linha = $('#ntexto').value.split('\n').map(s => s.trim()).find(Boolean);
+  $('#ntexto').blur();
+  if (linha) definirNome(linha, 'notas');
+  mostrar(telaAnterior || (cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca'));
+}
+$('#nVolta').addEventListener('click', fecharNotas);
+$('#nOk').addEventListener('click', () => { $('#ntexto').blur(); });
+
+/* =====================================================================
+   TELA DE INÍCIO (print) e marcação dos ícones
+   ===================================================================== */
+function aplicarPrint() {
+  const c = $('#cvIni');
+  $('#inicioVazio').style.display = cfg.temPrint ? 'none' : 'flex';
+  $('#marcar').style.backgroundImage = cfg.temPrint ? 'url("' + URLS.arq('inicio/print.jpg', cfg.ver) + '")' : '';
+  if (!cfg.temPrint) { c.width = 1; c.height = 1; return; }
+  const im = new Image();
+  im.onload = () => {
+    c.width = Math.round(W * DPR); c.height = Math.round(H * DPR);
+    const g = c.getContext('2d'), k = Math.max(c.width / im.naturalWidth, c.height / im.naturalHeight);
+    const w = im.naturalWidth * k, h = im.naturalHeight * k, x = (c.width - w) / 2, y = (c.height - h) / 2;
+    g.drawImage(im, x, y, w, h);
+    // apaga a hora/bateria do print: estica a faixa logo abaixo da barra (a barra de verdade do iPhone aparece por cima)
+    const faixa = Math.round((stPx() + 2) * DPR), srcY = (faixa + 3 * DPR - y) / k;
+    g.drawImage(im, 0, srcY, im.naturalWidth, 1, x, 0, w, faixa);
+  };
+  im.src = URLS.arq('inicio/print.jpg', cfg.ver);
+}
+$('#inicio').addEventListener('click', e => {
+  const z = cfg.zonas || {}, x = e.clientX / W, y = e.clientY / H;
+  const perto = p => p && Math.abs(p.x - x) * W < 38 && Math.abs(p.y - y) * H < 40;
+  if (perto(z.fotos)) abrirDoIcone('fototeca', z.fotos);
+  else if (perto(z.notas)) abrirDoIcone('notas', z.notas);
+  else if (perto(z.ajustes)) abrirAjustes();
+  else if (!cfg.temPrint) abrirAjustes();
+});
+function abrirDoIcone(qual, p) {
+  const el = qual === 'notas' ? $('#notas') : $('#fototeca');
+  el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
+  el.style.transition = 'none'; el.style.transform = 'scale(.12)'; el.style.opacity = '0.3';
+  if (qual === 'notas') abrirNotas(); else mostrar('fototeca');
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'transform .34s cubic-bezier(.2,.9,.25,1), opacity .2s'; el.style.transform = 'none'; el.style.opacity = '1'; }));
+}
+let passoMarca = 0;
+const PASSOS = [['fotos', 'Toque no meio do ícone Fotos'], ['notas', 'Toque no meio do ícone Notas'], ['ajustes', 'Toque no meio do ícone Ajustes (abre estes ajustes escondidos)']];
+function iniciarMarcar() {
+  if (!cfg.temPrint) { toast('Escolha o print primeiro'); return; }
+  passoMarca = 0; cfg.zonas = cfg.zonas || {}; $$('#marcar .ponto').forEach(p => p.remove());
+  mostrar('marcar', true); $('#mMsg').textContent = PASSOS[0][1];
+}
+function proximaMarca() { passoMarca++; if (passoMarca >= PASSOS.length) { salvar(); mostrar('ajustes', true); toast('Ícones marcados'); return; } $('#mMsg').textContent = PASSOS[passoMarca][1]; }
+$('#marcar').addEventListener('click', e => {
+  if (e.target.closest('.aviso')) return;
+  cfg.zonas[PASSOS[passoMarca][0]] = { x: e.clientX / W, y: e.clientY / H };
+  const p = document.createElement('div'); p.className = 'ponto'; p.style.left = e.clientX + 'px'; p.style.top = e.clientY + 'px'; $('#marcar').appendChild(p);
+  vibrar('leve'); proximaMarca();
+});
+$('#mPula').addEventListener('click', proximaMarca);
+$('#mSai').addEventListener('click', () => { salvar(); mostrar('ajustes', true); });
+
+/* =====================================================================
+   TELAS
+   ===================================================================== */
+let telaAtual = '', telaAnterior = '';
+function mostrar(id, guardaAnterior) {
+  if (guardaAnterior && telaAtual && telaAtual !== id && telaAtual !== 'ajustes' && telaAtual !== 'marcar') telaAnterior = telaAtual;
+  $$('.tela').forEach(t => t.classList.toggle('on', t.id === id));
+  telaAtual = id;
+  const escuro = cfg.tema !== 'claro' || id === 'inicio' || id === 'marcar';
+  nat.msg('barra', id === 'marcar');
+  nat.msg('estilo', escuro ? 'claro' : 'escuro');
+  if (id === 'fototeca') pedirDesenho();
+}
+function abrirAjustes() { encherAjustes(); mostrar('ajustes', true); }
+$('#aFecha').addEventListener('click', () => {
+  salvar();
+  const volta = telaAnterior && telaAnterior !== 'ajustes' && telaAnterior !== 'marcar' ? telaAnterior : (cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');
+  mostrar(volta);
+});
+let corFundo = '#000';
+function aplicarTema() { document.body.classList.toggle('claro', cfg.tema === 'claro'); corFundo = cfg.tema === 'claro' ? '#fff' : '#000'; pedirDesenho(); }
+
+/* =====================================================================
+   AJUSTES
+   ===================================================================== */
+const ROT_BEBE = ['Menino branco', 'Menina branca', 'Menino negro', 'Menina negra'];
+async function encherAjustes() {
+  mostrarAtual();
+  $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
+  $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
+  $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
+  $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0);
+  if (!analisando) $('#aAnalise').textContent = cores.size + ' fotos prontas para o mosaico';
+  desenharBebes(); desenharListaFam();
+  try {
+    const al = await nat.call('albuns'); const s = $('#aOrigem');
+    s.innerHTML = '<option value="">Todas as fotos</option>' + al.map(a => '<option value="' + a.id.replace(/"/g, '&quot;') + '">' + a.nome.replace(/</g, '') + ' (' + a.n + ')</option>').join('');
+    s.value = cfg.origem || '';
+  } catch (_) {}
+}
+function desenharBebes() {
+  $('#aBebes').innerHTML = ROT_BEBE.map((r, k) => '<div class="' + (cfg.bebe === k ? 'atual' : '') + '" data-k="' + k + '"><img ' + (cfg.bebes[k] ? 'src="' + URLS.arq('bebes/' + k + '.jpg', cfg.ver) + '"' : '') + '>' + (k + 1) + '. ' + r + '</div>').join('');
+}
+$('#aBebes').addEventListener('click', async e => {
+  const d = e.target.closest('[data-k]'); if (!d) return; const k = +d.dataset.k;
+  try {
+    const r = await nat.call('escolher', { nome: 'bebes/' + k + '.jpg', rosto: false });
+    if (r && r.ok) { cfg.bebes[k] = true; cfg.bebe = k; cfg.ver++; salvar(); desenharBebes(); montarSeq(); }
+  } catch (_) {}
+});
+function desenharListaFam() {
+  const el = $('#listaFam');
+  if (telaAtual !== 'ajustes') { atualizarContaFam(); return; }
+  const q = semAcento($('#aBuscaFam').value);
+  const lista = famosos.map((f, i) => [f, i]).filter(([f]) => !q || semAcento(f.n).includes(q)).sort((a, b) => a[0].n.localeCompare(b[0].n, 'pt'));
+  el.innerHTML = lista.map(([f, i]) => '<div class="lin" data-i="' + i + '"><img class="mini" data-a="foto" ' + (f.f ? 'src="' + URLS.arq(f.f, cfg.ver) + '"' : '') + '><div class="nm"><b>' + f.n.replace(/</g, '') + '</b><small class="' + (f.f ? (f.r === false ? 'erro' : 'ok') : '') + '">' + (f.f ? (f.r === false ? 'sem rosto achado — troque a foto' : 'foto pronta') : (f.r === false ? 'não achou foto' : 'sem foto')) + '</small></div>'
+    + '<select data-a="bebe"><option value="-1">Bebê: cantos</option>' + ROT_BEBE.map((r, k) => '<option value="' + k + '"' + (f.b === k ? ' selected' : '') + '>' + (k + 1) + '. ' + r + '</option>').join('') + '</select>'
+    + '<button class="bt cinza" data-a="usar">Usar</button><button class="bt cinza" data-a="tirar" style="padding:8px 9px">✕</button></div>').join('') || '<div class="lin estado">Nada encontrado — toque em + para adicionar</div>';
+  atualizarContaFam();
+}
+function atualizarContaFam() { const e = $('#aFamEst'); if (e) e.textContent = famosos.length + ' famosos · ' + famosos.filter(f => f.f).length + ' com foto'; }
+$('#aBuscaFam').addEventListener('input', desenharListaFam);
+$('#aAdd').addEventListener('click', async () => {
+  const v = $('#aBuscaFam').value.trim(); if (v.length < 2) return;
+  if (acharFamoso(v) && semAcento(acharFamoso(v).n) === semAcento(v)) { toast('Já está na lista'); return; }
+  const f = { n: maiusculas(v), w: '', a: [], b: -1, f: '', r: null };
+  famosos.push(f); salvarFam(); desenharListaFam(); toast('Procurando foto…');
+  const r = await baixarFamoso(f, false); toast(r ? 'Foto guardada' : 'Não achei foto — toque na miniatura para escolher uma');
+  desenharListaFam();
+});
+$('#listaFam').addEventListener('change', e => {
+  const l = e.target.closest('[data-i]'); if (!l || e.target.dataset.a !== 'bebe') return;
+  famosos[+l.dataset.i].b = +e.target.value; salvarFam();
+});
+$('#listaFam').addEventListener('click', async e => {
+  const l = e.target.closest('[data-i]'); const a = e.target.dataset.a; if (!l || !a) return;
+  const f = famosos[+l.dataset.i];
+  if (a === 'usar') { definirNome(f.n, 'ajustes'); toast('Preparando ' + f.n); }
+  else if (a === 'tirar') { if (confirm('Tirar ' + f.n + ' da lista?')) { if (f.f) nat.call('apagar', { nome: f.f }).catch(() => {}); famosos.splice(+l.dataset.i, 1); salvarFam(); desenharListaFam(); } }
+  else if (a === 'foto') {
+    const nome = 'famosos/' + slug(f.n) + '.jpg';
+    try { const r = await nat.call('escolher', { nome, rosto: true, prop: W / H }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto || null; cfg.ver++; salvar(); salvarFam(); desenharListaFam(); if (atual && atual.nome === f.n) definirNome(f.n, 'ajustes'); } } catch (_) {}
+  }
+});
+let baixandoTodos = false;
+$('#aBaixar').addEventListener('click', async () => {
+  if (baixandoTodos) { baixandoTodos = false; return; }
+  baixandoTodos = true; $('#aBaixar').textContent = 'Parar';
+  const faltam = famosos.filter(f => !f.f);
+  let feitos = 0;
+  for (const f of faltam) {
+    if (!baixandoTodos) break;
+    $('#aFamEst').textContent = 'Baixando ' + (++feitos) + ' de ' + faltam.length + '…';
+    await baixarFamoso(f, false);
+  }
+  baixandoTodos = false; $('#aBaixar').textContent = 'Baixar fotos'; desenharListaFam();
+  toast('Fotos dos famosos atualizadas');
+});
+$('#aUsar').addEventListener('click', () => { const v = $('#aNome').value.trim(); if (v) { definirNome(v, 'ajustes'); $('#aNome').value = ''; $('#aNome').blur(); } });
+$('#aLimpar').addEventListener('click', limparNome);
+$('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
+$('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
+$('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); iniciarInject(); });
+$('#aOrigem').addEventListener('change', e => { cfg.origem = e.target.value; salvar(); carregarFotos(); });
+$('#aLimite').addEventListener('change', e => { cfg.limite = +e.target.value; salvar(); analisarFotos(); });
+$('#aReanalisar').addEventListener('click', () => carregarFotos());
+$('#aCols').addEventListener('change', e => { cfg.colsM = +e.target.value; salvar(); if (atual) prepararMosaico(); });
+$('#aCor').addEventListener('change', e => { cfg.cor = e.target.value; salvar(); if (atual) prepararMosaico(); });
+$('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%'; });
+$('#aRef').addEventListener('change', () => { salvar(); if (atual) prepararMosaico(); });
+$('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
+$('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
+$('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });
+$('#aTema').addEventListener('change', e => { cfg.tema = e.target.value; salvar(); aplicarTema(); });
+$('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; nivel = zoom = cfg.n0; doFim = 0; salvar(); montarSeq(); if (atual) prepararMosaico(); });
+$('#aPrint').addEventListener('click', async () => {
+  try { const r = await nat.call('escolher', { nome: 'inicio/print.jpg', rosto: false }); if (r && r.ok) { cfg.temPrint = true; cfg.ver++; salvar(); aplicarPrint(); iniciarMarcar(); } } catch (_) {}
+});
+$('#aMarcar').addEventListener('click', iniciarMarcar);
+
+/* =====================================================================
+   INJECT (o mesmo intermediário do app Listas)
+   ===================================================================== */
+let injTimer = 0, injGen = 0, injUlt = null;
+function iniciarInject() {
+  clearTimeout(injTimer); const g = ++injGen;
+  if (!cfg.inj || !cfg.injId || !cfg.wk) return;
+  let w = cfg.wk.trim(); if (!/^https?:\/\//.test(w)) w = 'https://' + w; w = w.replace(/\/+$/, '');
+  const chave = 'injUlt_' + cfg.injId; injUlt = guarda.get(chave, null);
+  const passo = async () => {
+    if (g !== injGen) return;
+    if (!document.hidden) {
+      try {
+        const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
+        const r = await fetch(w + '/inject?id=' + encodeURIComponent(cfg.injId) + '&_=' + Date.now(), { cache: 'no-store', signal: ac.signal });
+        clearTimeout(t);
+        const d = await r.json();
+        if (g !== injGen) return;
+        if (d && !d.error) {
+          if (injUlt === null) { injUlt = d.count; guarda.set(chave, d.count); }
+          else if (d.count !== injUlt) {
+            injUlt = d.count; guarda.set(chave, d.count);
+            const v = String(d.value || '').trim();
+            const e = $('#aInjUlt'); if (e) e.textContent = v + ' (' + fmtHora.format(new Date()) + ')';
+            if (v) definirNome(v, 'inject');
+          }
+        }
+      } catch (_) {}
+    }
+    if (g === injGen) injTimer = setTimeout(passo, 1000);
+  };
+  passo();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { iniciarInject(); if (nat.tem) carregarFotos(); } });
+
+/* =====================================================================
+   INÍCIO
+   ===================================================================== */
+window.addEventListener('resize', () => { ajustarTamanho(); });
+function iniciar() {
+  aplicarTema(); ajustarTamanho(); aplicarPrint();
+  nivel = zoom = +cfg.n0 || 3;
+  mostrar(cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');
+  mostrarAtual();
+  carregarFotos().then(() => { if (atual) prepararMosaico(); });
+  iniciarInject();
+}
+iniciar();
+</script>
+</body>
+</html>
