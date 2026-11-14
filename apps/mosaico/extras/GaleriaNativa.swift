@@ -148,7 +148,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func atualizarGestos() {
         let pode = ligada && ativa
         toque.isEnabled = pode
-        zoomer.isScrollEnabled = pode
+        zoomer.isScrollEnabled = pode && !travado
         zoomer.pinchGestureRecognizer?.isEnabled = pode
     }
 
@@ -193,7 +193,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tiles.marcas = selecao ? selecionados : []
 
         // monta a imagem gigante
-        C = temMos ? mosCols : 13
+        C = temMos ? mosCols : max(1, Int(n0))
         linhas = Int(ceil(Double(seq.count) / Double(max(1, C))))
         let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)"
         if chave != geoChave {
@@ -224,17 +224,18 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.contentSize = plano.frame.size
         zoomer.contentInset = UIEdgeInsets(top: cima, left: 0, bottom: sb + 70, right: 0)
         zoomer.minimumZoomScale = 1
-        zoomer.maximumZoomScale = CGFloat(C) / 3
+        zoomer.maximumZoomScale = CGFloat(C) / max(1, min(CGFloat(C), n0))
         tiles.setNeedsDisplay()
     }
     private func posicaoInicial() {
-        zoomer.setZoomScale(CGFloat(C) / max(3, min(CGFloat(C), n0)), animated: false)
+        travado = false
+        zoomer.setZoomScale(CGFloat(C) / max(1, min(CGFloat(C), n0)), animated: false)
         irParaFim()
     }
     private func irParaFim() {
         let cs = zoomer.contentSize, ins = zoomer.contentInset
-        let x = max(0, (cs.width - W) / 2)
         let y = max(-ins.top, cs.height - H + ins.bottom)
+        let x: CGFloat = 0
         zoomer.contentOffset = CGPoint(x: x, y: y)
     }
 
@@ -255,7 +256,20 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
 
     // MARK: zoom
     func viewForZooming(in s: UIScrollView) -> UIView? { plano }
-    func scrollViewDidZoom(_ s: UIScrollView) { centralizar(); atualizar() }
+    func scrollViewDidZoom(_ s: UIScrollView) {
+        centralizar(); atualizar()
+        if travado && s.zoomScale > s.minimumZoomScale * 1.01 { travado = false; zoomer.isScrollEnabled = ligada && ativa }
+    }
+    /// rosto inteiro na tela: fica parado (só a pinça para aproximar funciona)
+    private var travado = false
+    func scrollViewDidEndZooming(_ s: UIScrollView, with v: UIView?, atScale e: CGFloat) {
+        guard temMos, e <= s.minimumZoomScale * 1.01 else { return }
+        travado = true
+        zoomer.isScrollEnabled = false
+        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+            self.zoomer.contentOffset = CGPoint(x: -self.zoomer.contentInset.left, y: self.zoomer.contentSize.height - self.H)
+        }
+    }
     func scrollViewDidScroll(_ s: UIScrollView) {}
     private func centralizar() {   // afastou demais: o rosto fica no meio enquanto volta
         let largura = plano.frame.width
@@ -308,6 +322,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.setContentOffset(CGPoint(x: x, y: y), animated: false)
     }
     private func irAoNivel(_ n: CGFloat) {
+        travado = false; atualizarGestos()
         zoomer.setZoomScale(CGFloat(C) / max(1, min(CGFloat(C), n)), animated: false)
         irParaFim()
         atualizar()
