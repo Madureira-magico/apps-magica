@@ -1,0 +1,1097 @@
+'use strict';
+/* =====================================================================
+   MOSAICO 1.1 — Fototeca falsa em que as fotos formam o rosto do famoso
+   ===================================================================== */
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const DPR = Math.min(3, window.devicePixelRatio || 1);
+let W = innerWidth, H = innerHeight;
+
+/* ---------- ponte com o iPhone ---------- */
+const nat = {
+  tem: !!(window.webkit && webkit.messageHandlers && webkit.messageHandlers.mz),
+  call(cmd, args) {
+    if (!this.tem) return Promise.reject(new Error('fora do app'));
+    return webkit.messageHandlers.mz.postMessage(Object.assign({ cmd }, args || {}));
+  },
+  msg(nome, valor) { try { webkit.messageHandlers[nome].postMessage(valor); } catch (_) {} }
+};
+const URLS = {
+  mini: id => 'mzfoto://mini?id=' + encodeURIComponent(id),
+  foto: (id, s, fit) => 'mzfoto://foto?id=' + encodeURIComponent(id) + '&s=' + s + (fit ? '&m=fit' : ''),
+  arq: (n, v) => 'mzfoto://arq?n=' + encodeURIComponent(n) + (v ? '&v=' + v : '')
+};
+const vibrar = f => nat.call('vibrar', { forca: f || 'leve' }).catch(() => {});
+function toast(t, ms) { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = 'none', ms || 2200); }
+const esc = s => String(s).replace(/[<&>"]/g, c => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;', '"': '&quot;' })[c]);
+
+/* ---------- configurações guardadas ---------- */
+const guarda = {
+  get(k, p) { try { const v = localStorage.getItem('mz_' + k); return v == null ? p : JSON.parse(v); } catch (_) { return p; } },
+  set(k, v) { try { localStorage.setItem('mz_' + k, JSON.stringify(v)); } catch (_) {} }
+};
+const cfg = Object.assign({
+  abrir: 'fototeca', tema: 'auto', n0: 3, colsM: 60, cor: 'cor', reforco: 0.4, enq: 'perto', filtro: true, aviso: true,
+  fotoReal: false, vibrar: true, origem: '', limite: 8000, inj: false, injId: '', wk: '', temPrint: false, zonas: {},
+  piada: 'bebes', bebe: 0, bebes: [false, false, false, false], fixas: [], fixa: 0, tirados: [], ver: 1, v: 2
+}, guarda.get('cfg', {}));
+if ((cfg.v || 1) < 2) {   // vindo da versão 1.0
+  Object.assign(cfg, { colsM: 60, cor: 'cor', reforco: 0.4, limite: 8000, tema: 'auto', enq: 'perto', filtro: true, aviso: true,
+    piada: 'bebes', fixas: cfg.fixas || [], fixa: 0, tirados: cfg.tirados || [], v: 2 });
+}
+const salvar = () => guarda.set('cfg', cfg);
+salvar();
+let tirados = new Set(cfg.tirados || []);
+
+/* ---------- lista de famosos ---------- */
+const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const maiusculas = s => String(s).toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+const slug = s => semAcento(s).replace(/ /g, '-').slice(0, 60) || 'x';
+function listaPadrao() {
+  return $('#dadosFamosos').textContent.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const [n, w, a] = l.split('|');
+    return { n: n.trim(), w: (w || '').trim(), a: (a || '').split(';').map(x => x.trim()).filter(Boolean), b: -1, f: '', r: null };
+  });
+}
+let famosos = guarda.get('famosos', null);
+if (!Array.isArray(famosos) || !famosos.length) famosos = listaPadrao();
+const salvarFam = () => guarda.set('famosos', famosos);
+function nomesDe(f) { return [f.n, (f.w || '').replace(/\s*\(.*\)$/, ''), ...(f.a || [])].map(semAcento).filter(x => x.length >= 2); }
+function distancia(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+const limiteErro = q => q.length >= 10 ? 2 : q.length >= 5 ? 1 : 0;
+/* o texto inteiro é o nome (digitado, Notas, Inject) */
+function acharFamoso(txt) {
+  const q = semAcento(txt); if (!q) return null;
+  let melhor = null, nota = 9;
+  for (const f of famosos) for (const nm of nomesDe(f)) {
+    if (nm === q) return f;
+    const d = distancia(nm, q);
+    if (d <= limiteErro(q) && d < nota) { nota = d; melhor = f; }
+  }
+  return melhor;
+}
+/* o nome está no meio de uma frase (microfone, câmera) */
+function acharFamosoEm(txt) {
+  const q = semAcento(txt); if (!q) return null;
+  const pal = q.split(' '), cheio = ' ' + q + ' ';
+  let melhor = null, tam = 0;
+  for (const f of famosos) for (const nm of nomesDe(f)) {
+    if (nm.length < 3) continue;
+    let ok = cheio.includes(' ' + nm + ' ');
+    if (!ok && nm.length >= 5) {
+      const k = nm.split(' ').length;
+      for (let i = 0; i + k <= pal.length && !ok; i++) ok = distancia(pal.slice(i, i + k).join(' '), nm) <= limiteErro(nm);
+    }
+    if (ok && nm.length > tam) { tam = nm.length; melhor = f; }
+  }
+  return melhor;
+}
+
+/* =====================================================================
+   FOTOS: lista da galeria, cores médias, sequência mostrada
+   ===================================================================== */
+let base = [];          // ids da galeria (antiga -> recente)
+let cores = new Map();  // id -> {c:[r,g,b], ok:1|0}
+let seq = [], seqNormal = [];
+let analisando = false;
+const lum = c => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+
+async function carregarFotos() {
+  let st;
+  try { st = await nat.call('permissao'); } catch (_) { st = 'fora'; }
+  if (st === 'negado') toast('Libere o acesso às fotos em Ajustes do iPhone › Mosaico › Fotos', 6000);
+  try { base = await nat.call('fotos', { album: cfg.origem || '' }); } catch (_) { base = base || []; }
+  montarSeq();
+  analisarFotos();
+}
+async function analisarFotos() {
+  if (analisando) return;
+  analisando = true;
+  const lim = Math.max(500, +cfg.limite || 8000);
+  const alvo = base.slice(-lim).reverse();   // das mais recentes para as mais antigas
+  for (let i = 0; i < alvo.length; i += 120) {
+    const lote = alvo.slice(i, i + 120);
+    try {
+      const res = await nat.call('analisar', { ids: lote });
+      lote.forEach((id, k) => { const c = res[k]; if (c) cores.set(id, { c: [c[0], c[1], c[2]], ok: c.length > 3 ? c[3] : 1 }); });
+    } catch (_) { break; }
+    mostrarAnalise(Math.min(alvo.length, i + 120), alvo.length);
+    if (i % 1200 === 0) pedirDesenho();
+  }
+  analisando = false;
+  mostrarAnalise(alvo.length, alvo.length);
+  if (atual && atual.pronto) prepararMosaico();
+}
+function mostrarAnalise(f, t) {
+  const e = $('#aAnalise'); if (!e) return;
+  let boas = 0; for (const v of cores.values()) if (v.ok) boas++;
+  e.textContent = f < t ? 'Preparando ' + f + ' de ' + t + '…' : cores.size + ' fotos prontas (' + boas + ' de pessoas e paisagens)';
+}
+
+/* foto da piada (bebê ou foto fixa) */
+function arqPiada() {
+  if (cfg.piada === 'fixa') { const f = cfg.fixas[cfg.fixa]; return f ? 'piada/' + f.id + '.jpg' : ''; }
+  return cfg.bebes[cfg.bebe] ? 'bebes/' + cfg.bebe + '.jpg' : '';
+}
+function fixosNoFim() { const n = +cfg.n0 || 3, t = W / n; return n * (Math.ceil(H / t) + 1); }
+function indiceBebe(total) {
+  const n = +cfg.n0 || 3, t = W / n, pb = padBaixo(n);
+  const k = Math.max(0, Math.round((H / 2 - pb) / t - 0.5));
+  const ultima = Math.floor((total - 1) / n), linha = Math.max(0, ultima - k);
+  return Math.min(total - 1, linha * n + Math.floor(n / 2));
+}
+function montarSeq() {
+  const s = tirados.size ? base.filter(id => !tirados.has(id)) : base.slice();
+  if (arqPiada()) s.splice(indiceBebe(s.length + 1), 0, '#piada');
+  seqNormal = s;
+  seq = (mos && mos.seq) ? mos.seq : seqNormal;
+  $('#contagem').textContent = s.length + ' Itens';
+  pedirDesenho();
+}
+
+/* =====================================================================
+   ALVO: rosto do famoso (ou o nome escrito) e montagem do mosaico
+   ===================================================================== */
+let atual = guarda.get('atual', null);   // {nome, tipo:'rosto'|'texto', arq, pronto}
+let mos = null;
+let preparo = 0;
+if (atual) atual.pronto = false;
+
+function estado(t, cls) { const e = $('#aEstado'); if (e) { e.textContent = t; e.className = 'r ' + (cls || ''); } }
+function mostrarAtual() {
+  const e = $('#aAtual'); if (e) e.textContent = atual ? atual.nome + (atual.tipo === 'texto' ? ' (nome escrito)' : '') : '—';
+  $('#ponto').classList.toggle('on', !!(cfg.aviso && atual && atual.pronto && mos));
+}
+
+async function definirNome(txt, origem) {
+  txt = String(txt || '').replace(/\s+/g, ' ').trim();
+  if (txt.length < 2 || txt.length > 60) return;
+  const meu = ++preparo;
+  const f = acharFamoso(txt);
+  const nome = f ? f.n : maiusculas(txt);
+  if (cfg.piada === 'bebes' && f && f.b >= 0 && cfg.bebes[f.b] && cfg.bebe !== f.b) { cfg.bebe = f.b; salvar(); montarSeq(); }
+  atual = { nome, tipo: 'texto', pronto: false, origem };
+  mostrarAtual(); estado('preparando…');
+  await prepararMosaico();             // 1) já fica pronto com o nome escrito
+  if (meu !== preparo) return;
+  let fam = f;
+  if (fam && fam.f) {
+    let existe = false;
+    try { existe = await nat.call('existe', { nome: fam.f }); } catch (_) {}
+    if (!existe) fam.f = '';
+  }
+  if (!fam || !fam.f) {
+    estado('procurando foto…');
+    fam = await baixarFamoso(fam || { n: nome, w: '', a: [], b: -1, f: '', r: null }, !fam);
+    if (meu !== preparo) return;
+  }
+  if (fam && fam.f) {                   // 2) troca pelo rosto
+    atual = { nome: fam.n, tipo: 'rosto', arq: fam.f, pronto: false, origem };
+    await prepararMosaico();
+  }
+  if (meu !== preparo) return;
+  guarda.set('atual', atual);
+  mostrarAtual();
+  estado(atual.tipo === 'rosto' ? 'pronto ✓' : 'pronto (sem foto: nome escrito)', 'ok');
+  if (cfg.vibrar) vibrar('leve');
+}
+
+async function infoWiki(lang, titulo, busca) {
+  const u = 'https://' + lang + '.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=1400&pilicense=any&'
+    + (titulo ? 'titles=' + encodeURIComponent(titulo) : 'generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(busca));
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 9000);
+  try {
+    const r = await fetch(u, { signal: ac.signal, cache: 'no-store' }); const d = await r.json();
+    const pags = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
+    const p = pags.find(x => x.thumbnail && x.thumbnail.source);
+    return p ? p.thumbnail.source : '';
+  } catch (_) { return ''; } finally { clearTimeout(t); }
+}
+async function baixarFamoso(f, novo) {
+  const tentativas = [];
+  if (f.w) tentativas.push(['pt', f.w, '']);
+  tentativas.push(['pt', '', f.n], ['en', f.w && !/\(/.test(f.w) ? f.w : '', f.n]);
+  let feito = null;
+  for (const [lang, tit, busca] of tentativas) {
+    const url = await infoWiki(lang, tit, busca);
+    if (!url) continue;
+    const nome = 'famosos/' + slug(f.n) + '.jpg';
+    try {
+      const r = await nat.call('baixarRosto', { url, nome });
+      feito = { arq: nome, rosto: !!(r && r.rosto) };
+      if (feito.rosto) break;
+    } catch (_) {}
+  }
+  if (!feito) { f.r = false; salvarFam(); return null; }
+  f.f = feito.arq; f.r = feito.rosto;
+  if (novo && !famosos.includes(f)) famosos.push(f);
+  salvarFam(); desenharListaFam();
+  return f;
+}
+
+/* desenha o nome em letras e devolve a grade de cores */
+function gradeTexto(nome, cols, rows) {
+  const k = 8, c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
+  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+  const linhas = []; let lin = '';
+  for (const p of nome.toUpperCase().split(' ')) { const t = lin ? lin + ' ' + p : p; if (lin && t.length > 7) { linhas.push(lin); lin = p; } else lin = t; }
+  if (lin) linhas.push(lin);
+  const largura = c.width * 0.88, alturaMax = c.height * 0.5 / linhas.length;
+  let fs = alturaMax;
+  g.font = '900 ' + fs + 'px -apple-system, Helvetica, Arial, sans-serif';
+  for (const l of linhas) { const w = g.measureText(l).width; if (w > largura) fs = Math.min(fs, alturaMax * largura / w); }
+  g.font = '900 ' + fs + 'px -apple-system, Helvetica, Arial, sans-serif';
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const total = linhas.length * fs * 1.12, y0 = c.height * 0.47 - total / 2 + fs * 0.56;
+  linhas.forEach((l, i) => g.fillText(l, c.width / 2, y0 + i * fs * 1.12));
+  const px = g.getImageData(0, 0, c.width, c.height).data, out = [];
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    let s = 0;
+    for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) s += px[((y * k + dy) * c.width + x * k + dx) * 4];
+    const v = Math.round(s / (k * k)); out.push(v, v, v);
+  }
+  return out;
+}
+
+/* fotos disponíveis para o mosaico */
+function pool() {
+  const todas = [], boas = [];
+  for (const [id, v] of cores) { if (tirados.has(id)) continue; const p = { id, c: v.c, l: lum(v.c) }; todas.push(p); if (v.ok) boas.push(p); }
+  return cfg.filtro && boas.length >= 300 ? boas : todas;
+}
+/* para cada cor (8x8x8 caixinhas), as fotos de cor mais parecida */
+function indiceCores(P) {
+  const tab = new Array(512);
+  return (r, g, b) => {
+    const k = ((r >> 5) << 6) | ((g >> 5) << 3) | (b >> 5);
+    if (!tab[k]) {
+      const cr = (r >> 5) * 32 + 16, cg = (g >> 5) * 32 + 16, cb = (b >> 5) * 32 + 16;
+      const m = [];
+      for (const p of P) {
+        const d = 2 * (p.c[0] - cr) ** 2 + 4 * (p.c[1] - cg) ** 2 + 3 * (p.c[2] - cb) ** 2;
+        if (m.length < 14) { m.push([d, p.id]); m.sort((a, z) => a[0] - z[0]); }
+        else if (d < m[13][0]) { m[13] = [d, p.id]; m.sort((a, z) => a[0] - z[0]); }
+      }
+      tab[k] = m.map(x => x[1]);
+    }
+    return tab[k];
+  };
+}
+
+async function prepararMosaico() {
+  if (!atual) return;
+  const meu = ++prepararMosaico.vez;
+  const n = +cfg.colsM || 60, t = W / n;
+  const rowsVis = Math.ceil(H / t) + 1;
+  let sN = seqNormal.slice();
+  if (sN.length < rowsVis * n) sN = new Array(rowsVis * n - sN.length).fill('').concat(sN);   // galeria pequena: repete fotos
+  const N = sN.length;
+  if (!N) return;
+  const ultima = Math.floor((N - 1) / n), primeira = Math.max(0, ultima - rowsVis + 1), linhas = ultima - primeira + 1;
+  const rg = Math.ceil(H / t);
+  let alvo = [];
+  if (atual.tipo === 'rosto' && atual.arq) { try { alvo = await nat.call('grade', { nome: atual.arq, cols: n, rows: rg, enq: cfg.enq, real: 'real.jpg' }); } catch (_) { alvo = []; } }
+  if (!alvo || alvo.length < n * rg * 3) { if (atual.tipo === 'rosto') atual.tipo = 'texto'; alvo = gradeTexto(atual.nome, n, rg); }
+  if (meu !== prepararMosaico.vez) return;
+  const texto = atual.tipo === 'texto';
+  const L = []; for (let i = 0; i < n * rg; i++) L.push(lum([alvo[i * 3], alvo[i * 3 + 1], alvo[i * 3 + 2]]));
+  const ord = L.slice().sort((a, b) => a - b), p2 = ord[Math.floor(ord.length * 0.02)], p98 = ord[Math.floor(ord.length * 0.98)] || 255;
+  const V = L.map(l => { let v = (l - p2) / Math.max(1, p98 - p2); v = Math.min(1, Math.max(0, v)); return texto ? v : v * v * (3 - 2 * v); });
+  const P = pool(); const NP = P.length;
+  const porLuz = P.slice().sort((a, b) => a.l - b.l);
+  const porCor = (!texto && cfg.cor === 'cor' && NP) ? indiceCores(P) : null;
+  const fixos = fixosNoFim();
+  const nova = sN.slice(), ids = [], tinta = [];
+  const cima = stPx() + 96, topo = Math.max(0, cima + (ultima + 1) * t - H);
+  const janela = texto ? Math.max(2, Math.round(NP * 0.3)) : Math.max(2, Math.round(NP * 0.015));
+  for (let r = primeira; r <= ultima; r++) {
+    const yc = cima + r * t - topo + t / 2, gy = Math.min(rg - 1, Math.max(0, Math.floor(yc / H * rg)));
+    for (let c = 0; c < n; c++) {
+      const idx = r * n + c, cel = gy * n + c, v = V[cel] == null ? 0 : V[cel];
+      const l0 = Math.max(1, L[cel] || 1), kk = (v * 255) / l0;   // cor do rosto com a claridade esticada
+      const cr = Math.min(255, Math.round((alvo[cel * 3] || 0) * kk)), cgc = Math.min(255, Math.round((alvo[cel * 3 + 1] || 0) * kk)), cb = Math.min(255, Math.round((alvo[cel * 3 + 2] || 0) * kk));
+      let id = '';
+      if (idx < N) {
+        if (idx >= N - fixos || !NP) id = sN[idx];
+        else {
+          const esq = c > 0 ? nova[idx - 1] : '', cimaId = idx - n >= 0 ? nova[idx - n] : '';
+          if (porCor) {
+            const cand = porCor(cr, cgc, cb);
+            for (let k = 0; k < 8; k++) { id = cand[Math.floor(Math.random() * Math.min(6, cand.length))]; if (id !== esq && id !== cimaId) break; }
+          } else {
+            const alvoI = Math.round(v * (NP - 1));
+            for (let k = 0; k < 8; k++) {
+              const j = Math.min(NP - 1, Math.max(0, alvoI + Math.round((Math.random() * 2 - 1) * janela)));
+              id = porLuz[j].id; if (id !== esq && id !== cimaId) break;
+            }
+          }
+          nova[idx] = id;
+        }
+      }
+      ids.push(id === '#piada' ? (arqPiada() ? 'arq:' + arqPiada() : '') : id);
+      if (porCor) tinta.push(cr, cgc, cb); else { const g = Math.round(v * 255); tinta.push(g, g, g); }
+    }
+  }
+  const px = Math.max(8, Math.min(64, Math.round(t * DPR)));
+  const versao = Date.now();
+  try {
+    const ok = await nat.call('compor', { ids, cols: n, rows: linhas, px, modo: 'cor', alvo: tinta, alfa: +cfg.reforco, saida: 'mosaico.jpg' });
+    if (!ok) throw new Error('não montou');
+  } catch (e) { if (meu === prepararMosaico.vez) estado('erro ao montar: ' + (e.message || e), 'erro'); return; }
+  if (meu !== prepararMosaico.vez) return;
+  const img = new Image();
+  await new Promise(ok => { img.onload = ok; img.onerror = ok; img.src = URLS.arq('mosaico.jpg', versao); });
+  if (meu !== prepararMosaico.vez) return;
+  mos = { seq: nova, img, primeira, linhas, cols: n, versao, N, ids, tinta, px, ultima };
+  seq = nova;
+  atual.pronto = true;
+  $('#real').style.backgroundImage = atual.tipo === 'rosto' ? 'url("' + URLS.arq('real.jpg', versao) + '")' : '';
+  mostrarAtual();
+  pedirDesenho();
+}
+prepararMosaico.vez = 0;
+
+function limparNome() {
+  preparo++; prepararMosaico.vez++;
+  atual = null; mos = null; guarda.set('atual', null); seq = seqNormal; $('#real').classList.remove('on');
+  if (modoMos) { modoMos = false; zoom = 5; trocarNivel(5); }
+  mostrarAtual(); estado(''); pedirDesenho();
+}
+
+/* =====================================================================
+   FOTOTECA: grade no canvas, rolar, pinça contínua, toque
+   ===================================================================== */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const ZM = 6.5;                 // a partir daqui a pinça mostra o mosaico ampliado
+let nivel = +cfg.n0 || 3;       // colunas da grade normal
+let zoom = nivel;               // colunas "contínuas"
+let modoMos = false;            // mostrando o mosaico (ampliado ou não)
+let doFim = 0;                  // rolagem a partir do fim (px)
+let corFundo = '#000';
+function niveis() { return mos ? [3, 5] : [3, 5, 9, 15, 25, +cfg.colsM || 60].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b); }
+function padBaixo(n) { return n <= 5 ? sbPx() + 70 : 0; }
+function sbPx() { return +document.documentElement.dataset.sb || 34; }
+function stPx() { return +document.documentElement.dataset.st || 47; }
+function alturaConteudo(n) { const t = W / n; return stPx() + 96 + Math.ceil(seq.length / n) * t + padBaixo(n); }
+function rolagemMax(n) { return Math.max(0, alturaConteudo(n) - H); }
+function topoRolado(n) { return Math.max(0, alturaConteudo(n) - H - doFim); }
+
+function ajustarTamanho() {
+  W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  const d = document.createElement('div'); d.style.cssText = 'position:fixed;top:0;height:var(--st);width:1px;visibility:hidden'; document.body.appendChild(d);
+  const st = d.getBoundingClientRect().height; d.style.height = 'var(--sb)'; const sb = d.getBoundingClientRect().height; d.remove();
+  document.documentElement.dataset.st = st || 47; document.documentElement.dataset.sb = sb || 34;
+  pedirDesenho();
+}
+
+/* cache de imagens (sem vai-e-vem) */
+const IMG = new Map(); const fila = []; let ativos = 0, relogio = 0;
+function pegar(chave, url) {
+  let e = IMG.get(chave);
+  if (!e) { e = { img: null, ok: false, t: 0, url, chave, naFila: false, carregando: false, erro: false }; IMG.set(chave, e); }
+  e.t = ++relogio;
+  if (e.ok) return e.img;
+  if (!e.naFila && !e.carregando && !e.erro) { e.naFila = true; fila.push(e); agendarBomba(); }
+  return null;
+}
+let bombaPedida = false;
+function agendarBomba() { if (!bombaPedida) { bombaPedida = true; setTimeout(() => { bombaPedida = false; bomba(); }, 0); } }
+function bomba() {
+  if (fila.length > 1500) { const fora = fila.splice(0, fila.length - 1500); fora.forEach(e => { e.naFila = false; }); }
+  while (ativos < 16 && fila.length) {
+    const e = fila.pop(); e.naFila = false;
+    if (e.t < relogio - 25000) continue;   // ninguém mais quer
+    e.carregando = true; ativos++;
+    const im = new Image();
+    im.onload = () => { e.img = im; e.ok = true; e.carregando = false; ativos--; pedirDesenho(); bomba(); };
+    im.onerror = () => { e.erro = true; e.carregando = false; ativos--; bomba(); };
+    im.src = e.url;
+  }
+  if (IMG.size > 12000) {
+    const v = [...IMG.values()].filter(e => !e.carregando && !e.naFila).sort((a, b) => a.t - b.t).slice(0, 3000);
+    v.forEach(e => IMG.delete(e.chave));
+  }
+}
+function imagemDoItem(it, pxTela) {
+  if (!it) return null;
+  if (it === '#piada') { const a = arqPiada(); return a ? pegar(a + '|' + cfg.ver, URLS.arq(a, cfg.ver)) : null; }
+  if (it.startsWith('arq:')) return pegar(it + '|' + cfg.ver, URLS.arq(it.slice(4), cfg.ver));
+  if (pxTela > 90) {
+    const s = pxTela > 260 ? Math.round(pxTela * 1.05 / 40) * 40 : 256;
+    const g = pegar(it + '|' + s, URLS.foto(it, s));
+    if (g) return g;
+  }
+  return pegar(it + '|m', URLS.mini(it));
+}
+function corMedia(it) { const v = cores.get(it); return v ? 'rgb(' + v.c[0] + ',' + v.c[1] + ',' + v.c[2] + ')' : 'rgba(128,128,128,.16)'; }
+function espaco(n) { return n <= 3 ? 2 : n <= 5 ? 1.5 : n <= 15 ? 1 : 0.6; }
+
+let desenhoPedido = false;
+function pedirDesenho() { if (!desenhoPedido) { desenhoPedido = true; requestAnimationFrame(desenhar); } }
+function desenhar() {
+  desenhoPedido = false;
+  if (!$('#fototeca').classList.contains('on')) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H);
+  if (modoMos && mos) desenharMosaico(); else desenharGrade();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  let f = '';   // sépia / preto e branco só no mosaico, entrando aos poucos
+  if (modoMos && mos && cfg.cor !== 'cor') { const a = rampa(); f = cfg.cor === 'sepia' ? 'sepia(' + (0.9 * a).toFixed(2) + ')' : 'grayscale(' + a.toFixed(2) + ')'; }
+  if (cv.style.filter !== f) cv.style.filter = f;
+}
+/* quanto o mosaico já "virou rosto" (0 = fotos grandes, 1 = mosaico pronto) */
+function rampa() { const C = mos ? mos.cols : 60, zt = C / 1.5; return Math.min(1, Math.max(0, (zoom - ZM) / Math.max(1, zt - ZM))); }
+
+function desenharGrade() {
+  const n = nivel, s = n / zoom, t = W / n, g = espaco(n), sel = emSelecao;
+  ctx.translate(W / 2, H); ctx.scale(s, s); ctx.translate(-W / 2, -H);
+  const topo = topoRolado(n), cima = stPx() + 96;
+  const yMin = H - H / s, yMax = H, xMin = W / 2 - W / 2 / s, xMax = W / 2 + W / 2 / s;
+  const r0 = Math.max(0, Math.floor((yMin + topo - cima) / t)), r1 = Math.min(Math.ceil(seq.length / n) - 1, Math.floor((yMax + topo - cima) / t));
+  const pxTela = t * s * DPR;
+  for (let r = r0; r <= r1; r++) {
+    const y = cima + r * t - topo;
+    for (let c = 0; c < n; c++) {
+      const i = r * n + c; if (i >= seq.length) break;
+      const x = c * t; if (x + t < xMin || x > xMax) continue;
+      const it = seq[i], lado = t - g, larg = c === n - 1 ? t : lado;
+      const im = imagemDoItem(it, pxTela);
+      if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, larg, lado); }
+      else { ctx.fillStyle = corMedia(it); ctx.fillRect(x, y, larg, lado); }
+      if (sel && selecionados.has(i)) desenharMarca(x, y, larg, lado);
+    }
+  }
+}
+function desenharMarca(x, y, w, h) {
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(x, y, w, h);
+  const r = Math.min(12, w / 5), cx = x + w - r - 5, cy = y + h - r - 5;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = '#0a84ff'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx - r * .45, cy); ctx.lineTo(cx - r * .1, cy + r * .38); ctx.lineTo(cx + r * .48, cy - r * .35); ctx.stroke();
+}
+
+/* mosaico ampliado em volta do centro da tela: k = colunas do mosaico / colunas da pinça */
+function desenharMosaico() {
+  const C = mos.cols, t0 = W / C, k = C / zoom, cima = stPx() + 96;
+  const topo0 = Math.max(0, cima + (mos.ultima + 1) * t0 - H);
+  const yR = r => cima + r * t0 - topo0;
+  const X = x => W / 2 + (x - W / 2) * k, Y = y => H / 2 + (y - H / 2) * k;
+  const pxTela = t0 * k * DPR;
+  if (pxTela <= mos.px * 1.5 && mos.img && mos.img.naturalWidth) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(mos.img, X(0), Y(yR(mos.primeira)), W * k, mos.linhas * t0 * k);
+    const g = espaco(zoom) * Math.min(1, k);
+    if (g > 0.3) {
+      ctx.fillStyle = corFundo; const y0 = Y(yR(mos.primeira)), alt = mos.linhas * t0 * k;
+      for (let c = 1; c < C; c++) { const x = X(c * t0); if (x > -2 && x < W + 2) ctx.fillRect(x - g, y0, g, alt); }
+      for (let r = 1; r <= mos.linhas; r++) { const y = Y(yR(mos.primeira + r)); if (y > -2 && y < H + 2) ctx.fillRect(0, y - g, W, g); }
+    }
+    return;
+  }
+  // fotinhas grandes: uma por uma, com o retoque de cor entrando aos poucos
+  const a = (+cfg.reforco) * Math.pow(rampa(), 1.3), g = espaco(zoom);
+  const xs0 = W / 2 - W / 2 / k, xs1 = W / 2 + W / 2 / k, ys0 = H / 2 - H / 2 / k, ys1 = H / 2 + H / 2 / k;
+  const c0 = Math.max(0, Math.floor(xs0 / t0)), c1 = Math.min(C - 1, Math.floor(xs1 / t0));
+  const r0 = Math.max(mos.primeira, Math.floor((ys0 - cima + topo0) / t0)), r1 = Math.min(mos.ultima, Math.floor((ys1 - cima + topo0) / t0));
+  const lado = t0 * k - g;
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+    const cel = (r - mos.primeira) * C + c, id = mos.ids[cel];
+    if (!id) continue;
+    const x = X(c * t0), y = Y(yR(r));
+    const im = imagemDoItem(id, pxTela);
+    if (im && im.naturalWidth) { const w = im.naturalWidth, h = im.naturalHeight, m = Math.min(w, h); ctx.drawImage(im, (w - m) / 2, (h - m) / 2, m, m, x, y, lado, lado); }
+    else { ctx.fillStyle = corMedia(id); ctx.fillRect(x, y, lado, lado); }
+    if (a > 0.01) { ctx.fillStyle = 'rgba(' + mos.tinta[cel * 3] + ',' + mos.tinta[cel * 3 + 1] + ',' + mos.tinta[cel * 3 + 2] + ',' + a.toFixed(3) + ')'; ctx.fillRect(x, y, lado, lado); }
+  }
+}
+
+/* toque, rolagem e pinça */
+const toques = { modo: '', y0: 0, x0: 0, f0: 0, t0: 0, d0: 0, z0: 0, vel: 0, ultY: 0, ultT: 0, moveu: 0, inercia: 0 };
+function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+function nivelPerto(z) { const L = niveis(); let m = L[0]; for (const v of L) if (Math.abs(Math.log(v / z)) < Math.abs(Math.log(m / z))) m = v; return m; }
+function trocarNivel(novo) {
+  if (novo === nivel) return;
+  const tVelho = W / nivel, tNovo = W / novo;
+  doFim = novo >= 9 ? 0 : Math.min(rolagemMax(novo), doFim * tNovo / tVelho);
+  nivel = novo;
+}
+function aplicarZoom(z) {
+  zoom = z;
+  if (mos && z >= ZM) { if (!modoMos) { modoMos = true; if (emSelecao) sairSelecao(); } }
+  else { modoMos = false; trocarNivel(nivelPerto(z)); }
+}
+cv.addEventListener('touchstart', e => {
+  e.preventDefault(); cancelAnimationFrame(toques.inercia); toques.inercia = 0;
+  if (e.touches.length >= 2) { toques.modo = 'pinca'; toques.d0 = dist(e.touches[0], e.touches[1]); toques.z0 = zoom; }
+  else if (e.touches.length === 1 && toques.modo !== 'pinca') {
+    const p = e.touches[0];
+    toques.modo = 'toque'; toques.x0 = p.clientX; toques.y0 = p.clientY; toques.f0 = doFim; toques.t0 = performance.now();
+    toques.ultY = p.clientY; toques.ultT = toques.t0; toques.vel = 0; toques.moveu = 0;
+  }
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (toques.modo === 'pinca' && e.touches.length >= 2) {
+    const d = dist(e.touches[0], e.touches[1]); if (!d || !toques.d0) return;
+    const L = niveis(), max = mos ? mos.cols * 1.08 : L[L.length - 1] * 1.18;
+    aplicarZoom(Math.min(max, Math.max(L[0] * 0.85, toques.z0 * toques.d0 / d)));
+    pedirDesenho();
+  } else if ((toques.modo === 'toque' || toques.modo === 'rolar') && e.touches.length === 1) {
+    const p = e.touches[0], dy = p.clientY - toques.y0;
+    toques.moveu = Math.max(toques.moveu, Math.abs(dy), Math.abs(p.clientX - toques.x0));
+    if (toques.moveu > 8) toques.modo = 'rolar';
+    if (toques.modo === 'rolar' && !modoMos) {
+      const agora = performance.now(), dt = Math.max(1, agora - toques.ultT);
+      toques.vel = 0.8 * toques.vel + 0.2 * ((p.clientY - toques.ultY) / dt);
+      toques.ultY = p.clientY; toques.ultT = agora;
+      doFim = Math.min(rolagemMax(nivel), Math.max(0, toques.f0 + dy));
+      pedirDesenho();
+    }
+  }
+}, { passive: false });
+cv.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (toques.modo === 'pinca') { if (e.touches.length === 0) { toques.modo = ''; soltouPinca(); } return; }
+  if (toques.modo === 'toque' && performance.now() - toques.t0 < 400 && toques.moveu < 10) tocou(toques.x0, toques.y0);
+  else if (toques.modo === 'rolar' && !modoMos) inercia(toques.vel * 16);
+  toques.modo = '';
+}, { passive: false });
+cv.addEventListener('touchcancel', () => { if (toques.modo === 'pinca') soltouPinca(); toques.modo = ''; });
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+function soltouPinca() {
+  if (modoMos && mos) {
+    if (zoom > mos.cols) animarZoom(mos.cols);
+    else if (zoom < ZM + 0.6) animarZoom(5);
+    // no meio do caminho: fica onde soltou (o rosto vai aparecendo aos poucos)
+  } else animarZoom(nivelPerto(zoom));
+}
+function animarZoom(alvo) {
+  const z0 = zoom, t0 = performance.now(), dur = 260;
+  (function passo() {
+    const k = Math.min(1, (performance.now() - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    aplicarZoom(z0 + (alvo - z0) * e); pedirDesenho();
+    if (k < 1) requestAnimationFrame(passo);
+  })();
+}
+function inercia(v) {
+  (function passo() {
+    v *= 0.95; if (Math.abs(v) < 0.3) return;
+    const novo = Math.min(rolagemMax(nivel), Math.max(0, doFim + v));
+    if (novo === doFim) return;
+    doFim = novo; pedirDesenho(); toques.inercia = requestAnimationFrame(passo);
+  })();
+}
+let ultimoToque = 0;
+function itemNoPonto(x, y) {
+  if (modoMos && mos) {
+    const C = mos.cols, t0 = W / C, k = C / zoom, cima = stPx() + 96, topo0 = Math.max(0, cima + (mos.ultima + 1) * t0 - H);
+    const xr = W / 2 + (x - W / 2) / k, yr = H / 2 + (y - H / 2) / k;
+    const c = Math.floor(xr / t0), r = Math.floor((yr - cima + topo0) / t0);
+    return c >= 0 && c < C && r >= 0 ? r * C + c : -1;
+  }
+  const n = nivel, t = W / n, topo = topoRolado(n), cima = stPx() + 96;
+  const r = Math.floor((y + topo - cima) / t), c = Math.floor(x / t);
+  return r < 0 || c < 0 || c >= n ? -1 : r * n + c;
+}
+function tocou(x, y) {
+  const i = itemNoPonto(x, y);
+  if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); pedirDesenho(); } return; }
+  const agora = performance.now();
+  if (modoMos && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
+  ultimoToque = agora;
+  if (i < 0 || i >= seq.length || !seq[i]) return;
+  setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, modoMos ? 330 : 0);
+}
+function alternarReal() { if (!cfg.fotoReal || !atual || atual.tipo !== 'rosto' || !mos) return; $('#real').classList.toggle('on'); }
+
+/* cantos: trocar o bebê */
+[['#cTL', 0], ['#cTR', 1], ['#cBL', 2], ['#cBR', 3]].forEach(([s, k]) => {
+  $(s).addEventListener('touchend', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (cfg.piada !== 'bebes') return;
+    if (!cfg.bebes[k]) { vibrar('forte'); return; }
+    cfg.bebe = k; salvar(); montarSeq(); vibrar('leve');
+    if (atual && atual.pronto) prepararMosaico();
+  }, { passive: false });
+});
+
+/* título: segurar 1 s ou três toques = ajustes */
+(function () {
+  let t = 0, x0 = 0, y0 = 0, toquesT = [];
+  const el = $('#titulo');
+  el.addEventListener('touchstart', e => {
+    e.preventDefault(); const p = e.touches[0]; x0 = p.clientX; y0 = p.clientY;
+    t = setTimeout(() => { t = 0; vibrar('media'); abrirAjustes(); }, 1000);
+    const agora = performance.now(); toquesT = toquesT.filter(v => agora - v < 700); toquesT.push(agora);
+    if (toquesT.length >= 3) { toquesT = []; clearTimeout(t); t = 0; vibrar('media'); abrirAjustes(); }
+  }, { passive: false });
+  el.addEventListener('touchmove', e => { const p = e.touches[0]; if (t && Math.hypot(p.clientX - x0, p.clientY - y0) > 14) { clearTimeout(t); t = 0; } }, { passive: true });
+  const fim = () => { if (t) clearTimeout(t); t = 0; };
+  el.addEventListener('touchend', fim); el.addEventListener('touchcancel', fim);
+})();
+
+/* botão redondo do meio: toque = câmera escondida; segurar = espiar o nome */
+(function () {
+  const el = $('#meio'); let t = 0, espiando = false;
+  el.addEventListener('touchstart', e => { e.preventDefault(); t = setTimeout(() => { t = 0; espiando = true; espiar(true); }, 350); }, { passive: false });
+  el.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (t) { clearTimeout(t); t = 0; ligarCamera(); }
+    if (espiando) { espiando = false; espiar(false); }
+  }, { passive: false });
+  el.addEventListener('touchcancel', () => { if (t) clearTimeout(t); t = 0; if (espiando) { espiando = false; espiar(false); } });
+})();
+function espiar(on) {
+  const r = $('#rotulo');
+  if (!on) { r.textContent = 'Fototeca'; r.style.color = ''; return; }
+  if (!atual) { r.textContent = '—'; r.style.color = '#8e8e93'; return; }
+  r.textContent = atual.nome;
+  r.style.color = !atual.pronto ? '#ff9f0a' : atual.tipo === 'rosto' ? '' : '#8e8e93';
+}
+
+/* lupa: busca (o nome digitado vira o famoso) */
+$('#lupa').addEventListener('click', () => { $('#busca').classList.add('on'); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); });
+$('#bInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = $('#bInput').value.trim(); $('#bInput').blur();
+    if (v) { definirNome(v, 'busca'); $('#bMsg').innerHTML = '<b>Nenhum Resultado</b>Não há resultados para “' + esc(v) + '”. Tente uma nova pesquisa.'; }
+  }
+});
+$('#bCanc').addEventListener('click', () => {
+  const v = $('#bInput').value.trim(); $('#bInput').blur();
+  if (v && !$('#bMsg').innerHTML) definirNome(v, 'busca');
+  $('#busca').classList.remove('on');
+});
+
+/* =====================================================================
+   SELECIONAR e tirar fotos do app (nunca do iPhone)
+   ===================================================================== */
+let emSelecao = false; const selecionados = new Set();
+$('#bSel').addEventListener('click', () => { if (emSelecao) sairSelecao(); else entrarSelecao(); });
+function entrarSelecao() {
+  if (modoMos) aplicarZoom(5);
+  emSelecao = true; selecionados.clear(); $('#fototeca').classList.add('selecao');
+  $('#bSel').textContent = 'Cancelar'; $('#tituloTxt').textContent = 'Selecionar Itens'; contarSelecao(); pedirDesenho();
+}
+function sairSelecao() {
+  emSelecao = false; selecionados.clear(); $('#fototeca').classList.remove('selecao');
+  $('#bSel').textContent = 'Selecionar'; $('#tituloTxt').textContent = 'Fototeca'; pedirDesenho();
+}
+function contarSelecao() { const n = selecionados.size; $('#selConta').textContent = n ? n + (n === 1 ? ' Item Selecionado' : ' Itens Selecionados') : 'Selecionar Itens'; }
+$('#selLixo').addEventListener('click', () => {
+  if (!selecionados.size) return;
+  tirarDoApp([...selecionados].map(i => seq[i]));
+  sairSelecao();
+});
+function tirarDoApp(ids) {
+  ids = ids.filter(id => id && id !== '#piada' && !String(id).startsWith('arq:'));
+  if (!ids.length) return;
+  ids.forEach(id => tirados.add(id));
+  cfg.tirados = [...tirados]; salvar();
+  if (mos) mos.seq = mos.seq.filter(id => !tirados.has(id));   // some já da tela
+  montarSeq();
+  if (atual) prepararMosaico();
+}
+$('#aDevolver').addEventListener('click', () => {
+  if (!tirados.size) return;
+  if (!confirm('Devolver ao app as ' + tirados.size + ' fotos tiradas?')) return;
+  tirados = new Set(); cfg.tirados = []; salvar(); montarSeq(); if (atual) prepararMosaico(); mostrarTirados();
+});
+function mostrarTirados() { const e = $('#aTirados'); if (e) e.textContent = 'Fotos tiradas do app: ' + tirados.size; }
+
+/* =====================================================================
+   VISUALIZADOR
+   ===================================================================== */
+let verI = 0;
+const fmtData = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtHora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function srcGrande(it) {
+  if (it === '#piada') return URLS.arq(arqPiada(), cfg.ver);
+  return URLS.foto(it, Math.round(Math.max(W, H) * DPR), true);
+}
+function montarPalco() {
+  const p = $('#palco'); p.innerHTML = '';
+  for (const d of [-1, 0, 1]) {
+    const i = verI + d, el = document.createElement('div'); el.className = 'fx'; el.style.left = (d * 100) + '%';
+    if (i >= 0 && i < seq.length && seq[i]) {
+      const im = document.createElement('img'); const it = seq[i];
+      if (it !== '#piada') { const pq = IMG.get(it + '|m'); if (pq && pq.ok) im.src = pq.img.src; }
+      const g = new Image(); g.onload = () => { im.src = g.src; }; g.src = srcGrande(it);
+      if (d === 0) im.id = 'imgAtual';
+      el.appendChild(im);
+    }
+    p.appendChild(el);
+  }
+  p.style.transform = 'translateX(0)';
+  mostrarData();
+}
+async function mostrarData() {
+  const it = seq[verI], el = $('#vData');
+  if (it === '#piada') { el.innerHTML = 'Hoje<small>' + fmtHora.format(new Date(Date.now() - 35 * 60000)) + '</small>'; return; }
+  el.innerHTML = '';
+  try { const d = await nat.call('info', { id: it }); if (d && d.data && seq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
+}
+function abrirFoto(i) { verI = i; $('#ver').classList.remove('limpo'); mostrar('ver', true); montarPalco(); }
+function fecharFoto() { mostrar('fototeca'); }
+$('#vVolta').addEventListener('click', fecharFoto);
+$('#vLixo').addEventListener('click', () => {
+  const it = seq[verI];
+  if (it === '#piada') { ligarVoz(); return; }   // camuflado: nada muda na tela
+  const im = $('#imgAtual'); if (im) im.classList.add('indo');
+  setTimeout(() => {
+    tirarDoApp([it]);
+    if (!seq.length) { fecharFoto(); return; }
+    verI = Math.min(verI, seq.length - 1); montarPalco();
+  }, 360);
+});
+(function () {
+  const p = $('#palco'); let x0 = 0, y0 = 0, dx = 0, dy = 0, modo = '', t0 = 0;
+  p.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = dy = 0; modo = ''; t0 = performance.now(); p.style.transition = 'none'; }, { passive: true });
+  p.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return; e.preventDefault();
+    dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
+    if (!modo && Math.hypot(dx, dy) > 8) modo = Math.abs(dx) > Math.abs(dy) ? 'lado' : 'baixo';
+    if (modo === 'lado') p.style.transform = 'translateX(' + dx + 'px)';
+    else if (modo === 'baixo' && dy > 0) { p.style.transform = 'translateY(' + dy + 'px) scale(' + Math.max(0.7, 1 - dy / 1200) + ')'; $('#ver').style.background = 'rgba(0,0,0,' + Math.max(0, 1 - dy / 400) + ')'; }
+  }, { passive: false });
+  p.addEventListener('touchend', () => {
+    p.style.transition = 'transform .25s ease';
+    if (!modo && performance.now() - t0 < 300) { $('#ver').classList.toggle('limpo'); return; }
+    if (modo === 'lado') {
+      const ir = dx < -60 && verI < seq.length - 1 ? 1 : dx > 60 && verI > 0 ? -1 : 0;
+      p.style.transform = 'translateX(' + (-ir * W) + 'px)';
+      if (ir) setTimeout(() => { verI += ir; p.style.transition = 'none'; montarPalco(); }, 250);
+    } else if (modo === 'baixo') {
+      $('#ver').style.background = '';
+      if (dy > 110) fecharFoto(); else p.style.transform = 'none';
+    }
+  });
+})();
+
+/* =====================================================================
+   CÂMERA ESCONDIDA e MICROFONE (avisos que vêm do iPhone)
+   ===================================================================== */
+let camLigada = false, camCand = '', camVezes = 0, vozLigada = false;
+async function ligarCamera() {
+  if (camLigada) return;
+  camLigada = true; camCand = ''; camVezes = 0;
+  try { await nat.call('cameraLigar', { segundos: 8 }); }
+  catch (e) { camLigada = false; vibrar('forte'); }
+}
+function camAchou(nome) {
+  camLigada = false; nat.call('cameraDesligar').catch(() => {});
+  vibrar('media'); definirNome(nome, 'camera');
+}
+async function ligarVoz() {
+  if (vozLigada) return;
+  vozLigada = true;
+  try { await nat.call('vozLigar', { segundos: 7 }); vibrar('leve'); }
+  catch (e) { vozLigada = false; vibrar('forte'); }
+}
+const PALAVRAS_SOBRA = new Set(('o a os as e é de da do dos das um uma esse essa este esta isso aqui ai aí olha olhe então entao era foi ' +
+  'ele ela the bebe bebê desenhado desenhada desenho quando pequeno pequena com meses mes foto ne né tá ta que quem').split(' ').map(semAcento));
+window.__mzEvento = ev => {
+  if (!ev || !ev.tipo) return;
+  if (ev.tipo === 'texto' && camLigada) {
+    const linhas = (ev.linhas || []).filter(l => l && l.t);
+    let f = acharFamosoEm(linhas.map(l => l.t).join(' '));
+    if (!f) for (const l of linhas) { f = acharFamoso(l.t); if (f) break; }
+    if (f) return camAchou(f.n);
+    // nome fora da lista: a maior linha que aparecer igual 3 vezes seguidas
+    const boa = linhas.filter(l => /[a-zà-ú]{2,}/i.test(l.t) && l.t.length <= 40).sort((a, b) => b.h - a.h)[0];
+    if (boa) { const k = semAcento(boa.t); if (k === camCand) camVezes++; else { camCand = k; camVezes = 1; } if (camVezes >= 3) camAchou(maiusculas(boa.t.trim())); }
+  } else if (ev.tipo === 'cameraFim') {
+    if (camLigada) { camLigada = false; vibrar('forte'); }
+  } else if (ev.tipo === 'voz' && vozLigada) {
+    const f = acharFamosoEm(ev.texto || '');
+    if (f) { vozLigada = false; nat.call('vozDesligar').catch(() => {}); vibrar('media'); definirNome(f.n, 'voz'); return; }
+    if (ev.final) {
+      vozLigada = false;
+      const resto = semAcento(ev.texto).split(' ').filter(p => p && !PALAVRAS_SOBRA.has(p));
+      if (resto.length >= 1 && resto.length <= 4) { vibrar('media'); definirNome(maiusculas(resto.join(' ')), 'voz'); }
+      else vibrar('forte');
+    }
+  } else if (ev.tipo === 'vozFim') {
+    if (vozLigada) { vozLigada = false; vibrar('forte'); }
+  }
+};
+
+/* =====================================================================
+   NOTAS FALSO
+   ===================================================================== */
+function abrirNotas() {
+  $('#ntexto').value = '';
+  const d = new Date(); $('#nData').textContent = fmtData.format(d) + ' às ' + fmtHora.format(d);
+  mostrar('notas', true);
+  setTimeout(() => $('#ntexto').focus(), 250);
+}
+function fecharNotas() {
+  const linha = $('#ntexto').value.split('\n').map(s => s.trim()).find(Boolean);
+  $('#ntexto').blur();
+  if (linha) definirNome(linha, 'notas');
+  mostrar(telaAnterior || (cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca'));
+}
+$('#nVolta').addEventListener('click', fecharNotas);
+$('#nOk').addEventListener('click', () => { $('#ntexto').blur(); });
+
+/* =====================================================================
+   TELA DE INÍCIO (print) e marcação dos ícones
+   ===================================================================== */
+function aplicarPrint() {
+  const c = $('#cvIni');
+  $('#inicioVazio').style.display = cfg.temPrint ? 'none' : 'flex';
+  $('#marcar').style.backgroundImage = cfg.temPrint ? 'url("' + URLS.arq('inicio/print.jpg', cfg.ver) + '")' : '';
+  if (!cfg.temPrint) { c.width = 1; c.height = 1; return; }
+  const im = new Image();
+  im.onload = () => {
+    c.width = Math.round(W * DPR); c.height = Math.round(H * DPR);
+    const g = c.getContext('2d'), k = Math.max(c.width / im.naturalWidth, c.height / im.naturalHeight);
+    const w = im.naturalWidth * k, h = im.naturalHeight * k, x = (c.width - w) / 2, y = (c.height - h) / 2;
+    g.drawImage(im, x, y, w, h);
+    const faixa = Math.round((stPx() + 2) * DPR), srcY = (faixa + 3 * DPR - y) / k;
+    g.drawImage(im, 0, srcY, im.naturalWidth, 1, x, 0, w, faixa);   // apaga a hora/bateria do print
+  };
+  im.src = URLS.arq('inicio/print.jpg', cfg.ver);
+}
+$('#inicio').addEventListener('click', e => {
+  const z = cfg.zonas || {}, x = e.clientX / W, y = e.clientY / H;
+  const perto = p => p && Math.abs(p.x - x) * W < 38 && Math.abs(p.y - y) * H < 40;
+  if (perto(z.fotos)) abrirDoIcone('fototeca', z.fotos);
+  else if (perto(z.notas)) abrirDoIcone('notas', z.notas);
+  else if (perto(z.ajustes)) abrirAjustes();
+  else if (!cfg.temPrint) abrirAjustes();
+});
+function abrirDoIcone(qual, p) {
+  const el = qual === 'notas' ? $('#notas') : $('#fototeca');
+  el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
+  el.style.transition = 'none'; el.style.transform = 'scale(.12)'; el.style.opacity = '0.3';
+  if (qual === 'notas') abrirNotas(); else mostrar('fototeca', true);
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'transform .34s cubic-bezier(.2,.9,.25,1), opacity .2s'; el.style.transform = 'none'; el.style.opacity = '1'; }));
+}
+let passoMarca = 0;
+const PASSOS = [['fotos', 'Toque no meio do ícone Fotos'], ['notas', 'Toque no meio do ícone Notas'], ['ajustes', 'Toque no meio do ícone Ajustes (abre estes ajustes escondidos)']];
+function iniciarMarcar() {
+  if (!cfg.temPrint) { toast('Escolha o print primeiro'); return; }
+  passoMarca = 0; cfg.zonas = cfg.zonas || {}; $$('#marcar .alvo').forEach(p => p.remove());
+  mostrar('marcar', true); $('#mMsg').textContent = PASSOS[0][1];
+}
+function proximaMarca() { passoMarca++; if (passoMarca >= PASSOS.length) { salvar(); mostrar('ajustes', true); toast('Ícones marcados'); return; } $('#mMsg').textContent = PASSOS[passoMarca][1]; }
+$('#marcar').addEventListener('click', e => {
+  if (e.target.closest('.aviso')) return;
+  cfg.zonas[PASSOS[passoMarca][0]] = { x: e.clientX / W, y: e.clientY / H };
+  const p = document.createElement('div'); p.className = 'alvo'; p.style.left = e.clientX + 'px'; p.style.top = e.clientY + 'px'; $('#marcar').appendChild(p);
+  vibrar('leve'); proximaMarca();
+});
+$('#mPula').addEventListener('click', proximaMarca);
+$('#mSai').addEventListener('click', () => { salvar(); mostrar('ajustes', true); });
+
+/* =====================================================================
+   TELAS
+   ===================================================================== */
+let telaAtual = '', telaAnterior = '';
+function escuroAgora() { return cfg.tema === 'escuro' || (cfg.tema === 'auto' && (!window.matchMedia || matchMedia('(prefers-color-scheme: dark)').matches)); }
+function mostrar(id, guardaAnterior) {
+  if (guardaAnterior && telaAtual && telaAtual !== id && telaAtual !== 'ajustes' && telaAtual !== 'marcar') telaAnterior = telaAtual;
+  $$('.tela').forEach(t => t.classList.toggle('on', t.id === id));
+  telaAtual = id;
+  const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
+  nat.msg('barra', id === 'marcar');
+  nat.msg('estilo', escuro ? 'claro' : 'escuro');
+  if (id === 'fototeca') pedirDesenho();
+}
+function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); encherAjustes(); }
+$('#aFecha').addEventListener('click', () => {
+  salvar();
+  const volta = telaAnterior && telaAnterior !== 'ajustes' && telaAnterior !== 'marcar' ? telaAnterior : (cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');
+  mostrar(volta);
+});
+function aplicarTema() {
+  const claro = !escuroAgora();
+  document.body.classList.toggle('claro', claro); corFundo = claro ? '#fff' : '#000';
+  if (telaAtual) mostrar(telaAtual);
+  pedirDesenho();
+}
+if (window.matchMedia) { try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', aplicarTema); } catch (_) {} }
+
+/* =====================================================================
+   AJUSTES
+   ===================================================================== */
+const ROT_BEBE = ['Menino branco', 'Menina branca', 'Menino negro', 'Menina negra'];
+const CURTO_BEBE = ['Men. br.', 'Mna. br.', 'Men. ng.', 'Mna. ng.'];
+async function encherAjustes() {
+  mostrarAtual(); mostrarTirados();
+  $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
+  $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
+  $('#aEnq').value = cfg.enq; $('#aFiltro').checked = !!cfg.filtro; $('#aAviso').checked = !!cfg.aviso;
+  $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
+  $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); $('#aPiada').value = cfg.piada;
+  if (!analisando) mostrarAnalise(1, 1);
+  desenharPiada(); desenharListaFam();
+  try {
+    const al = await nat.call('albuns'); const s = $('#aOrigem');
+    s.innerHTML = '<option value="">Todas as fotos</option>' + al.map(a => '<option value="' + esc(a.id) + '">' + esc(a.nome) + ' (' + a.n + ')</option>').join('');
+    s.value = cfg.origem || '';
+  } catch (_) {}
+}
+function desenharPiada() {
+  const bebes = cfg.piada === 'bebes';
+  $('#aBebes').parentNode.style.display = bebes ? '' : 'none';
+  $('#aFixas').style.display = bebes ? 'none' : '';
+  $('#aBebes').innerHTML = ROT_BEBE.map((r, k) => '<div class="' + (cfg.bebe === k ? 'atual' : '') + '" data-k="' + k + '"><img ' + (cfg.bebes[k] ? 'src="' + URLS.arq('bebes/' + k + '.jpg', cfg.ver) + '"' : '') + '>' + (k + 1) + '. ' + r + '</div>').join('');
+  $('#aFixas').innerHTML = cfg.fixas.map((f, i) => '<div class="lin" data-i="' + i + '"><img class="mini" src="' + URLS.arq('piada/' + f.id + '.jpg', cfg.ver) + '"><span style="flex:1">' + esc(f.nome) + '</span>'
+    + (cfg.fixa === i ? '<span class="ok">em uso</span>' : '<button class="bt cinza" data-a="usar">Usar</button>') + '<button class="bt cinza" data-a="tirar" style="padding:8px 9px">✕</button></div>').join('')
+    + '<div class="lin"><button class="bt" id="aAddFixa">+ Adicionar foto fixa</button></div>';
+}
+$('#aPiada').addEventListener('change', e => { cfg.piada = e.target.value; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); });
+$('#aBebes').addEventListener('click', async e => {
+  const d = e.target.closest('[data-k]'); if (!d) return; const k = +d.dataset.k;
+  try {
+    const r = await nat.call('escolher', { nome: 'bebes/' + k + '.jpg', rosto: false });
+    if (r && r.ok) { cfg.bebes[k] = true; cfg.bebe = k; cfg.ver++; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); }
+  } catch (_) {}
+});
+$('#aFixas').addEventListener('click', async e => {
+  if (e.target.id === 'aAddFixa') {
+    const id = 'f' + Date.now();
+    try {
+      const r = await nat.call('escolher', { nome: 'piada/' + id + '.jpg', rosto: false });
+      if (r && r.ok) {
+        const nome = prompt('Nome desta foto (ex.: Prancheta)', 'Prancheta') || 'Foto ' + (cfg.fixas.length + 1);
+        cfg.fixas.push({ id, nome }); cfg.fixa = cfg.fixas.length - 1; cfg.ver++; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
+      }
+    } catch (_) {}
+    return;
+  }
+  const l = e.target.closest('[data-i]'), a = e.target.dataset.a; if (!l || !a) return; const i = +l.dataset.i;
+  if (a === 'usar') cfg.fixa = i;
+  else if (a === 'tirar' && confirm('Tirar a foto "' + cfg.fixas[i].nome + '"?')) { nat.call('apagar', { nome: 'piada/' + cfg.fixas[i].id + '.jpg' }).catch(() => {}); cfg.fixas.splice(i, 1); if (cfg.fixa >= cfg.fixas.length) cfg.fixa = 0; }
+  salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
+});
+function desenharListaFam() {
+  atualizarContaFam();
+  if (telaAtual !== 'ajustes') return;
+  const el = $('#listaFam'), q = semAcento($('#aBuscaFam').value), filtro = $('#aFamFiltro').value;
+  const lista = famosos.map((f, i) => [f, i]).filter(([f]) => (!q || semAcento(f.n).includes(q)) && (filtro !== 'sembebe' || f.b < 0) && (filtro !== 'semfoto' || !f.f))
+    .sort((a, b) => a[0].n.localeCompare(b[0].n, 'pt'));
+  el.innerHTML = lista.map(([f, i]) => '<div class="lin" data-i="' + i + '"><img class="mini" data-a="foto" ' + (f.f ? 'src="' + URLS.arq(f.f, cfg.ver) + '"' : '') + '><div class="nm"><b>' + esc(f.n) + '</b><small class="' + (f.f ? (f.r === false ? 'erro' : 'ok') : '') + '">' + (f.f ? (f.r === false ? 'sem rosto achado — troque a foto' : 'foto pronta') : (f.r === false ? 'não achou foto' : 'sem foto')) + '</small></div>'
+    + '<button class="bt cinza" data-a="usar">Usar</button><button class="bt cinza" data-a="tirar" style="padding:8px 9px">✕</button>'
+    + '<div class="bbs">' + CURTO_BEBE.map((r, k) => '<button data-a="bebe" data-k="' + k + '" class="' + (f.b === k ? 'sim' : '') + '">' + (k + 1) + ' ' + r + '</button>').join('') + '</div></div>').join('')
+    || '<div class="lin estado">Nada encontrado — toque em + para adicionar</div>';
+}
+function atualizarContaFam() { const e = $('#aFamEst'); if (e && !baixandoTodos) e.textContent = famosos.length + ' famosos · ' + famosos.filter(f => f.f).length + ' com foto · ' + famosos.filter(f => f.b >= 0).length + ' com bebê'; }
+$('#aBuscaFam').addEventListener('input', desenharListaFam);
+$('#aFamFiltro').addEventListener('change', desenharListaFam);
+$('#aAdd').addEventListener('click', async () => {
+  const v = $('#aBuscaFam').value.trim(); if (v.length < 2) return;
+  const ja = acharFamoso(v); if (ja && semAcento(ja.n) === semAcento(v)) { toast('Já está na lista'); return; }
+  const f = { n: maiusculas(v), w: '', a: [], b: -1, f: '', r: null };
+  famosos.push(f); salvarFam(); desenharListaFam(); toast('Procurando foto…');
+  const r = await baixarFamoso(f, false); toast(r ? 'Foto guardada' : 'Não achei foto — toque na miniatura para escolher uma');
+  desenharListaFam();
+});
+$('#listaFam').addEventListener('click', async e => {
+  const l = e.target.closest('[data-i]'); const a = e.target.dataset.a; if (!l || !a) return;
+  const f = famosos[+l.dataset.i];
+  if (a === 'bebe') { const k = +e.target.dataset.k; f.b = f.b === k ? -1 : k; salvarFam(); desenharListaFam(); }
+  else if (a === 'usar') { definirNome(f.n, 'ajustes'); toast('Preparando ' + f.n); }
+  else if (a === 'tirar') { if (confirm('Tirar ' + f.n + ' da lista?')) { if (f.f) nat.call('apagar', { nome: f.f }).catch(() => {}); famosos.splice(+l.dataset.i, 1); salvarFam(); desenharListaFam(); } }
+  else if (a === 'foto') {
+    const nome = 'famosos/' + slug(f.n) + '.jpg';
+    try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; cfg.ver++; salvar(); salvarFam(); desenharListaFam(); if (atual && atual.nome === f.n) definirNome(f.n, 'ajustes'); } } catch (_) {}
+  }
+});
+let baixandoTodos = false;
+$('#aBaixar').addEventListener('click', async () => {
+  if (baixandoTodos) { baixandoTodos = false; return; }
+  baixandoTodos = true; $('#aBaixar').textContent = 'Parar';
+  const faltam = famosos.filter(f => !f.f);
+  let feitos = 0;
+  for (const f of faltam) {
+    if (!baixandoTodos) break;
+    $('#aFamEst').textContent = 'Baixando ' + (++feitos) + ' de ' + faltam.length + '…';
+    await baixarFamoso(f, false);
+  }
+  baixandoTodos = false; $('#aBaixar').textContent = 'Baixar fotos'; desenharListaFam();
+  toast('Fotos dos famosos atualizadas');
+});
+$('#aUsar').addEventListener('click', () => { const v = $('#aNome').value.trim(); if (v) { definirNome(v, 'ajustes'); $('#aNome').value = ''; $('#aNome').blur(); } });
+$('#aLimpar').addEventListener('click', limparNome);
+$('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
+$('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
+$('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); iniciarInject(); });
+$('#aOrigem').addEventListener('change', e => { cfg.origem = e.target.value; salvar(); carregarFotos(); });
+$('#aLimite').addEventListener('change', e => { cfg.limite = +e.target.value; salvar(); analisarFotos(); });
+$('#aReanalisar').addEventListener('click', () => carregarFotos());
+const refazer = () => { salvar(); if (atual) prepararMosaico(); };
+$('#aCols').addEventListener('change', e => { cfg.colsM = +e.target.value; refazer(); });
+$('#aCor').addEventListener('change', e => { cfg.cor = e.target.value; refazer(); });
+$('#aEnq').addEventListener('change', e => { cfg.enq = e.target.value; refazer(); });
+$('#aFiltro').addEventListener('change', e => { cfg.filtro = e.target.checked; refazer(); });
+$('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%'; });
+$('#aRef').addEventListener('change', refazer);
+$('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
+$('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
+$('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
+$('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });
+$('#aTema').addEventListener('change', e => { cfg.tema = e.target.value; salvar(); aplicarTema(); });
+$('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; modoMos = false; nivel = zoom = cfg.n0; doFim = 0; salvar(); montarSeq(); if (atual) prepararMosaico(); });
+$('#aPrint').addEventListener('click', async () => {
+  try { const r = await nat.call('escolher', { nome: 'inicio/print.jpg', rosto: false }); if (r && r.ok) { cfg.temPrint = true; cfg.ver++; salvar(); aplicarPrint(); iniciarMarcar(); } } catch (_) {}
+});
+$('#aMarcar').addEventListener('click', iniciarMarcar);
+
+/* =====================================================================
+   INJECT (o mesmo intermediário do app Listas)
+   ===================================================================== */
+let injTimer = 0, injGen = 0, injUlt = null;
+function iniciarInject() {
+  clearTimeout(injTimer); const g = ++injGen;
+  if (!cfg.inj || !cfg.injId || !cfg.wk) return;
+  let w = cfg.wk.trim(); if (!/^https?:\/\//.test(w)) w = 'https://' + w; w = w.replace(/\/+$/, '');
+  const chave = 'injUlt_' + cfg.injId; injUlt = guarda.get(chave, null);
+  const passo = async () => {
+    if (g !== injGen) return;
+    if (!document.hidden) {
+      try {
+        const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
+        const r = await fetch(w + '/inject?id=' + encodeURIComponent(cfg.injId) + '&_=' + Date.now(), { cache: 'no-store', signal: ac.signal });
+        clearTimeout(t);
+        const d = await r.json();
+        if (g !== injGen) return;
+        if (d && !d.error) {
+          if (injUlt === null) { injUlt = d.count; guarda.set(chave, d.count); }
+          else if (d.count !== injUlt) {
+            injUlt = d.count; guarda.set(chave, d.count);
+            const v = String(d.value || '').trim();
+            const e = $('#aInjUlt'); if (e) e.textContent = v + ' (' + fmtHora.format(new Date()) + ')';
+            if (v) definirNome(v, 'inject');
+          }
+        }
+      } catch (_) {}
+    }
+    if (g === injGen) injTimer = setTimeout(passo, 1000);
+  };
+  passo();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { iniciarInject(); if (nat.tem) carregarFotos(); } });
+
+/* =====================================================================
+   INÍCIO
+   ===================================================================== */
+window.addEventListener('resize', () => { ajustarTamanho(); });
+function iniciar() {
+  ajustarTamanho(); aplicarTema(); aplicarPrint();
+  nivel = zoom = +cfg.n0 || 3;
+  mostrar(cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');
+  mostrarAtual();
+  carregarFotos().then(() => { if (atual) prepararMosaico(); });
+  iniciarInject();
+}
+iniciar();

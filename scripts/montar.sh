@@ -58,6 +58,8 @@ targets:
         UISupportedInterfaceOrientations: $GIRO
         NSCameraUsageDescription: "Para escolher imagens."
         NSPhotoLibraryUsageDescription: "Para escolher imagens."
+        NSMicrophoneUsageDescription: "Para ouvir comandos de voz."
+        NSSpeechRecognitionUsageDescription: "Para entender comandos de voz."
         ITSAppUsesNonExemptEncryption: false
         EsconderIndicador: $IND
         ManterTelaAcesa: $ACESA

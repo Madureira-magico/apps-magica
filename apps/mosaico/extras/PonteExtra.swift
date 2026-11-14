@@ -4,16 +4,21 @@ import Photos
 import PhotosUI
 import Vision
 import CoreImage
+import AVFoundation
+import Speech
 
 /// Parte do iPhone só do app Mosaico.
 /// Recados da página (window.webkit.messageHandlers.mz.postMessage({cmd: ...}) devolve uma resposta):
-///   permissao, albuns, fotos, analisar, info, baixarRosto, grade, compor, escolher, apagar, listar, existe, vibrar
+///   permissao, albuns, fotos, analisar, info, baixarRosto, grade, compor, escolher, apagar, listar, existe, vibrar,
+///   cameraLigar, cameraDesligar, vozLigar, vozDesligar
+/// Avisos para a página: window.__mzEvento({tipo: 'texto'|'cameraFim'|'voz'|'vozFim', ...})
 /// Imagens para a página pelo endereço mzfoto://
 ///   mzfoto://mini?id=...          miniatura quadrada (64 px) guardada no celular
 ///   mzfoto://foto?id=...&s=400&m=fill|fit   foto da Fototeca no tamanho pedido
 ///   mzfoto://arq?n=pasta/nome.jpg arquivo guardado pelo app (rostos, bebês, mosaico pronto)
 @objc(PonteExtra)
-final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, WKURLSchemeHandler, PHPickerViewControllerDelegate {
+final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, WKURLSchemeHandler,
+                        PHPickerViewControllerDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     typealias Resposta = (Any?, String?) -> Void
 
     private weak var web: WKWebView?
@@ -23,14 +28,25 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     private let gerente = PHImageManager.default()
     private var parados = Set<ObjectIdentifier>()
 
-    private var cores: [String: [Int]] = [:]
+    private var cores: [String: [Int]] = [:]   // id -> [r, g, b, boa(1/0)]
     private var coresLidas = false
     private let travaCores = NSLock()
 
     private var escolhaResposta: Resposta?
     private var escolhaNome = ""
     private var escolhaRosto = false
-    private var escolhaProp: CGFloat = 0.46
+
+    // câmera (leitura de texto)
+    private var sessao: AVCaptureSession?
+    private let filaCam = DispatchQueue(label: "mosaico.camera")
+    private var camGiro = 0
+    private var camFim: DispatchWorkItem?
+
+    // microfone (fala)
+    private var motor: AVAudioEngine?
+    private var pedidoVoz: SFSpeechAudioBufferRecognitionRequest?
+    private var tarefaVoz: SFSpeechRecognitionTask?
+    private var vozFim: DispatchWorkItem?
 
     // MARK: ligar ao app
     func instalar(_ config: WKWebViewConfiguration) {
@@ -50,7 +66,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
         return u
     }()
-    private var arqCores: URL { pastaMinis.appendingPathComponent("cores.json") }
+    private var arqCores: URL { pastaMinis.appendingPathComponent("cores2.json") }
 
     private func arq(_ nome: String) -> URL {
         let limpo = nome.replacingOccurrences(of: "..", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -65,6 +81,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     private func gravar(_ dados: Data, _ url: URL) -> Bool {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         return (try? dados.write(to: url, options: .atomic)) != nil
+    }
+
+    private func evento(_ d: [String: Any]) {
+        guard let j = try? JSONSerialization.data(withJSONObject: d), let s = String(data: j, encoding: .utf8) else { return }
+        DispatchQueue.main.async {
+            self.web?.evaluateJavaScript("window.__mzEvento&&window.__mzEvento(\(s))", completionHandler: nil)
+        }
     }
 
     // MARK: recados da página
@@ -93,10 +116,10 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             let id = txt("id")
             fila.async { responder(self.info(id), nil) }
         case "baixarRosto":
-            baixarRosto(txt("url"), nome: txt("nome"), prop: CGFloat(num("prop", 0.46)), responder)
+            baixarRosto(txt("url"), nome: txt("nome"), responder)
         case "grade":
-            let nome = txt("nome"), c = Int(num("cols", 40)), l = Int(num("rows", 80))
-            fila.async { responder(self.grade(nome, cols: c, rows: l), nil) }
+            let nome = txt("nome"), c = Int(num("cols", 40)), l = Int(num("rows", 80)), enq = txt("enq"), real = txt("real")
+            fila.async { responder(self.grade(nome, cols: c, rows: l, enq: enq, real: real), nil) }
         case "compor":
             let ids = (m["ids"] as? [String]) ?? []
             let alvo = ((m["alvo"] as? [NSNumber]) ?? []).map { $0.intValue }
@@ -107,7 +130,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
                 responder(ok, nil)
             }
         case "escolher":
-            escolher(nome: txt("nome"), rosto: (m["rosto"] as? Bool) ?? false, prop: CGFloat(num("prop", 0.46)), responder)
+            escolher(nome: txt("nome"), rosto: (m["rosto"] as? Bool) ?? false, responder)
         case "apagar":
             try? FileManager.default.removeItem(at: arq(txt("nome")))
             responder(true, nil)
@@ -122,6 +145,16 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             let g = UIImpactFeedbackGenerator(style: estilo)
             g.prepare()
             g.impactOccurred()
+            responder(true, nil)
+        case "cameraLigar":
+            cameraLigar(num("segundos", 8), responder)
+        case "cameraDesligar":
+            cameraDesligar(avisar: false)
+            responder(true, nil)
+        case "vozLigar":
+            vozLigar(num("segundos", 7), responder)
+        case "vozDesligar":
+            pararVoz(avisar: false)
             responder(true, nil)
         default:
             responder(nil, "recado desconhecido: \(cmd)")
@@ -184,7 +217,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         return d
     }
 
-    // MARK: cores médias e miniaturas (para montar o mosaico)
+    // MARK: cores médias, miniaturas e filtro (só pessoas e paisagens)
     private func lerCores() {
         if coresLidas { return }
         coresLidas = true
@@ -194,10 +227,32 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         }
     }
 
+    private let palavrasFora = ["document", "text", "receipt", "screenshot", "paper", "handwriting", "menu", "whiteboard",
+                                "blackboard", "computer", "monitor", "screen", "diagram", "chart", "map", "book", "magazine",
+                                "newspaper", "poster", "sign", "label", "envelope", "letter", "printed", "calculator",
+                                "keyboard", "barcode", "qr", "ticket", "note", "illustration", "drawing", "cartoon", "logo",
+                                "graphic", "office_supplies", "tool", "wire", "cable"]
+
+    /// 1 = foto boa para o mosaico (pessoas, paisagens...), 0 = print, documento, texto, objeto
+    private func fotoBoa(_ a: PHAsset, _ cg: CGImage) -> Int {
+        if a.mediaSubtypes.contains(.photoScreenshot) { return 0 }
+        let classes = VNClassifyImageRequest()
+        let textos = VNDetectTextRectanglesRequest()
+        try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([classes, textos])
+        var area: CGFloat = 0
+        for o in textos.results ?? [] { area += o.boundingBox.width * o.boundingBox.height }
+        if area > 0.05 { return 0 }
+        for o in classes.results ?? [] where o.confidence > 0.3 {
+            let id = o.identifier.lowercased()
+            if palavrasFora.contains(where: { id.contains($0) }) { return 0 }
+        }
+        return 1
+    }
+
     private func analisar(_ ids: [String]) -> [Any] {
         travaCores.lock()
         lerCores()
-        let faltam = ids.filter { cores[$0] == nil || !FileManager.default.fileExists(atPath: nomeMini($0).path) }
+        let faltam = ids.filter { (cores[$0]?.count ?? 0) < 4 || !FileManager.default.fileExists(atPath: nomeMini($0).path) }
         travaCores.unlock()
 
         if !faltam.isEmpty {
@@ -211,11 +266,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             res.enumerateObjects { a, _, _ in
                 autoreleasepool {
                     var img: UIImage?
-                    self.gerente.requestImage(for: a, targetSize: CGSize(width: 128, height: 128),
-                                              contentMode: .aspectFill, options: o) { i, _ in img = i }
+                    self.gerente.requestImage(for: a, targetSize: CGSize(width: 300, height: 300),
+                                              contentMode: .aspectFit, options: o) { i, _ in img = i }
                     guard let im = img, let q = self.quadrado(im, lado: 64) else { return }
                     if let d = q.jpegData(compressionQuality: 0.8) { _ = self.gravar(d, self.nomeMini(a.localIdentifier)) }
-                    novas[a.localIdentifier] = self.media(q)
+                    var c = self.media(q)
+                    c.append(im.cgImage.map { self.fotoBoa(a, $0) } ?? 1)
+                    novas[a.localIdentifier] = c
                 }
             }
             travaCores.lock()
@@ -299,30 +356,35 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         return [r / 16, g / 16, b / 16]
     }
 
-    /// Corta a foto em volta do maior rosto, no formato da tela (prop = largura / altura).
-    private func cortarRosto(_ original: UIImage, prop: CGFloat) -> (UIImage, Bool) {
-        let im = normalizar(original, maior: 2000)
-        guard let cg = im.cgImage else { return (im, false) }
-        let W = CGFloat(cg.width), H = CGFloat(cg.height)
+    private func acharRosto(_ cg: CGImage) -> CGRect? {
         let pedido = VNDetectFaceRectanglesRequest()
         try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([pedido])
         let rostos = pedido.results ?? []
+        return rostos.max(by: { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height })?.boundingBox
+    }
+
+    /// Corta a foto no formato pedido (prop = largura / altura).
+    /// fator > 0: em volta do rosto, com altura = fator x altura do rosto. fator = 0: a foto inteira (centrada no rosto).
+    private func cortarRosto(_ original: UIImage, prop: CGFloat, fator: CGFloat) -> (UIImage, Bool) {
+        let im = normalizar(original, maior: 2000)
+        guard let cg = im.cgImage else { return (im, false) }
+        let W = CGFloat(cg.width), H = CGFloat(cg.height)
         let p = max(0.2, min(1.5, prop))
+        let rosto = acharRosto(cg)
 
         var cw: CGFloat, ch: CGFloat, cx: CGFloat, cy: CGFloat
-        var achou = false
-        if let f = rostos.max(by: { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }) {
-            let b = f.boundingBox
+        if let b = rosto, fator > 0 {
             let fh = b.height * H
-            ch = fh * 2.7
+            ch = fh * fator
             cw = ch * p
             cx = b.midX * W
-            cy = (1 - b.midY) * H + ch * 0.08   // rosto um pouco acima do meio
-            achou = true
+            cy = (1 - b.midY) * H + ch * (fator < 2 ? 0.03 : 0.08)
         } else {
-            ch = H; cw = H * p
+            ch = H
+            cw = H * p
             if cw > W { cw = W; ch = W / p }
-            cx = W / 2; cy = H / 2
+            cx = rosto.map { $0.midX * W } ?? W / 2
+            cy = rosto.map { (1 - $0.midY) * H } ?? H / 2
         }
         if cw > W { cw = W; ch = cw / p }
         if ch > H { ch = H; cw = ch * p }
@@ -330,20 +392,21 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         x = min(max(0, x), W - cw)
         y = min(max(0, y), H - ch)
         let r = CGRect(x: x, y: y, width: cw, height: ch).integral
-        guard let c = cg.cropping(to: r) else { return (im, achou) }
-        return (normalizar(UIImage(cgImage: c), maior: 1000), achou)
+        guard let c = cg.cropping(to: r) else { return (im, rosto != nil) }
+        return (normalizar(UIImage(cgImage: c), maior: 1400), rosto != nil)
     }
 
-    // MARK: baixar a foto de um famoso (Wikipédia) e guardar só o rosto
-    private func baixarRosto(_ endereco: String, nome: String, prop: CGFloat, _ r: @escaping Resposta) {
+    // MARK: baixar a foto de um famoso (Wikipédia) e guardar
+    private func baixarRosto(_ endereco: String, nome: String, _ r: @escaping Resposta) {
         guard let url = URL(string: endereco), !nome.isEmpty else { return r(nil, "endereço inválido") }
         var pedido = URLRequest(url: url, timeoutInterval: 20)
-        pedido.setValue("MosaicoApp/1.0 (iPhone; uso pessoal)", forHTTPHeaderField: "User-Agent")
+        pedido.setValue("MosaicoApp/1.1 (iPhone; uso pessoal)", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: pedido) { dados, _, erro in
             guard let d = dados, let im = UIImage(data: d) else { return r(nil, erro?.localizedDescription ?? "não baixou") }
             self.fila.async {
-                let (cortada, achou) = self.cortarRosto(im, prop: prop)
-                guard let jpg = cortada.jpegData(compressionQuality: 0.9), self.gravar(jpg, self.arq(nome)) else {
+                let pronta = self.normalizar(im, maior: 1600)
+                let achou = pronta.cgImage.flatMap { self.acharRosto($0) } != nil
+                guard let jpg = pronta.jpegData(compressionQuality: 0.9), self.gravar(jpg, self.arq(nome)) else {
                     return r(nil, "não gravou")
                 }
                 r(["rosto": achou], nil)
@@ -351,10 +414,15 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         }.resume()
     }
 
-    /// Cores da imagem guardada, reduzida para cols x rows (lista r,g,b,r,g,b...).
-    private func grade(_ nome: String, cols: Int, rows: Int) -> [Int] {
-        guard cols > 0, rows > 0, cols * rows < 40000,
-              let im = UIImage(contentsOfFile: arq(nome).path), let cg = normalizar(im, maior: 1200).cgImage else { return [] }
+    /// Cores da imagem guardada, já cortada no enquadramento e reduzida para cols x rows (lista r,g,b,r,g,b...).
+    /// Se "real" vier preenchido, guarda o corte também (para a foto real no final).
+    private func grade(_ nome: String, cols: Int, rows: Int, enq: String, real: String) -> [Int] {
+        guard cols > 0, rows > 0, cols * rows < 60000,
+              let im = UIImage(contentsOfFile: arq(nome).path) else { return [] }
+        let fator: CGFloat = enq == "inteira" ? 0 : (enq == "cabelo" ? 2.3 : 1.6)
+        let (corte, _) = cortarRosto(im, prop: CGFloat(cols) / CGFloat(rows), fator: fator)
+        if !real.isEmpty, let j = corte.jpegData(compressionQuality: 0.88) { _ = gravar(j, arq(real)) }
+        guard let cg = corte.cgImage else { return [] }
         let p = pixels(cg, cols, rows)
         var saida: [Int] = []
         saida.reserveCapacity(cols * rows * 3)
@@ -365,7 +433,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     // MARK: montar o mosaico pronto numa imagem só
     private func compor(_ ids: [String], cols: Int, rows: Int, px: Int, modo: String,
                         alvo: [Int], alfa: CGFloat, saida: String) -> Bool {
-        guard cols > 0, rows > 0, px > 0, cols * px <= 4000, rows * px <= 8000 else { return false }
+        guard cols > 0, rows > 0, px > 0, cols * px <= 4200, rows * px <= 9000 else { return false }
         let tam = CGSize(width: cols * px, height: rows * px)
         let f = UIGraphicsImageRendererFormat()
         f.scale = 1
@@ -408,15 +476,14 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         return gravar(jpg, arq(saida))
     }
 
-    // MARK: escolher uma foto da Fototeca (bebês, trocar foto de famoso, tela de início)
-    private func escolher(nome: String, rosto: Bool, prop: CGFloat, _ r: @escaping Resposta) {
+    // MARK: escolher uma foto da Fototeca (bebês, foto da piada, trocar foto de famoso, tela de início)
+    private func escolher(nome: String, rosto: Bool, _ r: @escaping Resposta) {
         DispatchQueue.main.async {
             guard let t = self.tela, !nome.isEmpty else { return r(false, nil) }
             self.escolhaResposta?(false, nil)
             self.escolhaResposta = r
             self.escolhaNome = nome
             self.escolhaRosto = rosto
-            self.escolhaProp = prop
             var conf = PHPickerConfiguration()
             conf.filter = .images
             conf.selectionLimit = 1
@@ -431,23 +498,146 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         guard let r = escolhaResposta else { return }
         escolhaResposta = nil
         guard let prov = results.first?.itemProvider, prov.canLoadObject(ofClass: UIImage.self) else { return r(false, nil) }
-        let nome = escolhaNome, rosto = escolhaRosto, prop = escolhaProp
+        let nome = escolhaNome, rosto = escolhaRosto
         _ = prov.loadObject(ofClass: UIImage.self) { obj, _ in
             guard let im = obj as? UIImage else { return r(false, nil) }
             self.fila.async {
-                var pronta = im
-                var achou = false
-                if rosto {
-                    let corte = self.cortarRosto(im, prop: prop)
-                    pronta = corte.0
-                    achou = corte.1
-                } else {
-                    pronta = self.normalizar(im, maior: 2400)
-                }
+                let pronta = self.normalizar(im, maior: rosto ? 1600 : 2400)
+                let achou = rosto && pronta.cgImage.flatMap { self.acharRosto($0) } != nil
                 guard let jpg = pronta.jpegData(compressionQuality: 0.9), self.gravar(jpg, self.arq(nome)) else { return r(false, nil) }
                 r(["ok": true, "rosto": achou], nil)
             }
         }
+    }
+
+    // MARK: câmera da frente lendo texto (Notas do espectador, cartão escrito à mão)
+    private func cameraLigar(_ segundos: Double, _ r: @escaping Resposta) {
+        let ligar = {
+            self.filaCam.async {
+                if self.sessao == nil {
+                    let s = AVCaptureSession()
+                    s.sessionPreset = .hd1280x720
+                    guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+                          let entrada = try? AVCaptureDeviceInput(device: dev), s.canAddInput(entrada) else {
+                        return r(false, "sem câmera")
+                    }
+                    s.addInput(entrada)
+                    let saida = AVCaptureVideoDataOutput()
+                    saida.alwaysDiscardsLateVideoFrames = true
+                    saida.setSampleBufferDelegate(self, queue: self.filaCam)
+                    guard s.canAddOutput(saida) else { return r(false, "sem câmera") }
+                    s.addOutput(saida)
+                    if let c = saida.connection(with: .video) {
+                        if c.isVideoOrientationSupported { c.videoOrientation = .portrait }
+                        if c.isVideoMirroringSupported { c.automaticallyAdjustsVideoMirroring = false; c.isVideoMirrored = false }
+                    }
+                    self.sessao = s
+                }
+                if !(self.sessao?.isRunning ?? false) { self.sessao?.startRunning() }
+                r(true, nil)
+                DispatchQueue.main.async {
+                    self.camFim?.cancel()
+                    let w = DispatchWorkItem { self.cameraDesligar(avisar: true) }
+                    self.camFim = w
+                    DispatchQueue.main.asyncAfter(deadline: .now() + segundos, execute: w)
+                }
+            }
+        }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: ligar()
+        case .notDetermined: AVCaptureDevice.requestAccess(for: .video) { ok in if ok { ligar() } else { r(false, "câmera negada") } }
+        default: r(false, "câmera negada")
+        }
+    }
+
+    private func cameraDesligar(avisar: Bool) {
+        DispatchQueue.main.async { self.camFim?.cancel(); self.camFim = nil }
+        filaCam.async {
+            if self.sessao?.isRunning ?? false { self.sessao?.stopRunning() }
+            if avisar { self.evento(["tipo": "cameraFim"]) }
+        }
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let px = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        camGiro = (camGiro + 1) % 3
+        let giros: [CGImagePropertyOrientation] = [.up, .right, .left]   // celular em pé ou deitado
+        let pedido = VNRecognizeTextRequest()
+        pedido.recognitionLevel = .accurate
+        pedido.usesLanguageCorrection = false
+        pedido.minimumTextHeight = 0.025
+        if let idiomas = try? pedido.supportedRecognitionLanguages() {
+            let quero = ["pt-BR", "en-US"].filter { idiomas.contains($0) }
+            if !quero.isEmpty { pedido.recognitionLanguages = quero }
+        }
+        try? VNImageRequestHandler(cvPixelBuffer: px, orientation: giros[camGiro], options: [:]).perform([pedido])
+        let linhas: [[String: Any]] = (pedido.results ?? []).compactMap { o in
+            guard let t = o.topCandidates(1).first?.string, !t.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            return ["t": t, "h": Double(o.boundingBox.height)]
+        }
+        if !linhas.isEmpty { evento(["tipo": "texto", "linhas": linhas]) }
+    }
+
+    // MARK: microfone (o mágico fala o nome)
+    private func vozLigar(_ segundos: Double, _ r: @escaping Resposta) {
+        SFSpeechRecognizer.requestAuthorization { st in
+            guard st == .authorized else { return r(false, "reconhecimento de fala negado") }
+            AVAudioSession.sharedInstance().requestRecordPermission { ok in
+                guard ok else { return r(false, "microfone negado") }
+                DispatchQueue.main.async { self.comecarVoz(segundos, r) }
+            }
+        }
+    }
+
+    private func comecarVoz(_ segundos: Double, _ r: Resposta) {
+        pararVoz(avisar: false)
+        guard let rec = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR")), rec.isAvailable else {
+            return r(false, "reconhecimento indisponível")
+        }
+        let sessaoAudio = AVAudioSession.sharedInstance()
+        do {
+            try sessaoAudio.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker])
+            try sessaoAudio.setActive(true)
+        } catch { return r(false, "áudio ocupado") }
+        let pedido = SFSpeechAudioBufferRecognitionRequest()
+        pedido.shouldReportPartialResults = true
+        if rec.supportsOnDeviceRecognition { pedido.requiresOnDeviceRecognition = true }
+        let m = AVAudioEngine()
+        let entrada = m.inputNode
+        let formato = entrada.outputFormat(forBus: 0)
+        entrada.installTap(onBus: 0, bufferSize: 1024, format: formato) { buf, _ in pedido.append(buf) }
+        m.prepare()
+        do { try m.start() } catch {
+            entrada.removeTap(onBus: 0)
+            return r(false, "microfone não ligou")
+        }
+        motor = m
+        pedidoVoz = pedido
+        tarefaVoz = rec.recognitionTask(with: pedido) { res, erro in
+            if let res = res {
+                self.evento(["tipo": "voz", "texto": res.bestTranscription.formattedString, "final": res.isFinal])
+            }
+            if erro != nil || (res?.isFinal ?? false) { DispatchQueue.main.async { self.pararVoz(avisar: true) } }
+        }
+        r(true, nil)
+        let w = DispatchWorkItem { self.pararVoz(avisar: true) }
+        vozFim = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + segundos, execute: w)
+    }
+
+    private func pararVoz(avisar: Bool) {
+        vozFim?.cancel()
+        vozFim = nil
+        guard let m = motor else { return }
+        m.stop()
+        m.inputNode.removeTap(onBus: 0)
+        pedidoVoz?.endAudio()
+        tarefaVoz?.finish()
+        motor = nil
+        pedidoVoz = nil
+        tarefaVoz = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if avisar { evento(["tipo": "vozFim"]) }
     }
 
     // MARK: endereço mzfoto:// (imagens para a página)
