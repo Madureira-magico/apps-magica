@@ -897,40 +897,56 @@ function preCarregar(i) {   // foto grande das vizinhas, antes de deslizar
   const g = new Image(); g.src = srcGrande(vSeq[i]); preCarga.set(vSeq[i], g);
   if (preCarga.size > 24) preCarga.delete(preCarga.keys().next().value);
 }
-function montarPalco() {
-  const p = $('#palco'); p.innerHTML = '';
-  for (const d of [-1, 0, 1]) {
-    const i = verI + d, el = document.createElement('div'); el.className = 'fx'; el.style.left = (d * 100) + '%';
-    if (i >= 0 && i < vSeq.length && vSeq[i]) {
-      const im = document.createElement('img'); const it = vSeq[i];
-      const pc = preCarga.get(it);
-      if (pc && pc.complete && pc.naturalWidth) im.src = pc.src;
-      else {
-        // na hora: a miniatura (já está no aparelho) no tamanho e lugar exatos da foto; a nítida entra por cima
-        const c = grandeEmCache(it);
-        im.src = c || srcMini(it);
-        if (!c && tams.has(it)) { const e = encaixe(...tams.get(it)); Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover' }); }
-        else if (!c) {
-          im.style.visibility = 'hidden';
-          tamanhoFoto(it).then(([fw, fh]) => {
-            const e = encaixe(fw, fh);
-            Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover', visibility: '' });
-          });
-        }
-        const g = pc || new Image();
-        g.addEventListener('load', () => { im.src = g.src; im.style.objectFit = 'contain'; });
-        if (!pc) { g.src = srcGrande(it); preCarga.set(it, g); }
+/* deslizar entre as fotos com a rolagem do próprio iPhone (igual ao app Fotos): nada é remontado no meio */
+let slides = new Map();
+function slideDe(i) {
+  const el = document.createElement('div'); el.className = 'fx'; el.style.left = (i * W) + 'px'; el.style.width = W + 'px';
+  if (i >= 0 && i < vSeq.length && vSeq[i]) {
+    const im = document.createElement('img'); const it = vSeq[i];
+    const pc = preCarga.get(it);
+    if (pc && pc.complete && pc.naturalWidth) im.src = pc.src;
+    else {
+      // na hora: a miniatura (já está no aparelho) no tamanho e lugar exatos da foto; a nítida entra por cima
+      const c = grandeEmCache(it);
+      im.src = c || srcMini(it);
+      if (!c && tams.has(it)) { const e = encaixe(...tams.get(it)); Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover' }); }
+      else if (!c) {
+        im.style.visibility = 'hidden';
+        tamanhoFoto(it).then(([fw, fh]) => {
+          const e = encaixe(fw, fh);
+          Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover', visibility: '' });
+        });
       }
-      if (d === 0) im.id = 'imgAtual';
-      el.appendChild(im);
+      const g = pc || new Image();
+      g.addEventListener('load', () => { im.src = g.src; im.style.objectFit = 'contain'; });
+      if (!pc) { g.src = srcGrande(it); preCarga.set(it, g); }
     }
-    p.appendChild(el);
+    el.appendChild(im);
   }
-  p.style.transform = 'translateX(0)';
+  return el;
+}
+function povoar() {
+  const t = $('#trilhoV'); if (!t) return;
+  for (let i = verI - 3; i <= verI + 3; i++) if (i >= 0 && i < vSeq.length && !slides.has(i)) { const el = slideDe(i); slides.set(i, el); t.appendChild(el); }
+  for (const [i, el] of slides) if (Math.abs(i - verI) > 6) { el.remove(); slides.delete(i); }
+  const velho = $('#imgAtual'); if (velho) velho.removeAttribute('id');
+  const at = slides.get(verI); const im = at && at.querySelector('img'); if (im) im.id = 'imgAtual';
   for (const d of [1, -1, 2, -2, 3, -3]) preCarregar(verI + d);
+}
+function montarPalco() {
+  const p = $('#palco');
+  p.innerHTML = '<div id="trilhoV" style="position:relative;height:100%;width:' + (vSeq.length * W) + 'px"></div>';
+  slides = new Map();
+  povoar();
+  p.scrollLeft = verI * W;
+  requestAnimationFrame(() => { p.scrollLeft = verI * W; });
   montarTira();
   mostrarData();
 }
+$('#palco').addEventListener('scroll', () => {
+  const p = $('#palco'), k = Math.round(p.scrollLeft / W);
+  if (k !== verI && k >= 0 && k < vSeq.length) { verI = k; povoar(); montarTira(); mostrarData(); }
+}, { passive: true });
 /* faixa de miniaturas embaixo */
 function montarTira() {
   const t = $('#tira'); if (!t) return;
@@ -1023,26 +1039,23 @@ $('#vLixo').addEventListener('click', () => {
     verI = Math.min(verI, vSeq.length - 1); montarPalco();
   }, 360);
 });
-(function () {
+(function () {   // para baixo fecha; um toque esconde os botões (o lado é a rolagem do iPhone)
   const p = $('#palco'); let x0 = 0, y0 = 0, dx = 0, dy = 0, modo = '', t0 = 0;
-  p.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = dy = 0; modo = ''; t0 = performance.now(); p.style.transition = 'none'; }, { passive: true });
+  const atual = () => slides.get(verI);
+  p.addEventListener('touchstart', e => { if (e.touches.length !== 1) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = dy = 0; modo = ''; t0 = performance.now(); }, { passive: true });
   p.addEventListener('touchmove', e => {
-    if (e.touches.length !== 1) return; e.preventDefault();
+    if (e.touches.length !== 1) return;
     dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
     if (!modo && Math.hypot(dx, dy) > 8) modo = Math.abs(dx) > Math.abs(dy) ? 'lado' : 'baixo';
-    if (modo === 'lado') p.style.transform = 'translateX(' + dx + 'px)';
-    else if (modo === 'baixo' && dy > 0) { p.style.transform = 'translateY(' + dy + 'px) scale(' + Math.max(0.7, 1 - dy / 1200) + ')'; $('#ver').style.background = 'rgba(0,0,0,' + Math.max(0, 1 - dy / 400) + ')'; }
-  }, { passive: false });
+    if (modo === 'baixo' && dy > 0 && atual()) { const a = atual(); a.style.transition = 'none'; a.style.transform = 'translateY(' + dy + 'px) scale(' + Math.max(0.7, 1 - dy / 1200) + ')'; $('#ver').style.background = 'rgba(0,0,0,' + Math.max(0, 1 - dy / 400) + ')'; }
+  }, { passive: true });
   p.addEventListener('touchend', () => {
-    p.style.transition = 'transform .25s ease';
     if (!modo && performance.now() - t0 < 300) { $('#ver').classList.toggle('limpo'); return; }
-    if (modo === 'lado') {
-      const ir = dx < -60 && verI < vSeq.length - 1 ? 1 : dx > 60 && verI > 0 ? -1 : 0;
-      p.style.transform = 'translateX(' + (-ir * W) + 'px)';
-      if (ir) setTimeout(() => { verI += ir; p.style.transition = 'none'; montarPalco(); }, 250);
-    } else if (modo === 'baixo') {
+    if (modo === 'baixo') {
       $('#ver').style.background = '';
-      if (dy > 110) fecharFoto(); else p.style.transform = 'none';
+      const a = atual();
+      if (dy > 110) fecharFoto();
+      else if (a) { a.style.transition = 'transform .25s ease'; a.style.transform = 'none'; }
     }
   });
 })();

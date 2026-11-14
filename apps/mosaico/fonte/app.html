@@ -66,8 +66,9 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 .bmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--fg2);font-size:16px;padding:0 30px}
 .bmsg b{display:block;color:var(--fg);font-size:22px;margin-bottom:6px}
 #ver{background:var(--bg);z-index:5;touch-action:none}
-#ver .palco{position:absolute;inset:0;overflow:hidden}
-#ver .fx{position:absolute;top:0;bottom:0;width:100%;display:flex;align-items:center;justify-content:center}
+#ver .palco{position:absolute;inset:0;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:none;overscroll-behavior-x:contain}
+#ver .palco::-webkit-scrollbar{display:none}
+#ver .fx{position:absolute;top:0;bottom:0;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center}
 #ver .fx img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;transition:transform .35s ease,opacity .35s ease}
 #ver .fx img.indo{transform:translate(30%,60%) scale(.05);opacity:0}
 #ver .vcab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;transition:opacity .2s}
