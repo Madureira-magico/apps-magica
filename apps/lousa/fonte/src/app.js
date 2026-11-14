@@ -1,6 +1,6 @@
 // ===== Lousa v1.1 (app nativo) — telas e envio =====
 (function () {
-  const VER = '1.1.3';
+  const VER = '1.1.4';
   const NATIVO = !!window.__NATIVE_APP__;
   const nat = (name, v) => { try { window.webkit.messageHandlers[name].postMessage(v); } catch (e) {} };
   const $ = (s) => document.querySelector(s);
@@ -18,7 +18,7 @@
 
   // ---------- opções (guardadas no iPhone) ----------
   const DEF = { dust: true, numerals: false, rotate180: false, full: false, onConnect: 'keep', cardSize: 100, dateSize: 100, clockSize: 100, wordSize: 100, sqSize: 100, sqLine: 100, menu: 'txt',
-    bgOn: true, padOn: false, padMode: 'square', rx: false, dz: true, camStyle: 'desenho', gotSecs: 5 };
+    bgOn: true, musT: '', musA: '', padOn: false, padMode: 'square', rx: false, dz: true, camStyle: 'desenho', gotSecs: 5 };
   let opt = Object.assign({}, DEF);
   try { Object.assign(opt, JSON.parse(localStorage.getItem('lousa.opt') || '{}')); } catch (e) {}
   function saveOpt() { try { localStorage.setItem('lousa.opt', JSON.stringify(opt)); } catch (e) {} }
@@ -665,7 +665,19 @@
   // ---------- funcionar com a tela apagada (app nativo) ----------
   // além do som mudo da casca, a página toca a sua "música" muda (é o que segura o app com a tela apagada, igual ao Relógio)
   // ----- "música" muda que mantém o app acordado; na tela de bloqueio aparece como uma música de verdade -----
-  const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252 };
+  const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252, capa: null };
+  const MUSICA_PADRAO = { title: MUSICA.title, artist: MUSICA.artist };
+  // capa: foto da galeria, cortada em quadrado
+  function capaDaFoto(file, done) {
+    const u = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const s = Math.min(im.naturalWidth, im.naturalHeight), c = document.createElement('canvas'); c.width = c.height = 512;
+      c.getContext('2d').drawImage(im, (im.naturalWidth - s) / 2, (im.naturalHeight - s) / 2, s, s, 0, 0, 512, 512);
+      URL.revokeObjectURL(u); done(c.toDataURL('image/jpeg', .85));
+    };
+    im.onerror = () => { URL.revokeObjectURL(u); done(null); };
+    im.src = u;
+  }
   function musicaMudaUrl() {
     const rate = 8000, n = rate * MUSICA.secs, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
@@ -679,7 +691,8 @@
     try { document.title = MUSICA.title; } catch (e) {}
     if (!('mediaSession' in navigator)) return;
     try {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: MUSICA.title, artist: MUSICA.artist, album: '', artwork: [] });
+      navigator.mediaSession.metadata = new MediaMetadata({ title: MUSICA.title, artist: MUSICA.artist, album: '',
+      artwork: MUSICA.capa ? [{ src: MUSICA.capa, sizes: '512x512', type: 'image/jpeg' }] : [] });
       const keep = () => { const p = audio.play(); if (p && p.catch) p.catch(() => {}); };   // "pausar" no bloqueio não para o app
       ['pause', 'stop'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, keep); } catch (e) {} });
       ['previoustrack', 'nexttrack'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, () => {}); } catch (e) {} });
@@ -698,6 +711,33 @@
   }
   document.addEventListener('touchend', () => { if (opt.bgOn && bgAudio && bgAudio.paused) bgAplicar(); }, { passive: true });
   bindSw('#optBg', 'bgOn'); $('#optBg').addEventListener('change', bgAplicar);
+  // nome da música, artista e capa (o que aparece no player da tela de bloqueio)
+  try { MUSICA.capa = localStorage.getItem('lousa.musCapa') || null; } catch (e) {}
+  function musAplicar() {
+    MUSICA.title = opt.musT || MUSICA_PADRAO.title; MUSICA.artist = opt.musA || MUSICA_PADRAO.artist;
+    $('#musT').textContent = MUSICA.title + ' ›'; $('#musA').textContent = MUSICA.artist + ' ›';
+    $('#btnCapa').textContent = MUSICA.capa ? 'Trocar' : 'Escolher'; $('#btnCapaOff').classList.toggle('hide', !MUSICA.capa);
+    if (bgAudio) musicaInfo(bgAudio);
+  }
+  function musPedir(key, pergunta) {
+    const atual = key === 'musT' ? MUSICA.title : MUSICA.artist;
+    const v = prompt(pergunta + ' (deixe vazio para voltar ao padrão)', atual);
+    if (v == null) return;
+    opt[key] = v.trim(); saveOpt(); musAplicar();
+  }
+  $('#musTRow').addEventListener('click', () => musPedir('musT', 'Nome da música'));
+  $('#musARow').addEventListener('click', () => musPedir('musA', 'Artista'));
+  $('#btnCapa').addEventListener('click', () => $('#capaIn').click());
+  $('#btnCapaOff').addEventListener('click', () => { MUSICA.capa = null; try { localStorage.removeItem('lousa.musCapa'); } catch (e) {} musAplicar(); toast('Capa tirada'); });
+  $('#capaIn').addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0]; e.target.value = ''; if (!file) return;
+    capaDaFoto(file, data => {
+      if (!data) { toast('Não consegui abrir essa foto', true); return; }
+      try { localStorage.setItem('lousa.musCapa', data); MUSICA.capa = data; toast('Capa da música trocada'); } catch (err) { toast('Sem espaço para guardar a capa', true); }
+      musAplicar();
+    });
+  });
+  musAplicar();
   if (!NATIVO) $('#bgRow').classList.add('hide');
   const rnd = () => (Math.random() * 1e9) >>> 0;
   const two = (n) => String(n).padStart(2, '0');

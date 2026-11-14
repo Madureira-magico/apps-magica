@@ -279,6 +279,9 @@ body.soicones #s-inicio .grid2 .tile.wide .ico{transform:scale(1.5)}
   <div class="secbody" id="sec-disf"><div class="list">
     <div class="row"><label for="optDz">Disfarce (cadeado na tela principal)</label><input type="checkbox" class="sw" id="optDz"></div>
     <div class="row"><span>Foto do bloqueio</span><button class="mini" id="btnFoto">Escolher</button></div>
+    <div class="row" id="musTRow"><span>Nome da música</span><span class="v" id="musT" style="max-width:55%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <div class="row" id="musARow"><span>Artista</span><span class="v" id="musA" style="max-width:55%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <div class="row"><span>Capa da música</span><div style="display:flex;gap:8px"><button class="mini hide" id="btnCapaOff">Tirar</button><button class="mini" id="btnCapa">Escolher</button></div></div>
     <div class="row"><span>Câmera</span><div class="seg" id="segCam"><button data-v="desenho">Desenho</button><button data-v="circulo">Círculo</button></div></div>
     <div class="row"><span>Aviso some em</span><div class="seg" id="segGot"><button data-v="3">3 s</button><button data-v="5">5 s</button><button data-v="10">10 s</button><button data-v="30">30 s</button><button data-v="0">nunca</button></div></div>
     <div class="note">Câmera verde = pronto · laranja = chegou na lousa (e o que chegou aparece ao lado da data) · vermelha = lousa desconectada. Para sair: dois toques.</div>
@@ -316,6 +319,7 @@ body.soicones #s-inicio .grid2 .tile.wide .ico{transform:scale(1.5)}
   <div class="fbar"></div>
 </div>
 <input type="file" id="fotoIn" accept="image/*" style="display:none">
+<input type="file" id="capaIn" accept="image/*" style="display:none">
 
 <div id="toast"></div>
 

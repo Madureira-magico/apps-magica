@@ -272,7 +272,7 @@
     </button>
   </div>
   <div id="diag" class="hide" style="font-size:11px;color:#EF9F27;text-align:center;min-height:14px;word-break:break-word;-webkit-user-select:text;user-select:text"></div>
-  <div class="ver">v2.5.2</div>
+  <div class="ver">v2.5.3</div>
 </div>
 
 <!-- Tela de configurações -->
@@ -299,6 +299,9 @@
     <button class="row" id="iconesRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h2M14 8h2M8 12h2M14 12h2"/></svg>Foto da tela de ícones</span><b class="v" id="vIcones">escolher</b></button>
     <button class="row" id="camRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l1.5 2H20a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V7.5A1.5 1.5 0 0 1 4 6h3.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>Aviso na câmera</span><b class="v" id="vCam">desenho</b></button>
     <button class="row" id="gotRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>Tempo do laranja</span><b class="v" id="vGot">até a próxima</b></button>
+    <button class="row" id="musTRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V5l12-2v13"/></svg>Nome da música</span><b class="v" id="vMusT" style="max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></b></button>
+    <button class="row" id="musARow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V5l12-2v13"/></svg>Artista</span><b class="v" id="vMusA" style="max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></b></button>
+    <button class="row" id="musCRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M9 18V5l12-2v13"/></svg>Capa da música</span><b class="v" id="vMusC">escolher</b></button>
     <button class="row" id="bgRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Funcionar com a tela apagada</span><i class="sw" id="bgSw"></i></button>
     <button class="row" id="dgRow"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>Mostrar diagnóstico</span><i class="sw" id="dgSw"></i></button>
   </div>
@@ -360,6 +363,7 @@
 </div>
 <input type="file" id="fotoIn" accept="image/*" style="display:none">
 <input type="file" id="iconesIn" accept="image/*" style="display:none">
+<input type="file" id="capaIn" accept="image/*" style="display:none">
 <!-- Tela de ícones falsa: dois toques = tela de bloqueio; segurar 1,5 s = app -->
 <div class="icones" id="icones"></div>
 
@@ -1103,7 +1107,19 @@ $('icones').addEventListener('touchend', e => {
 // Um som mudo (inaudível) mantém o app acordado com a tela apagada: Bluetooth e internet continuam.
 let bgOn = store.get('bgOn') !== false, bgAudio = null;
 // ----- "música" muda que mantém o app acordado; na tela de bloqueio aparece como uma música de verdade -----
-const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252 };
+const MUSICA = { title: "Don't Stop Believin' - Live 1977", artist: 'Journey', secs: 252, capa: null };
+const MUSICA_PADRAO = { title: MUSICA.title, artist: MUSICA.artist };
+// capa: foto da galeria, cortada em quadrado
+function capaDaFoto(file, done) {
+  const u = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    const s = Math.min(im.naturalWidth, im.naturalHeight), c = document.createElement('canvas'); c.width = c.height = 512;
+    c.getContext('2d').drawImage(im, (im.naturalWidth - s) / 2, (im.naturalHeight - s) / 2, s, s, 0, 0, 512, 512);
+    URL.revokeObjectURL(u); done(c.toDataURL('image/jpeg', .85));
+  };
+  im.onerror = () => { URL.revokeObjectURL(u); done(null); };
+  im.src = u;
+}
 function musicaMudaUrl() {
   const rate = 8000, n = rate * MUSICA.secs, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
   const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
@@ -1117,7 +1133,8 @@ function musicaInfo(audio) {
   try { document.title = MUSICA.title; } catch (e) {}
   if (!('mediaSession' in navigator)) return;
   try {
-    navigator.mediaSession.metadata = new MediaMetadata({ title: MUSICA.title, artist: MUSICA.artist, album: '', artwork: [] });
+    navigator.mediaSession.metadata = new MediaMetadata({ title: MUSICA.title, artist: MUSICA.artist, album: '',
+      artwork: MUSICA.capa ? [{ src: MUSICA.capa, sizes: '512x512', type: 'image/jpeg' }] : [] });
     const keep = () => { const p = audio.play(); if (p && p.catch) p.catch(() => {}); };   // "pausar" no bloqueio não para o app
     ['pause', 'stop'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, keep); } catch (e) {} });
     ['previoustrack', 'nexttrack'].forEach(a => { try { navigator.mediaSession.setActionHandler(a, () => {}); } catch (e) {} });
@@ -1132,6 +1149,34 @@ function bgAplicar() {
     const p = bgAudio.play(); if (p && p.catch) p.catch(() => {});
   } else if (bgAudio) bgAudio.pause();
 }
+// nome da música, artista e capa (o que aparece no player da tela de bloqueio)
+MUSICA.capa = store.get('musCapa') || null;
+function musAplicar() {
+  MUSICA.title = store.get('musT') || MUSICA_PADRAO.title; MUSICA.artist = store.get('musA') || MUSICA_PADRAO.artist;
+  $('vMusT').textContent = MUSICA.title; $('vMusA').textContent = MUSICA.artist; $('vMusC').textContent = MUSICA.capa ? 'trocar / tirar' : 'escolher';
+  if (bgAudio) musicaInfo(bgAudio);
+}
+function musPedir(key, pergunta, atual) {
+  const v = prompt(pergunta + ' (deixe vazio para voltar ao padrão)', atual);
+  if (v == null) return;
+  store.set(key, v.trim()); musAplicar();
+}
+$('musTRow').addEventListener('click', () => musPedir('musT', 'Nome da música', MUSICA.title));
+$('musARow').addEventListener('click', () => musPedir('musA', 'Artista', MUSICA.artist));
+$('musCRow').addEventListener('click', () => {
+  if (MUSICA.capa && confirm('Tirar a capa da música? (Cancelar = escolher outra foto)')) { MUSICA.capa = null; store.set('musCapa', null); musAplicar(); $('cfgNote').textContent = 'Capa tirada'; return; }
+  $('capaIn').click();
+});
+$('capaIn').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0]; e.target.value = ''; if (!file) return;
+  capaDaFoto(file, data => {
+    if (!data) { $('cfgNote').textContent = 'Não consegui abrir essa foto'; return; }
+    store.set('musCapa', data);
+    if (store.get('musCapa') !== data) { $('cfgNote').textContent = 'Sem espaço para guardar a capa'; return; }
+    MUSICA.capa = data; $('cfgNote').textContent = 'Capa da música trocada'; musAplicar();
+  });
+});
+musAplicar();
 function setBg(on) { bgOn = on; store.set('bgOn', on); $('bgSw').classList.toggle('on', on); bgAplicar(); }
 $('bgRow').addEventListener('click', () => setBg(!bgOn));
 if (!NATIVO) $('bgRow').style.display = 'none';
