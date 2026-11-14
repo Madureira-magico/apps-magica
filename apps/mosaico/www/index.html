@@ -186,7 +186,7 @@ body:not(.claro) .nok{color:#000}
 </head>
 <body>
 
-<div class="tela" id="inicio"><div id="iniFundo"></div><div id="iniGrade"></div><div id="iniBusca"><svg width="12" height="12" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg> Buscar</div><div id="iniDock"></div><div class="vazio" id="inicioVazio">Escolha o papel de parede e os ícones nos ajustes</div></div>
+<div class="tela" id="inicio"><div id="iniFundo"></div><canvas id="cvIni" style="position:absolute;inset:0;width:100%;height:100%"></canvas><div id="iniGrade" style="display:none"></div><div id="iniBusca" style="display:none!important"><svg width="12" height="12" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg> Buscar</div><div id="iniDock"></div><div class="vazio" id="inicioVazio">Escolha o papel de parede e os ícones nos ajustes</div></div>
 
 <div class="tela" id="fototeca">
   <canvas id="cv"></canvas>
@@ -320,9 +320,9 @@ body:not(.claro) .nok{color:#000}
 
   <div class="sec" data-ic="▢" data-cor="#30b0c7"><h3>Tela de início</h3><div class="caixa">
     <div class="lin">Abrir o app em<select id="aAbrir"><option value="fototeca">Fototeca</option><option value="inicio">Tela de início</option></select></div>
+    <div class="lin">Print da tela de início<button class="bt cinza" id="aPrint" style="margin-left:auto">Escolher</button></div>
     <div class="lin">Papel de parede<button class="bt cinza" id="aFundo" style="margin-left:auto">Escolher</button></div>
-    <div class="lin">Ícones<span class="r" id="aIcN"></span><button class="bt cinza" id="aIcones">Escolher</button></div>
-  </div><div class="nota">Escolha os ícones de uma vez, tocando na ordem: Ajustes, Notas, Tempo, Relógio, Amazon, Fotos, Mapas, Mail, Telefone, Calculadora, Contatos, FaceTime, WhatsApp, YouTube, X, Carteira, Casa, Livros, Instagram, Spotify, Notion, Messenger, ChatGPT, Câmera (e mais 4 para a barra de baixo, se quiser). Para voltar da Fototeca ou das Notas à tela de início: deslize de baixo para cima a partir da borda.</div></div>
+  </div><div class="nota">Print com Ajustes, Notas e Fotos na primeira linha e Instagram na 5ª linha (como no Mozaic). O papel de parede serve para apagar o nome do Instagram e escrever o do famoso. Voltar da Fototeca ou das Notas: deslize de baixo para cima a partir da borda.</div></div>
 
   <div class="sec" data-ic="◐" data-cor="#636366"><h3>Aparência</h3><div class="caixa">
     <div class="lin">Tema<select id="aTema"><option value="auto">Automático (igual ao iPhone)</option><option value="escuro">Escuro</option><option value="claro">Claro</option></select></div>
@@ -1761,6 +1761,10 @@ function posicionarFerramentas() {
   if (aberto) b.style.top = (vv.offsetTop + vv.height - 58) + 'px';
 }
 if (window.visualViewport) { visualViewport.addEventListener('resize', posicionarFerramentas); visualViewport.addEventListener('scroll', posicionarFerramentas); }
+/* Notas: o teclado não empurra a página para cima (a barra fica embaixo da hora, como no Notas de verdade) */
+function prenderPagina() { if (telaAtual === 'notas' && (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop)) { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } }
+window.addEventListener('scroll', prenderPagina, { passive: true });
+if (window.visualViewport) { visualViewport.addEventListener('resize', () => { prenderPagina(); setTimeout(prenderPagina, 60); setTimeout(prenderPagina, 300); }); visualViewport.addEventListener('scroll', prenderPagina); }
 $('#ntexto').addEventListener('focus', () => setTimeout(posicionarFerramentas, 350));
 $('#ntexto').addEventListener('blur', () => $('#nferr').classList.remove('on'));
 
@@ -1774,39 +1778,66 @@ function pontos(n, foto) {
 /* =====================================================================
    TELA DE INÍCIO (print) e marcação dos ícones
    ===================================================================== */
-const NOMES_IC = ['Ajustes', 'Notas', 'Tempo', 'Relógio', 'Amazon', 'Fotos', 'Mapas', 'Mail', 'Telefone', 'Calculadora', 'Contatos', 'FaceTime',
-  'WhatsApp', 'YouTube', 'X', 'Carteira', 'Casa', 'Livros', 'Instagram', 'Spotify', 'Notion', 'Messenger', 'ChatGPT', 'Câmera'];
-const IC_AJUSTES = 0, IC_NOTAS = 1, IC_FOTOS = 5, IC_INSTA = 18;
-function temInicio() { return !!(cfg.temFundo || cfg.icones.length); }
-function geoIcone(k) {   // grade de 4 colunas igual à do iPhone
-  const lado = Math.round(W * 0.155), m = W * 0.068, gx = (W - 2 * m - 4 * lado) / 3, passo = Math.round(W * 0.262);
-  if (k >= 28) { const g = geoIcone(k - 28); return { x: g.x + W, y: g.y, lado: g.lado }; }
-  if (k >= 24) { const d = k - 24; return { x: m + d * (lado + gx), y: H - Math.max(sbPx(), 20) - lado - 16, lado, doca: true }; }
-  return { x: m + (k % 4) * (lado + gx), y: stPx() + 14 + Math.floor(k / 4) * passo, lado };
-}
-function desenharInicio() {
+/* tela de início = print da tela de verdade. Posições medidas no print (frações da tela), na ordem do Mozaic */
+const PI = {
+  ajustes: { x: 0.1546, y: 0.1390 }, notas: { x: 0.3843, y: 0.1390 }, fotos: { x: 0.3843, y: 0.2535 },
+  insta: { x: 0.6157, y: 0.5978, meio: 0.0794 },                     // centro do ícone e meia largura (fração da largura)
+  nome: { x0: 0.5068, x1: 0.7264, y0: 0.6405, y1: 0.6669, cx: 0.6153, topo: 0.6471, larg: 0.1588 },
+  bolinha: { x: 0.6900, y: 0.5637, d: 0.0642 },
+  hora: [0.0800, 0.0190, 0.2850, 0.0550], bat: [0.6950, 0.0190, 0.9350, 0.0550]   // hora e bateria do print
+};
+function temInicio() { return !!cfg.temPrint; }
+function carregarImg(src) { return new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; }); }
+let iniVez = 0;
+async function desenharInicio() {
+  const vez = ++iniVez;
   $('#inicioVazio').style.display = temInicio() ? 'none' : 'flex';
   $('#iniFundo').style.backgroundImage = cfg.temFundo ? 'url("' + URLS.arq('inicio/fundo.jpg', cfg.ver) + '")' : '';
-  let h = '';
-  cfg.icones.forEach((a, k) => {
-    if (k >= 52) return;
-    const g = geoIcone(k), nome = k === IC_INSTA && atual ? atual.nome : (NOMES_IC[k] || (cfg.nomes2 && cfg.nomes2[k - 28]) || '');
-    h += '<div class="ic" data-k="' + k + '" style="left:' + g.x + 'px;top:' + g.y + 'px;width:' + g.lado + 'px;height:' + g.lado + 'px">'
-      + '<img src="' + URLS.arq('icones/' + a.id + '.jpg', cfg.ver) + '">'
-      + (g.doca ? '' : '<div class="nm" style="top:' + (g.lado + 5) + 'px">' + esc(nome) + '</div>')
-      + (k === IC_INSTA && atual ? '<div class="bd">1</div>' : '') + '</div>';
-  });
-  $('#iniGrade').innerHTML = h;
-  const doca = cfg.icones.length > 24, g = geoIcone(24), d = $('#iniDock'), b = $('#iniBusca');
-  d.style.display = doca ? 'block' : 'none';
-  if (doca) { d.style.top = (g.y - 15) + 'px'; d.style.height = (g.lado + 30) + 'px'; }
-  b.style.display = cfg.icones.length ? 'flex' : 'none';
-  b.style.top = ((doca ? g.y - 15 : H - Math.max(sbPx(), 20) - 20) - 42) + 'px';
+  const c = $('#cvIni');
+  if (!temInicio()) { c.width = 1; c.height = 1; return; }
+  const pr = await carregarImg(URLS.arq('inicio/print.jpg', cfg.ver));
+  if (vez !== iniVez || !pr) return;
+  const cw = Math.round(W * DPR), ch = Math.round(H * DPR);
+  c.width = cw; c.height = ch;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  const cobrir = (ctx, im) => { const k = Math.max(cw / im.naturalWidth, ch / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k; ctx.drawImage(im, (cw - w) / 2, (ch - h) / 2, w, h); };
+  cobrir(g, pr);
+  // apaga um pedaço do print ligando, coluna por coluna, a cor de cima com a de baixo (o fundo é um degradê suave)
+  const apagar = (x0, y0, x1, y1) => {
+    x0 = Math.max(0, Math.round(x0 * cw)); x1 = Math.min(cw, Math.round(x1 * cw)); y0 = Math.max(3, Math.round(y0 * ch)); y1 = Math.min(ch - 4, Math.round(y1 * ch));
+    const w = x1 - x0, h = y1 - y0; if (w <= 0 || h <= 0) return;
+    const cima = g.getImageData(x0, y0 - 3, w, 3).data, baixo = g.getImageData(x0, y1 + 1, w, 3).data, out = g.createImageData(w, h), d = out.data;
+    for (let x = 0; x < w; x++) {
+      const a = [0, 0, 0], b = [0, 0, 0];
+      for (let r = 0; r < 3; r++) for (let c3 = 0; c3 < 3; c3++) { a[c3] += cima[(r * w + x) * 4 + c3] / 3; b[c3] += baixo[(r * w + x) * 4 + c3] / 3; }
+      for (let y = 0; y < h; y++) { const t = (y + 1) / (h + 1), k = (y * w + x) * 4; for (let c3 = 0; c3 < 3; c3++) d[k + c3] = a[c3] + (b[c3] - a[c3]) * t + (Math.random() - 0.5) * 2; d[k + 3] = 255; }
+    }
+    g.putImageData(out, x0, y0);
+  };
+  // hora e bateria do print (as de verdade aparecem por cima)
+  apagar(PI.hora[0], PI.hora[1], PI.hora[2], PI.hora[3]);
+  apagar(PI.bat[0], PI.bat[1], PI.bat[2], PI.bat[3]);
+  if (atual) {
+    const n = PI.nome;
+    apagar(n.x0, n.y0, n.x1, n.y1);
+    // nome do famoso, na fonte do iPhone, do mesmo tamanho do "Instagram"
+    g.font = '500 10px -apple-system, system-ui'; const base = g.measureText('Instagram').width;
+    const f = 10 * (n.larg * cw) / base;
+    g.font = '500 ' + f + 'px -apple-system, system-ui';
+    let txt = atual.nome; const max = 0.205 * cw;
+    if (g.measureText(txt).width > max) { while (txt.length > 1 && g.measureText(txt + '…').width > max) txt = txt.slice(0, -1); txt = txt.trimEnd() + '…'; }
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    g.fillText(txt, n.cx * cw, n.topo * ch + 0.705 * f);
+    // bolinha vermelha com o 1
+    const b = PI.bolinha, r = b.d * cw / 2;
+    g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(b.x * cw, b.y * ch, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff'; g.font = '500 ' + (r * 1.15) + 'px -apple-system, system-ui'; g.textBaseline = 'middle'; g.fillText('1', b.x * cw, b.y * ch + r * 0.04);
+  }
 }
 /* deslizar para o lado na tela de início: mostra a página ao lado e volta sozinha */
 (function () {
   const el = $('#inicio'); let x0 = 0, y0 = 0, dx = 0, modo = '';
-  const mover = (x, anim) => { const g = $('#iniGrade'); g.style.transition = anim ? 'transform .38s cubic-bezier(.25,.9,.3,1)' : 'none'; g.style.transform = 'translateX(' + x + 'px)'; };
+  const mover = (x, anim) => { const g = $('#cvIni'); g.style.transition = anim ? 'transform .38s cubic-bezier(.25,.9,.3,1)' : 'none'; g.style.transform = 'translateX(' + x + 'px)'; };
   el.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; modo = ''; }, { passive: true });
   el.addEventListener('touchmove', e => {
     const t = e.touches[0]; dx = t.clientX - x0;
@@ -1820,29 +1851,26 @@ function desenharInicio() {
     el.dataset.arrastou = '1'; setTimeout(() => { el.dataset.arrastou = ''; }, 60);
   }, { passive: true });
 })();
-function centroIcone(k) { const g = geoIcone(k); return { x: (g.x + g.lado / 2) / W, y: (g.y + g.lado / 2) / H }; }
 $('#inicio').addEventListener('click', e => {
-  const ic = e.target.closest('.ic');
   if ($('#inicio').dataset.arrastou) return;
   if (!temInicio()) { abrirAjustes(); return; }
-  if (!ic) return;
-  const k = +ic.dataset.k;
-  ic.classList.add('toque'); setTimeout(() => ic.classList.remove('toque'), 160);
-  if (k === IC_AJUSTES) abrirAjustes();
-  else if (k === IC_NOTAS) abrirDoIcone('notas', centroIcone(k));
-  else if (k === IC_FOTOS) abrirDoIcone('fototeca', centroIcone(k));
+  const x = e.clientX / W, y = e.clientY / H, perto = p => Math.abs(p.x - x) < 0.095 && Math.abs(p.y - y) < 0.05;
+  if (perto(PI.ajustes)) abrirAjustes();
+  else if (perto(PI.notas)) abrirDoIcone('notas', PI.notas);
+  else if (perto(PI.fotos)) abrirDoIcone('fototeca', PI.fotos);
 });
 function abrirDoIcone(qual, p) {
   const el = qual === 'notas' ? $('#notas') : $('#fototeca');
   el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
   el.style.transition = 'none'; el.style.transform = 'scale(.12)'; el.style.opacity = '0.3';
   if (qual === 'notas') abrirNotas(); else { $('#busca').classList.remove('on'); mostrar('fototeca', true); }
+  setTimeout(() => { el.style.transform = 'none'; if (qual === 'fototeca') enviarGaleria(); }, 420);   // botões no lugar certo depois da animação
   requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'transform .34s cubic-bezier(.2,.9,.25,1), opacity .2s'; el.style.transform = 'none'; el.style.opacity = '1'; }));
 }
 /* deslizar de baixo para cima (a partir da borda): volta à tela de início falsa */
 function voltarInicio() {
   if (!temInicio()) return;
-  const qual = telaAtual, el = $('#' + qual), p = centroIcone(qual === 'notas' ? IC_NOTAS : IC_FOTOS);
+  const qual = telaAtual, el = $('#' + qual), p = qual === 'notas' ? PI.notas : PI.fotos;
   if (qual === 'notas') { $('#ntexto').blur(); enviarNota(); }
   el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
   el.style.transition = 'transform .3s cubic-bezier(.3,.6,.3,1), opacity .3s'; el.style.transform = 'scale(.12)'; el.style.opacity = '0';
@@ -1916,7 +1944,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-  $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots(); $('#aIcN').textContent = cfg.icones.length ? cfg.icones.length + ' ' : '';
+  $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); $('#aPiada').value = cfg.piada;
   if (!analisando) mostrarAnalise(1, 1);
@@ -2058,11 +2086,8 @@ $('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; zoom = cfg
 $('#aFundo').addEventListener('click', async () => {
   try { const r = await nat.call('escolher', { nome: 'inicio/fundo.jpg', rosto: false }); if (r && r.ok) { cfg.temFundo = true; cfg.ver++; salvar(); desenharInicio(); } } catch (_) {}
 });
-$('#aIcones').addEventListener('click', async () => {
-  try {
-    const r = await nat.call('escolherVarias', { pasta: 'icones', max: 52 });
-    if (Array.isArray(r) && r.length) { for (const a of cfg.icones) nat.call('apagar', { nome: 'icones/' + a.id + '.jpg' }).catch(() => {}); cfg.icones = r; cfg.ver++; salvar(); desenharInicio(); $('#aIcN').textContent = r.length + ' '; }
-  } catch (_) {}
+$('#aPrint').addEventListener('click', async () => {
+  try { const r = await nat.call('escolher', { nome: 'inicio/print.jpg', rosto: false }); if (r && r.ok) { cfg.temPrint = true; cfg.ver++; salvar(); desenharInicio(); } } catch (_) {}
 });
 
 /* =====================================================================

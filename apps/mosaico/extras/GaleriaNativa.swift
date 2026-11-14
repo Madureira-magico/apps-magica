@@ -313,7 +313,27 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
 
     // MARK: zoom
     func viewForZooming(in s: UIScrollView) -> UIView? { plano }
+    /// ao aproximar (voltando do rosto), vai levando aos poucos até as fotos do começo
+    private var escalaAnt: CGFloat = 0
+    private func guiarVolta(_ s: UIScrollView) {
+        let sc = s.zoomScale
+        defer { escalaAnt = sc }
+        guard temMos, sc >= 1, escalaAnt > 0, sc > escalaAnt * 1.0005 else { return }
+        let smax = s.maximumZoomScale, ins = zoomer.contentInset
+        let oi = offsetInicio(smax), of = offsetRosto()
+        let q = CGPoint(x: W / 2, y: (ins.top + H - ins.bottom) / 2)
+        let p = CGPoint(x: (oi.x + q.x) / smax, y: (oi.y + q.y) / smax)
+        let sf = CGPoint(x: p.x - of.x, y: p.y - of.y)
+        let u = min(1, max(0, log(sc) / log(max(1.0001, smax))))
+        let alvo = CGPoint(x: p.x * sc - (sf.x + (q.x - sf.x) * u), y: p.y * sc - (sf.y + (q.y - sf.y) * u))
+        let k: CGFloat = 0.10 + 0.25 * u   // mais firme perto do fim
+        let o = s.contentOffset
+        ajustando = true
+        s.contentOffset = CGPoint(x: o.x + (alvo.x - o.x) * k, y: o.y + (alvo.y - o.y) * k)
+        ajustando = false
+    }
     func scrollViewDidZoom(_ s: UIScrollView) {
+        if !trilho { guiarVolta(s) }
         centralizar()
         if trilho, let t = dadosTrilho, s.zoomScale >= 1 {
             // caminho fixo entre as fotos do começo e o rosto inteiro: desliza junto com a pinça, sem pulo

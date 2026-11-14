@@ -186,7 +186,7 @@ body:not(.claro) .nok{color:#000}
 </head>
 <body>
 
-<div class="tela" id="inicio"><div id="iniFundo"></div><div id="iniGrade"></div><div id="iniBusca"><svg width="12" height="12" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg> Buscar</div><div id="iniDock"></div><div class="vazio" id="inicioVazio">Escolha o papel de parede e os ícones nos ajustes</div></div>
+<div class="tela" id="inicio"><div id="iniFundo"></div><canvas id="cvIni" style="position:absolute;inset:0;width:100%;height:100%"></canvas><div id="iniGrade" style="display:none"></div><div id="iniBusca" style="display:none!important"><svg width="12" height="12" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="#fff" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg> Buscar</div><div id="iniDock"></div><div class="vazio" id="inicioVazio">Escolha o papel de parede e os ícones nos ajustes</div></div>
 
 <div class="tela" id="fototeca">
   <canvas id="cv"></canvas>
@@ -320,9 +320,9 @@ body:not(.claro) .nok{color:#000}
 
   <div class="sec" data-ic="▢" data-cor="#30b0c7"><h3>Tela de início</h3><div class="caixa">
     <div class="lin">Abrir o app em<select id="aAbrir"><option value="fototeca">Fototeca</option><option value="inicio">Tela de início</option></select></div>
+    <div class="lin">Print da tela de início<button class="bt cinza" id="aPrint" style="margin-left:auto">Escolher</button></div>
     <div class="lin">Papel de parede<button class="bt cinza" id="aFundo" style="margin-left:auto">Escolher</button></div>
-    <div class="lin">Ícones<span class="r" id="aIcN"></span><button class="bt cinza" id="aIcones">Escolher</button></div>
-  </div><div class="nota">Escolha os ícones de uma vez, tocando na ordem: Ajustes, Notas, Tempo, Relógio, Amazon, Fotos, Mapas, Mail, Telefone, Calculadora, Contatos, FaceTime, WhatsApp, YouTube, X, Carteira, Casa, Livros, Instagram, Spotify, Notion, Messenger, ChatGPT, Câmera (e mais 4 para a barra de baixo, se quiser). Para voltar da Fototeca ou das Notas à tela de início: deslize de baixo para cima a partir da borda.</div></div>
+  </div><div class="nota">Print com Ajustes, Notas e Fotos na primeira linha e Instagram na 5ª linha (como no Mozaic). O papel de parede serve para apagar o nome do Instagram e escrever o do famoso. Voltar da Fototeca ou das Notas: deslize de baixo para cima a partir da borda.</div></div>
 
   <div class="sec" data-ic="◐" data-cor="#636366"><h3>Aparência</h3><div class="caixa">
     <div class="lin">Tema<select id="aTema"><option value="auto">Automático (igual ao iPhone)</option><option value="escuro">Escuro</option><option value="claro">Claro</option></select></div>

@@ -743,14 +743,26 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
 
     private func fotoDaFototeca(_ id: String, lado: CGFloat, preencher: Bool, _ fim: @escaping (Data?) -> Void) {
         guard let a = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else { return fim(nil) }
-        let o = PHImageRequestOptions()
-        o.deliveryMode = .highQualityFormat
-        o.resizeMode = .fast
-        o.isNetworkAccessAllowed = true
-        o.isSynchronous = false
-        gerente.requestImage(for: a, targetSize: CGSize(width: lado, height: lado),
-                             contentMode: preencher ? .aspectFill : .aspectFit, options: o) { im, _ in
-            self.filaImg.async { fim(im?.jpegData(compressionQuality: 0.85)) }
+        // primeiro a melhor versão que já está no aparelho (na hora); só vai ao iCloud se ela for pequena demais
+        let local = PHImageRequestOptions()
+        local.deliveryMode = .highQualityFormat
+        local.resizeMode = .fast
+        local.isNetworkAccessAllowed = false
+        local.isSynchronous = false
+        let modo: PHImageContentMode = preencher ? .aspectFill : .aspectFit
+        gerente.requestImage(for: a, targetSize: CGSize(width: lado, height: lado), contentMode: modo, options: local) { im, _ in
+            if let im = im, max(im.size.width * im.scale, im.size.height * im.scale) >= lado * 0.45 {
+                self.filaImg.async { fim(im.jpegData(compressionQuality: 0.85)) }
+                return
+            }
+            let o = PHImageRequestOptions()
+            o.deliveryMode = .highQualityFormat
+            o.resizeMode = .fast
+            o.isNetworkAccessAllowed = true
+            o.isSynchronous = false
+            self.gerente.requestImage(for: a, targetSize: CGSize(width: lado, height: lado), contentMode: modo, options: o) { im2, _ in
+                self.filaImg.async { fim((im2 ?? im)?.jpegData(compressionQuality: 0.85)) }
+            }
         }
     }
 
