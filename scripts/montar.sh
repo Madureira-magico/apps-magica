@@ -121,11 +121,14 @@ M
   echo "::endgroup::"
 done
 
+cp scripts/icone-pagina.png site/apple-touch-icon.png   # ícone do atalho da página na Tela de Início
 DATA="$(TZ=America/Sao_Paulo date '+%d/%m/%Y %H:%M')"
 cat > site/index.html <<H
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Apps de Mágica</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Mágicas">
 <style>
 body{margin:0;font-family:-apple-system,system-ui,sans-serif;background:#111;color:#fff;padding:28px 18px}
 h1{font-size:26px;margin:0 0 6px}p{color:#aaa;margin:0 0 22px;font-size:14px}
