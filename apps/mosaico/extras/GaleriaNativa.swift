@@ -28,7 +28,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var seq: [String] = []
     private var mosIds: [String] = []
     private var mosTinta: [UInt8] = []
-    private var mosCols = 0, primeira = 0, linhasMos = 0, ini = 0
+    private var mosCols = 0, primeira = 0, linhasMos = 0, ini = 0, faixaL = 0
     private var mosImg = "", mosV = ""
     private var temMos: Bool { mosCols > 0 && magImg.image != nil }
     private var reforco: CGFloat = 0.4
@@ -169,6 +169,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             primeira = (d["primeira"] as? NSNumber)?.intValue ?? 0
             linhasMos = (d["linhas"] as? NSNumber)?.intValue ?? 0
             ini = (d["ini"] as? NSNumber)?.intValue ?? 0
+            faixaL = (d["faixaL"] as? NSNumber)?.intValue ?? 0
             let img = (d["img"] as? String) ?? "", v = "\(d["v"] ?? "")"
             if v != mosV || img != mosImg || magImg.image == nil {
                 mosImg = img; mosV = v
@@ -273,8 +274,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         var px = [UInt8](repeating: 0, count: w * h * 4)
         let c0 = max(0, (w - Int(n0)) / 2), c1 = c0 + Int(n0)
         for cel in 0..<(w * h) where cel * 3 + 2 < mosTinta.count {
-            let c = cel % w
-            if soFaixa && (c < c0 || c >= c1) { continue }
+            let c = cel % w, r = cel / w
+            if soFaixa && (c < c0 || c >= c1 || r < h - faixaL) { continue }
             px[cel * 4] = mosTinta[cel * 3]; px[cel * 4 + 1] = mosTinta[cel * 3 + 1]; px[cel * 4 + 2] = mosTinta[cel * 3 + 2]; px[cel * 4 + 3] = 255
         }
         guard let prov = CGDataProvider(data: Data(px) as CFData),
@@ -357,7 +358,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         CATransaction.begin(); CATransaction.setDisableActions(true)
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
-        tintaFaixa.alpha = 0.8 * pow(ramp, 1.2)
+        tintaFaixa.alpha = 0.55 * pow(ramp, 1.2)
         if corModo != "cor" && ramp > 0 {
             corCamada.frame = vista.bounds
             corCamada.backgroundColor = corModo == "sepia" ? UIColor(red: 0.44, green: 0.30, blue: 0.16, alpha: 1).cgColor : UIColor.gray.cgColor
