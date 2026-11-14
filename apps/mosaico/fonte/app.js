@@ -201,7 +201,7 @@ async function definirNome(txt, origem) {
   const meu = ++preparo;
   const f = acharFamoso(txt);
   const nome = f ? f.n : maiusculas(txt);
-  if (cfg.piada === 'bebes' && f && f.b >= 0 && cfg.bebes[f.b] && cfg.bebe !== f.b) { cfg.bebe = f.b; salvar(); montarSeq(); }
+  escolherBebe(f, nome);
   atual = { nome, tipo: 'texto', pronto: false, origem };
   pontos(1, false);
   mostrarAtual(); estado('preparando…');
@@ -218,6 +218,7 @@ async function definirNome(txt, origem) {
     fam = await baixarFamoso(fam || { n: nome, w: '', a: [], b: -1, f: '', r: null }, !fam);
     if (meu !== preparo) return;
   }
+  if (fam) { await completarFamoso(fam); if (meu !== preparo) return; escolherBebe(fam, nome); }
   if (fam && fam.f) {                   // 2) troca pelo rosto
     pontos(2, true);
     atual = { nome: fam.n, tipo: 'rosto', arq: fam.f, pronto: false, origem };
@@ -231,14 +232,55 @@ async function definirNome(txt, origem) {
   if (cfg.vibrar) vibrar('leve');
 }
 
+/* bebê da piada: automático (sexo pelo cadastro da Wikipédia, tom de pele pela foto) ou o marcado na lista */
+const FEM = new Set('ana maria julia luiza beatriz isabel larissa xuxa ivete anitta marilia claudia gisele taylor beyonce rihanna adele madonna shakira'.split(' '));
+const MASC_A = new Set('luca nicola joshua andrea jonah elijah noah garcia costa silva'.split(' '));
+function sexoPeloNome(n) {
+  const p = semAcento(String(n || '').split(' ')[0] || '');
+  if (FEM.has(p)) return 'f'; if (MASC_A.has(p)) return 'm';
+  return /a$/.test(p) ? 'f' : 'm';
+}
+function peleEscura(rgb) {   // ITA (ângulo de tipologia individual): abaixo de ~-8° é pele escura
+  if (!rgb) return null;
+  const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const [r, g, b] = rgb.map(lin), X = r * 0.4124 + g * 0.3576 + b * 0.1805, Y = r * 0.2126 + g * 0.7152 + b * 0.0722, Z = r * 0.0193 + g * 0.1192 + b * 0.9505;
+  const fx = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const L = 116 * fx(Y) - 16, B = 200 * (fx(Y) - fx(Z / 1.089));
+  return Math.atan2(L - 50, B) * 180 / Math.PI < -8;
+}
+async function completarFamoso(f) {   // sexo e tom de pele (uma vez por famoso)
+  let mudou = false;
+  if (f.p == null && f.f) { try { const p = await nat.call('pele', { nome: f.f }); f.p = Array.isArray(p) ? p : 0; mudou = true; } catch (_) {} }
+  if (!f.g && f.q) {
+    try {
+      const ac = new AbortController(); setTimeout(() => ac.abort(), 6000);
+      const d = await (await fetch('https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&origin=*&property=P21&entity=' + f.q, { signal: ac.signal })).json();
+      const v = d && d.claims && d.claims.P21 && d.claims.P21[0] && d.claims.P21[0].mainsnak.datavalue.value.id;
+      if (v) { f.g = (v === 'Q6581072' || v === 'Q1052281' ? 'f' : 'm'); if (v === 'Q1052281') f.g = 'm'; if (v === 'Q2449503') f.g = 'f'; mudou = true; }
+    } catch (_) {}
+  }
+  if (mudou) salvarFam();
+}
+function escolherBebe(f, nome) {
+  if (!cfg.auto || cfg.piada !== 'bebes') return;
+  let k = f && f.b >= 0 ? f.b : -1;
+  if (k < 0) {
+    const g = (f && f.g) || sexoPeloNome(nome || (f && f.n));
+    const esc = f && Array.isArray(f.p) ? peleEscura(f.p) : false;
+    k = (esc ? 2 : 0) + (g === 'f' ? 1 : 0);
+  }
+  if (!cfg.bebes[k]) { const alt = [k, k ^ 2, k ^ 1, k ^ 3].find(x => cfg.bebes[x]); if (alt == null) return; k = alt; }
+  if (cfg.bebe !== k) { cfg.bebe = k; salvar(); montarSeq(); }
+}
 async function infoWiki(lang, titulo, busca) {
-  const u = 'https://' + lang + '.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=1400&pilicense=any&'
+  const u = 'https://' + lang + '.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages|pageprops&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=1400&pilicense=any&'
     + (titulo ? 'titles=' + encodeURIComponent(titulo) : 'generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(busca));
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 9000);
   try {
     const r = await fetch(u, { signal: ac.signal, cache: 'no-store' }); const d = await r.json();
     const pags = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
     const p = pags.find(x => x.thumbnail && x.thumbnail.source);
+    if (p && p.pageprops && p.pageprops.wikibase_item) infoWiki.q = p.pageprops.wikibase_item;
     return p ? p.thumbnail.source : '';
   } catch (_) { return ''; } finally { clearTimeout(t); }
 }
@@ -248,12 +290,15 @@ async function baixarFamoso(f, novo) {
   tentativas.push(['pt', '', f.n], ['en', f.w && !/\(/.test(f.w) ? f.w : '', f.n]);
   let feito = null;
   for (const [lang, tit, busca] of tentativas) {
+    infoWiki.q = '';
     const url = await infoWiki(lang, tit, busca);
     if (!url) continue;
+    if (infoWiki.q) f.q = infoWiki.q;
     const nome = 'famosos/' + slug(f.n) + '.jpg';
     try {
       const r = await nat.call('baixarRosto', { url, nome });
       feito = { arq: nome, rosto: !!(r && r.rosto) };
+      if (r && Array.isArray(r.pele)) f.p = r.pele;
       if (feito.rosto) break;
     } catch (_) {}
   }
@@ -265,37 +310,36 @@ async function baixarFamoso(f, novo) {
 }
 
 /* desenha o nome em letras e devolve a grade de cores */
-function gradeTexto(nome, cols, rows) {   // nome escrito: letras altas e estreitas, traço grosso, uma palavra por linha
-  const k = 8, c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
-  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
-  const pal = nome.toUpperCase().split(/\s+/).filter(Boolean), linhas = [];
-  for (const p of pal) { const u = linhas[linhas.length - 1]; if (u && linhas.length >= 3) linhas[linhas.length - 1] = u + ' ' + p; else linhas.push(p); }
-  const n = linhas.length, alto = c.height * 0.74, passo = alto / n, hLetra = passo * 0.82, larg = c.width * 0.92;
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-  const y0 = (c.height - alto) / 2 - c.height * 0.02;
-  linhas.forEach((l, i) => {   // letra por letra, cada uma na sua casa, com espaço entre elas
-    const m = l.length, casa = Math.min(larg / m, hLetra * 0.62), gap = Math.max(k * 1.1, casa * 0.16), xi = (c.width - casa * m) / 2;
-    const sy = hLetra / 72, yb = y0 + i * passo + (passo + hLetra) / 2;
-    for (let j = 0; j < m; j++) {
-      const ch = l[j]; if (ch === ' ') continue;
-      g.font = '800 100px -apple-system, "Helvetica Neue", Arial, sans-serif';
-      const w = g.measureText(ch).width || 1, sx = Math.min(sy, (casa - gap) / w);
-      g.save(); g.translate(xi + casa * (j + 0.5), yb); g.scale(sx, sy); g.fillText(ch, 0, 0); g.restore();
-    }
-  });
-  const px = g.getImageData(0, 0, c.width, c.height).data, cob = [];
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    let s = 0;
-    for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) s += px[((y * k + dy) * c.width + x * k + dx) * 4];
-    cob.push(s / (k * k * 255));
-  }
-  // preto e branco puro
+function palavrasNome(nome) {   // uma palavra por linha; palavra muito comprida é dividida ao meio
   const out = [];
+  for (const p of nome.toUpperCase().split(/\s+/).filter(Boolean)) {
+    if (p.length > 11) { const m = Math.ceil(p.length / 2); out.push(p.slice(0, m), p.slice(m)); } else out.push(p);
+  }
+  while (out.length > 4) out.splice(out.length - 2, 2, out[out.length - 2] + ' ' + out[out.length - 1]);
+  return out;
+}
+function colsTexto(nome) { const m = Math.max(...palavrasNome(nome).map(l => l.length)); return Math.max(+cfg.colsM || 40, Math.min(80, Math.round(m * 7.4 + 4))); }
+function gradeTexto(nome, cols, rows) {   // igual ao Mozaic: palavra por linha, numa faixa no meio, letras grossas na proporção normal
+  const k = 16, c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
+  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+  const linhas = palavrasNome(nome), F = '900 300px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
+  g.font = F; g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  const alt = 300 * 0.72;   // altura da letra maiúscula
+  const s = Math.min(...linhas.map(l => c.width * 0.92 / g.measureText(l).width), c.height * 0.15 / alt);
+  const lh = alt * s * 1.32, total = lh * linhas.length, y0 = (c.height - total) / 2;
+  linhas.forEach((l, i) => { g.save(); g.translate(c.width / 2, y0 + i * lh + (lh + alt * s) / 2); g.scale(s, s); g.fillText(l, 0, 0); g.restore(); });
+  const px = g.getImageData(0, 0, c.width, c.height).data, out = [];
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    const b = cob[y * cols + x] > 0.4 ? 255 : 0; out.push(b, b, b);
+    let v = 0;
+    for (let dy = 0; dy < k; dy += 2) for (let dx = 0; dx < k; dx += 2) v += px[((y * k + dy) * c.width + x * k + dx) * 4];
+    v /= (k * k / 4) * 255;
+    if (v > 0.45) {   // letra: claro, com degradê de cor da esquerda (amarelo) para a direita (azul)
+      const h = 0.13 + 0.45 * (x / cols), rgb = hsl(h, 0.55, 0.82); out.push(...rgb);
+    } else out.push(52, 46, 44);   // fundo: fotos normais, mais escuras
   }
   return out;
 }
+function hsl(h, s, l) { const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }; return [f(0), f(8), f(4)]; }
 
 /* fotos disponíveis para o mosaico */
 function pool() {
@@ -325,7 +369,7 @@ function indiceCores(P) {
 async function prepararMosaico() {
   if (!atual) return;
   const meu = ++prepararMosaico.vez;
-  const n = +cfg.colsM || 60, t = W / n;
+  const n = atual.tipo === 'texto' ? colsTexto(atual.nome) : (+cfg.colsM || 60), t = W / n;
   const rowsVis = Math.ceil(H / t) + 1;
   let sN = seqNormal.slice();
   if (sN.length < rowsVis * n) sN = new Array(rowsVis * n - sN.length).fill('').concat(sN);   // galeria pequena: repete fotos
@@ -345,7 +389,7 @@ async function prepararMosaico() {
   const V = L.map(l => { let v = (l - p2) / Math.max(1, p98 - p2); v = Math.min(1, Math.max(0, v)); return texto ? v : v * v * (3 - 2 * v); });
   const P = pool(); const NP = P.length;
   const porLuz = P.slice().sort((a, b) => a.l - b.l);
-  const porCor = (!texto && cfg.cor === 'cor' && NP) ? indiceCores(P) : null;
+  const porCor = (cfg.cor === 'cor' && NP) ? indiceCores(P) : null;   // nome escrito também escolhe pela cor (letras claras e coloridas, fundo escuro)
   // faixa da esquerda (3 colunas): as MESMAS fotos, no mesmo lugar, da Fototeca normal que o público já viu
   const k0 = +cfg.n0 || 3, M = seqNormal.length, uN = Math.floor((M - 1) / k0);
   const cS = 0;   // a Fototeca de perto fica no canto esquerdo da grade grande (igual ao Mozaic)
@@ -359,7 +403,7 @@ async function prepararMosaico() {
     const yc = cima + r * t - topo + t / 2, gy = Math.min(rg - 1, Math.max(0, Math.floor(yc / H * rg)));
     for (let c = 0; c < n; c++) {
       const idx = r * n + c, cel = gy * n + c, v = V[cel] == null ? 0 : V[cel];
-      const l0 = Math.max(1, L[cel] || 1), kk = (v * 255) / l0;   // cor do rosto com a claridade esticada
+      const l0 = Math.max(1, L[cel] || 1), kk = texto ? 1 : (v * 255) / l0;   // cor do rosto com a claridade esticada
       const cr = Math.min(255, Math.round((alvo[cel * 3] || 0) * kk)), cgc = Math.min(255, Math.round((alvo[cel * 3 + 1] || 0) * kk)), cb = Math.min(255, Math.round((alvo[cel * 3 + 2] || 0) * kk));
       let id = '';
       if (idx < N) {
@@ -783,7 +827,7 @@ function enviarGaleria(zerar) {
     const ap = arqPiada();
     const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
     const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, img: 'mosaico.jpg', v: String(mos.versao) } : null;
-    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on') };
+    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.ajuda == null ? 3 : +cfg.ajuda };
     nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
     zerarGal = false;
   }, 0);
@@ -792,40 +836,19 @@ async function rectNat(i) {
   try { const r = await nat.call('galeriaRect', { i }); return r ? { x: r[0], y: r[1], w: r[2], h: r[3] } : null; } catch (_) { return null; }
 }
 
-/* cantos: trocar o bebê */
-[['#cTL', 0], ['#cTR', 1], ['#cBL', 2], ['#cBR', 3]].forEach(([s, k]) => {
-  $(s).addEventListener('touchend', e => {
-    e.preventDefault(); e.stopPropagation();
-    if (cfg.piada !== 'bebes') return;
-    if (!cfg.bebes[k]) { vibrar('forte'); return; }
-    cfg.bebe = k; salvar(); montarSeq(); vibrar('leve');
-    if (atual && atual.pronto) prepararMosaico();
-  }, { passive: false });
-});
 
-/* título: segurar 1 s ou três toques = ajustes */
-(function () {
-  let t = 0, x0 = 0, y0 = 0, toquesT = [];
-  const el = $('#titulo');
-  el.addEventListener('touchstart', e => {
-    e.preventDefault(); const p = e.touches[0]; x0 = p.clientX; y0 = p.clientY;
-    t = setTimeout(() => { t = 0; vibrar('media'); abrirAjustes(); }, 1000);
-    const agora = performance.now(); toquesT = toquesT.filter(v => agora - v < 700); toquesT.push(agora);
-    if (toquesT.length >= 3) { toquesT = []; clearTimeout(t); t = 0; vibrar('media'); abrirAjustes(); }
-  }, { passive: false });
-  el.addEventListener('touchmove', e => { const p = e.touches[0]; if (t && Math.hypot(p.clientX - x0, p.clientY - y0) > 14) { clearTimeout(t); t = 0; } }, { passive: true });
-  const fim = () => { if (t) clearTimeout(t); t = 0; };
-  el.addEventListener('touchend', fim); el.addEventListener('touchcancel', fim);
-})();
+
+/* título "Fototeca": um toque volta para a tela de início (sem ela configurada, abre os ajustes) */
+$('#titulo').addEventListener('click', () => { if (emSelecao) return; if (temInicio()) voltarInicio(); else abrirAjustes(); });
 
 /* botão redondo do meio: toque = câmera escondida; segurar = espiar o nome */
 (function () {
   const el = $('#meio'); let t = 0, espiando = false;
-  el.addEventListener('touchstart', e => { e.preventDefault(); t = setTimeout(() => { t = 0; espiando = true; espiar(true); }, 350); }, { passive: false });
+  el.addEventListener('touchstart', e => { e.preventDefault(); espiando = true; espiar(true); }, { passive: false });
   el.addEventListener('touchend', e => {
     e.preventDefault();
-    if (t) { clearTimeout(t); t = 0; ligarCamera(); }
-    if (espiando) { espiando = false; espiar(false); }
+    if (t) clearTimeout(t);
+    t = setTimeout(() => { t = 0; if (espiando) { espiando = false; espiar(false); } }, 900);   // um toque: mostra o nome por um instante
   }, { passive: false });
   el.addEventListener('touchcancel', () => { if (t) clearTimeout(t); t = 0; if (espiando) { espiando = false; espiar(false); } });
 })();
@@ -838,7 +861,10 @@ function espiar(on) {
 }
 
 /* lupa: busca (o nome digitado vira o famoso) */
-$('#lupa').addEventListener('click', () => { $('#busca').classList.add('on'); if (nativo) nat.call('galeria', { on: true, ativa: false }).catch(() => {}); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); });
+function abrirBusca() { $('#busca').classList.add('on'); if (nativo) nat.call('galeria', { on: true, ativa: false }).catch(() => {}); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); }
+$('#lupa').addEventListener('click', () => ligarCamera());   // lupa: câmera escondida
+/* dois toques na aba "Fototeca": janelinha Pesquisar */
+(function () { let ult = 0; $('#aba').addEventListener('click', () => { const a = performance.now(); if (a - ult < 380) { ult = 0; abrirBusca(); } else ult = a; }); })();
 function fecharBusca(mandar) {   // janelinha "Pesquisar": o nome digitado vira o famoso (Cancelar também manda, escondido)
   const v = $('#bInput').value.trim(); $('#bInput').blur();
   if (v && mandar !== false) definirNome(v, 'busca');
@@ -1380,9 +1406,10 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
+  if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
-  $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); $('#aPiada').value = cfg.piada;
+  $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); 
   if (!analisando) mostrarAnalise(1, 1);
   desenharPiada(); desenharListaFam();
   try {
@@ -1392,20 +1419,22 @@ async function encherAjustes() {
   } catch (_) {}
 }
 function desenharPiada() {
-  const bebes = cfg.piada === 'bebes';
-  $('#aBebes').parentNode.style.display = bebes ? '' : 'none';
-  $('#aFixas').style.display = bebes ? 'none' : '';
-  $('#aBebes').innerHTML = ROT_BEBE.map((r, k) => '<div class="' + (cfg.bebe === k ? 'atual' : '') + '" data-k="' + k + '"><img ' + (cfg.bebes[k] ? 'src="' + URLS.arq('bebes/' + k + '.jpg', cfg.ver) + '"' : '') + '>' + (k + 1) + '. ' + r + '</div>').join('');
-  $('#aFixas').innerHTML = cfg.fixas.map((f, i) => '<div class="lin" data-i="' + i + '"><img class="mini" src="' + URLS.arq('piada/' + f.id + '.jpg', cfg.ver) + '"><span style="flex:1">' + esc(f.nome) + '</span>'
-    + (cfg.fixa === i ? '<span class="ok">em uso</span>' : '<button class="bt cinza" data-a="usar">Usar</button>') + '<button class="bt cinza" data-a="tirar" style="padding:8px 9px">✕</button></div>').join('')
-    + '<div class="lin"><button class="bt" id="aAddFixa">+ Adicionar foto fixa</button></div>';
+  if (cfg.auto == null) cfg.auto = true;
+  const usado = !cfg.auto ? (cfg.piada === 'bebes' ? 'b' + cfg.bebe : 'f' + cfg.fixa) : '';
+  const lin = (chave, img, nome, extra) => '<div class="lin" data-c="' + chave + '"><img class="mini" ' + (img ? 'src="' + img + '"' : '') + '><span style="flex:1">' + nome + '</span>' + extra
+    + (usado === chave ? '<span class="ok">✓ fixa</span>' : '<button class="bt cinza" data-a="fixar">Fixar</button>') + '</div>';
+  $('#aPiadaAuto').innerHTML = '<div class="lin" data-c="auto"><span style="flex:1">Automático<br><small style="color:var(--fg2)">Escolhe o bebê pelo famoso</small></span>' + (cfg.auto ? '<span class="ok">✓</span>' : '<button class="bt cinza" data-a="auto">Usar</button>') + '</div>';
+  $('#aBebes').innerHTML = ROT_BEBE.map((r, k) => lin('b' + k, cfg.bebes[k] ? URLS.arq('bebes/' + k + '.jpg', cfg.ver) : '', (k + 1) + '. ' + r, '<button class="bt cinza" data-a="trocar" style="padding:8px 9px">Foto</button>')).join('');
+  $('#aFixas').innerHTML = cfg.fixas.map((f, i) => lin('f' + i, URLS.arq('piada/' + f.id + '.jpg', cfg.ver), esc(f.nome), '<button class="bt cinza" data-a="tirar" style="padding:8px 9px">✕</button>')).join('')
+    + '<div class="lin"><button class="bt" id="aAddFixa">+ Adicionar outra foto</button></div>';
 }
-$('#aPiada').addEventListener('change', e => { cfg.piada = e.target.value; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); });
+$('#aPiadaAuto').addEventListener('click', e => { if (e.target.dataset.a !== 'auto') return; cfg.auto = true; cfg.piada = 'bebes'; salvar(); escolherBebe(atual && acharFamoso(atual.nome), atual && atual.nome); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); });
 $('#aBebes').addEventListener('click', async e => {
-  const d = e.target.closest('[data-k]'); if (!d) return; const k = +d.dataset.k;
+  const d = e.target.closest('[data-c]'), a = e.target.dataset.a; if (!d || !a) return; const k = +d.dataset.c.slice(1);
+  if (a === 'fixar') { if (!cfg.bebes[k]) { toast('Escolha a foto deste bebê primeiro'); return; } cfg.auto = false; cfg.piada = 'bebes'; cfg.bebe = k; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); return; }
   try {
     const r = await nat.call('escolher', { nome: 'bebes/' + k + '.jpg', rosto: false });
-    if (r && r.ok) { cfg.bebes[k] = true; cfg.bebe = k; cfg.ver++; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); }
+    if (r && r.ok) { cfg.bebes[k] = true; cfg.ver++; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico(); }
   } catch (_) {}
 });
 $('#aFixas').addEventListener('click', async e => {
@@ -1415,13 +1444,13 @@ $('#aFixas').addEventListener('click', async e => {
       const r = await nat.call('escolher', { nome: 'piada/' + id + '.jpg', rosto: false });
       if (r && r.ok) {
         const nome = prompt('Nome desta foto (ex.: Prancheta)', 'Prancheta') || 'Foto ' + (cfg.fixas.length + 1);
-        cfg.fixas.push({ id, nome }); cfg.fixa = cfg.fixas.length - 1; cfg.ver++; salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
+        cfg.fixas.push({ id, nome }); cfg.ver++; salvar(); desenharPiada();
       }
     } catch (_) {}
     return;
   }
-  const l = e.target.closest('[data-i]'), a = e.target.dataset.a; if (!l || !a) return; const i = +l.dataset.i;
-  if (a === 'usar') cfg.fixa = i;
+  const l = e.target.closest('[data-c]'), a = e.target.dataset.a; if (!l || !a) return; const i = +l.dataset.c.slice(1);
+  if (a === 'fixar') { cfg.auto = false; cfg.piada = 'fixa'; cfg.fixa = i; }
   else if (a === 'tirar' && confirm('Tirar a foto "' + cfg.fixas[i].nome + '"?')) { nat.call('apagar', { nome: 'piada/' + cfg.fixas[i].id + '.jpg' }).catch(() => {}); cfg.fixas.splice(i, 1); if (cfg.fixa >= cfg.fixas.length) cfg.fixa = 0; }
   salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
 });
@@ -1515,6 +1544,7 @@ $('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#a
 $('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
+$('#aAjuda').addEventListener('input', e => { cfg.ajuda = +e.target.value; $('#aAjudaV').textContent = cfg.ajuda; salvar(); enviarGaleria(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });
 $('#aTema').addEventListener('change', e => { cfg.tema = e.target.value; salvar(); aplicarTema(); });

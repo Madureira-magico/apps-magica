@@ -214,7 +214,7 @@ body:not(.claro) .nok{color:#000}
     <div class="aba vid"><span id="selConta">Selecionar Itens</span></div>
     <div class="redondo vid lixo" id="selLixo"><svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg></div>
   </div>
-  <div class="canto" id="cTL"></div><div class="canto" id="cTR"></div><div class="canto" id="cBL"></div><div class="canto" id="cBR"></div>
+
   <div id="busca"><div class="alerta">
     <div class="atit">Pesquisar</div>
     <input id="bInput" type="text" placeholder="Nome da celebridade" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -272,7 +272,7 @@ body:not(.claro) .nok{color:#000}
   <div class="sec" data-ic="🎩" data-cor="#5856d6"><h3>Apresentação</h3><div class="caixa">
     <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
     <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
-  </div><div class="nota">Espiar o nome: segure o botão redondo do meio. Câmera: toque nele. Microfone: lixeira da foto da piada.</div></div>
+  </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
 
   <div class="sec" data-ic="📡" data-cor="#007aff"><h3>Receber pelo Inject</h3><div class="caixa">
     <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aInj"><span></span></label></div>
@@ -289,6 +289,7 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Bolinha quando pronto<label class="chave"><input type="checkbox" id="aAviso"><span></span></label></div>
     <div class="lin">Vibrar quando pronto<label class="chave"><input type="checkbox" id="aVib"><span></span></label></div>
     <div class="lin">Foto real no final<label class="chave"><input type="checkbox" id="aReal"><span></span></label></div>
+    <div class="lin">Ajuda na volta<input type="range" id="aAjuda" min="0" max="10" step="1"><span class="r" id="aAjudaV" style="margin-left:6px;min-width:22px"></span></div>
   </div><div class="nota">Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
 
   <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="caixa"><div id="aSlots"></div>
@@ -296,12 +297,10 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Colunas ao abrir<select id="aN0"><option value="3">3</option><option value="5">5</option></select></div>
   </div><div class="nota">A primeira tela da Fototeca. Toque num quadrado para escolher a foto; toque numa foto e depois em outro quadrado para trocar de lugar. Quadrado vazio recebe uma foto automática.</div></div>
 
-  <div class="sec" data-ic="👶" data-cor="#ff2d55"><h3>Foto da piada</h3><div class="caixa">
-    <div class="lin">Usar<select id="aPiada"><option value="bebes">Bebês (escolhe sozinho pelo famoso)</option><option value="fixa">Foto fixa</option></select></div>
-  </div>
-  <div class="caixa" style="margin-top:10px"><div class="grade4" id="aBebes"></div></div>
-  <div class="caixa" style="margin-top:10px" id="aFixas"></div>
-  <div class="nota">Lixeira da foto da piada: liga o microfone. Trocar o bebê: um toque num canto da tela (em cima à esquerda = 1, em cima à direita = 2, embaixo à esquerda = 3, embaixo à direita = 4).</div></div>
+  <div class="sec" data-ic="👶" data-cor="#ff2d55"><h3>Foto da piada</h3><div class="caixa" id="aPiadaAuto"></div>
+  <div class="nota" style="margin-top:14px">Ou deixar uma foto fixa</div>
+  <div class="caixa" style="margin-top:6px"><div id="aBebes"></div><div id="aFixas"></div></div>
+  <div class="nota">Lixeira da foto da piada: liga o microfone. Automático: menino ou menina pelo cadastro do famoso e o tom de pele pela foto; o bebê marcado na lista de Famosos vale por cima.</div></div>
 
   <div class="sec" data-ic="★" data-cor="#ffcc00"><h3>Famosos</h3><div class="caixa">
     <div class="lin"><span class="estado" id="aFamEst">—</span><button class="bt" id="aBaixar" style="margin-left:auto">Baixar fotos</button></div>
@@ -326,7 +325,7 @@ body:not(.claro) .nok{color:#000}
 
   <div class="sec" data-ic="◐" data-cor="#636366"><h3>Aparência</h3><div class="caixa">
     <div class="lin">Tema<select id="aTema"><option value="auto">Automático (igual ao iPhone)</option><option value="escuro">Escuro</option><option value="claro">Claro</option></select></div>
-  </div><div class="nota">Abrir estes ajustes: ícone Ajustes da tela de início, ou segure o título "Fototeca" por 1 segundo.</div></div>
+  </div><div class="nota">Abrir estes ajustes: ícone Ajustes da tela de início.</div></div>
   <div style="height:80px"></div>
 </div>
 

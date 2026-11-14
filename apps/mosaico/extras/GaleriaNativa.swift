@@ -207,6 +207,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
                 a.count == 4 ? CGRect(x: a[0].doubleValue, y: a[1].doubleValue, width: a[2].doubleValue, height: a[3].doubleValue) : nil
             }
             if let a = c["ativa"] as? Bool { ativa = a }
+            ajuda = CGFloat((c["ajuda"] as? NSNumber)?.doubleValue ?? 3)
         }
         vista.backgroundColor = escuro ? .black : .white
         tiles.backgroundColor = vista.backgroundColor
@@ -315,6 +316,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     func viewForZooming(in s: UIScrollView) -> UIView? { plano }
     /// ao aproximar (voltando do rosto), vai levando aos poucos até as fotos do começo
     private var escalaAnt: CGFloat = 0
+    private var ajuda: CGFloat = 3   // 0 = sem ajuda, 3 = como era, 10 = bem forte
     private func guiarVolta(_ s: UIScrollView) {
         let sc = s.zoomScale
         defer { escalaAnt = sc }
@@ -326,7 +328,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let sf = CGPoint(x: p.x - of.x, y: p.y - of.y)
         let u = min(1, max(0, log(sc) / log(max(1.0001, smax))))
         let alvo = CGPoint(x: p.x * sc - (sf.x + (q.x - sf.x) * u), y: p.y * sc - (sf.y + (q.y - sf.y) * u))
-        let k: CGFloat = 0.10 + 0.25 * u   // mais firme perto do fim
+        guard ajuda > 0 else { return }
+        let k: CGFloat = min(0.9, (0.10 + 0.25 * u) * ajuda / 3)   // mais firme perto do fim; a força vem do menu
         let o = s.contentOffset
         ajustando = true
         s.contentOffset = CGPoint(x: o.x + (alvo.x - o.x) * k, y: o.y + (alvo.y - o.y) * k)

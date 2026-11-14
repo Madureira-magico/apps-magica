@@ -143,6 +143,12 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             fila.async { responder(self.info(id), nil) }
         case "baixarRosto":
             baixarRosto(txt("url"), nome: txt("nome"), responder)
+        case "pele":
+            let n = txt("nome")
+            fila.async {
+                guard let im = UIImage(contentsOfFile: self.arq(n).path), let cg = self.normalizar(im, maior: 1600).cgImage else { return responder(NSNull(), nil) }
+                responder(self.corDaPele(cg) ?? NSNull(), nil)
+            }
         case "grade":
             let nome = txt("nome"), c = Int(num("cols", 40)), l = Int(num("rows", 80)), enq = txt("enq"), real = txt("real")
             fila.async { responder(self.grade(nome, cols: c, rows: l, enq: enq, real: real), nil) }
@@ -384,6 +390,19 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         return [r / 16, g / 16, b / 16]
     }
 
+    /// cor média da pele (bochechas e nariz, sem olhos e cabelo): [r, g, b]
+    private func corDaPele(_ cg: CGImage) -> [Int]? {
+        guard let b = acharRosto(cg) else { return nil }
+        let W = CGFloat(cg.width), H = CGFloat(cg.height)
+        let x = (b.minX + b.width * 0.25) * W, w = b.width * 0.5 * W
+        let yTopo = (1 - (b.minY + b.height * 0.55)) * H, h = b.height * 0.3 * H
+        guard w > 4, h > 4, let c = cg.cropping(to: CGRect(x: x, y: yTopo, width: w, height: h).integral) else { return nil }
+        let p = pixels(c, 4, 4)
+        var s = [0, 0, 0]
+        for i in 0..<16 { s[0] += Int(p[i * 4]); s[1] += Int(p[i * 4 + 1]); s[2] += Int(p[i * 4 + 2]) }
+        return s.map { $0 / 16 }
+    }
+
     private func acharRosto(_ cg: CGImage) -> CGRect? {
         let pedido = VNDetectFaceRectanglesRequest()
         try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([pedido])
@@ -437,7 +456,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
                 guard let jpg = pronta.jpegData(compressionQuality: 0.9), self.gravar(jpg, self.arq(nome)) else {
                     return r(nil, "não gravou")
                 }
-                r(["rosto": achou], nil)
+                var d: [String: Any] = ["rosto": achou]
+                if achou, let cg = pronta.cgImage, let p = self.corDaPele(cg) { d["pele"] = p }
+                r(d, nil)
             }
         }.resume()
     }
