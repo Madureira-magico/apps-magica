@@ -51,6 +51,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var z0Pinca: CGFloat = 3
     private var ajustando = false
     private var precisa = true
+    private var nivelVis: CGFloat = 3, nivelAnt: CGFloat?, trocaT0: CFTimeInterval = 0, atual = 0
     private var anim: (de: CGFloat, para: CGFloat, t0: CFTimeInterval, fim: () -> Void)?
 
     private let ZM0: CGFloat = 13, ZM1: CGFloat = 16.5
@@ -203,7 +204,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         vista.backgroundColor = escuro ? .black : .white
         magTiles.backgroundColor = vista.backgroundColor
         magTiles.reforco = reforco
-        if zerar { anc = nil; anim = nil; zoom = n0; doFim = 0; ox = 0; oy = 0 }
+        if zerar { anc = nil; anim = nil; zoom = n0; doFim = 0; ox = 0; oy = 0; nivelVis = n0; nivelAnt = nil }
         if !niveis.contains(where: { abs($0 - zoom) < 0.001 }) && !(temMag && zoom > ZM0) { zoom = nivelPerto(zoom) }
         if !temMag && zoom > niveis.last! { zoom = niveis.last! }
         montarRolador()
@@ -431,16 +432,19 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let b = mistura
         var usados = [0: false, 1: false]
         if b < 1 {
-            let L = niveis, z = min(zoom, ZM0)
-            if z <= L[0] || z >= L[L.count - 1] {
-                desenharNivel(z <= L[0] ? L[0] : L[L.count - 1], camadas[0], 1 - b); usados[0] = true
-            } else {
-                var a = L[0], c = L[1]
-                for k in 0..<(L.count - 1) where z >= L[k] && z <= L[k + 1] { a = L[k]; c = L[k + 1] }
-                let u = log(z / a) / log(c / a), ab = suave(0.2, 0.8, u)
-                desenharNivel(a, camadas[0], 1 - b); usados[0] = true
-                if ab > 0.001 { desenharNivel(c, camadas[1], ab * (1 - b)); usados[1] = true }
+            // como o app Fotos: a grade só troca de nível quando a pinça passa do meio do caminho,
+            // e a troca é uma dissolução rápida (0,2 s) — nunca as duas grades misturadas por muito tempo
+            let alvo = nivelBase
+            if alvo != nivelVis { nivelAnt = nivelVis; nivelVis = alvo; trocaT0 = CACurrentMediaTime(); atual = 1 - atual }
+            var p: CGFloat = 1
+            if nivelAnt != nil {
+                p = CGFloat(min(1, (CACurrentMediaTime() - trocaT0) / 0.2))
+                if p >= 1 { nivelAnt = nil } else { precisa = true }
             }
+            camadas[atual].zPosition = 1
+            camadas[1 - atual].zPosition = 0
+            desenharNivel(nivelVis, camadas[atual], p * (1 - b)); usados[atual] = true
+            if let ant = nivelAnt { desenharNivel(ant, camadas[1 - atual], 1 - b); usados[1 - atual] = true }
         }
         for (k, u) in usados where !u { limpar(camadas[k]) }
         // rosto ampliado
