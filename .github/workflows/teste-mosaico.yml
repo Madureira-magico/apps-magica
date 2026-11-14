@@ -1,0 +1,31 @@
+name: Teste Mosaico (simulador)
+on:
+  workflow_dispatch:
+jobs:
+  teste:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - name: Montar e rodar no simulador
+        run: |
+          T=build/teste; mkdir -p $T/App
+          cp teste/mosaico/Teste.swift apps/mosaico/extras/GaleriaNativa.swift $T/App/
+          cat > $T/project.yml <<Y
+          name: T
+          options: {deploymentTarget: {iOS: "15.0"}}
+          targets:
+            T:
+              type: application
+              platform: iOS
+              sources: [App]
+              info: {path: App/Info.plist, properties: {UILaunchScreen: {}}}
+              settings: {base: {PRODUCT_BUNDLE_IDENTIFIER: br.teste.mosaico, SWIFT_VERSION: "5.0", CODE_SIGNING_ALLOWED: NO}}
+          Y
+          cd $T && xcodegen generate
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print([x['udid'] for k,v in d.items() if 'iOS' in k for x in v if 'iPhone' in x['name']][-1])")
+          xcodebuild -project T.xcodeproj -scheme T -sdk iphonesimulator -destination "id=$UDID" -derivedDataPath dd build -quiet
+          xcrun simctl boot $UDID; xcrun simctl bootstatus $UDID
+          xcrun simctl install $UDID dd/Build/Products/Debug-iphonesimulator/T.app
+          ( timeout 180 xcrun simctl launch --console-pty $UDID br.teste.mosaico || true ) 2>&1 | tee saida.txt
+          grep -q "TUDO OK" saida.txt && echo "RESULTADO: OK" || { echo "RESULTADO: QUEBROU"; ls ~/Library/Logs/DiagnosticReports/ || true; for f in ~/Library/Logs/DiagnosticReports/T*; do head -c 20000 "$f"; done; }

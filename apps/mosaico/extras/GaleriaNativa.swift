@@ -17,7 +17,7 @@ final class GaleriaNativa: NSObject, UICollectionViewDataSource, UICollectionVie
     private let magImg = UIImageView()
     private let magTiles = TilesMosaico()
     private let corCamada = CALayer()
-    private var pinca: UIPinchGestureRecognizer!
+    private var pincaG: UIPinchGestureRecognizer!
     private var toque: UITapGestureRecognizer!
     private var link: CADisplayLink?
     private weak var web: WKWebView?
@@ -130,9 +130,9 @@ final class GaleriaNativa: NSObject, UICollectionViewDataSource, UICollectionVie
         webView.addSubview(capa)
         capa.addGestureRecognizer(grade.panGestureRecognizer)
         capa.addGestureRecognizer(rolador.panGestureRecognizer)
-        pinca = UIPinchGestureRecognizer(target: self, action: #selector(pincou(_:)))
-        pinca.delegate = self
-        capa.addGestureRecognizer(pinca)
+        pincaG = UIPinchGestureRecognizer(target: self, action: #selector(pincou(_:)))
+        pincaG.delegate = self
+        capa.addGestureRecognizer(pincaG)
         toque = UITapGestureRecognizer(target: self, action: #selector(tocou(_:)))
         toque.delegate = self
         capa.addGestureRecognizer(toque)
@@ -172,7 +172,7 @@ final class GaleriaNativa: NSObject, UICollectionViewDataSource, UICollectionVie
 
     private func atualizarGestos() {
         let pode = ligada && ativa
-        pinca.isEnabled = pode
+        pincaG.isEnabled = pode
         toque.isEnabled = pode
         grade.isScrollEnabled = pode && !modoMag && trans == nil
         rolador.isScrollEnabled = pode && emMag
@@ -406,7 +406,7 @@ final class GaleriaNativa: NSObject, UICollectionViewDataSource, UICollectionVie
 
     // MARK: gestos
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive t: UITouch) -> Bool { ligada && ativa }
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { g === pinca || o === pinca }
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { g === pincaG || o === pincaG }
 
     @objc private func tocou(_ g: UITapGestureRecognizer) {
         let p = g.location(in: vista)
@@ -414,22 +414,31 @@ final class GaleriaNativa: NSObject, UICollectionViewDataSource, UICollectionVie
     }
 
     @objc private func pincou(_ g: UIPinchGestureRecognizer) {
-        let p = g.location(in: vista)
-        switch g.state {
-        case .began:
+        let e = g.state == .began ? 0 : (g.state == .changed ? 1 : (g.state == .ended || g.state == .cancelled || g.state == .failed ? 2 : -1))
+        if e >= 0 { pinca(e, g.location(in: vista), g.scale) }
+    }
+    private var pincaViva = false, escalaViva: CGFloat = 1
+    /// e: 0 começou, 1 mudou, 2 soltou (também usado no teste automático)
+    func pinca(_ e: Int, _ p: CGPoint, _ escala: CGFloat) {
+        switch e {
+        case 0:
+            pincaViva = true; escalaViva = escala
             terminarAnim()
             grade.isScrollEnabled = false; rolador.isScrollEnabled = false
             let q = pontoAgora(p.x, p.y)
             anc = (q.i, q.fx, q.fy, p.x, p.y)
             baseNivel = modoMag ? zoom : nivel
-            baseEscala = g.scale
-        case .changed:
+            baseEscala = escala
+        case 1:
+            guard pincaViva else { return }
+            escalaViva = escala
             anc?.mx = p.x; anc?.my = p.y
-            let z = baseNivel / max(0.05, g.scale / baseEscala)   // colunas que a pinça pede
-            pincaMudou(z, g.scale)
-        case .ended, .cancelled, .failed:
+            let z = baseNivel / max(0.05, escala / baseEscala)   // colunas que a pinça pede
+            pincaMudou(z, escala)
+        default:
+            guard pincaViva else { return }
+            pincaViva = false
             soltou()
-        default: break
         }
     }
 
@@ -506,8 +515,7 @@ final class GaleriaNativa: NSObject, UICollectionViewDataSource, UICollectionVie
         zoom = nivel
         if let a = anc { gradeNaFoto(a.i, a.fy, a.my) }   // a foto presa continua embaixo dos dedos
         atualizarCelulas()
-        let ativo = pinca.state == .changed || pinca.state == .began
-        if ativo { baseEscala = pinca.scale } else { anc = nil }
+        if pincaViva { baseEscala = escalaViva } else { anc = nil }
         atualizarGestos()
         precisa = true
     }
