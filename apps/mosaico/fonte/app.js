@@ -338,10 +338,11 @@ async function prepararMosaico() {
   const porCor = (!texto && cfg.cor === 'cor' && NP) ? indiceCores(P) : null;
   // faixa da esquerda (3 colunas): as MESMAS fotos, no mesmo lugar, da Fototeca normal que o público já viu
   const k0 = +cfg.n0 || 3, M = seqNormal.length, uN = Math.floor((M - 1) / k0);
-  const cS = Math.floor((n - k0) / 2);   // no meio, para sumir dentro do rosto
-  const fL = Math.ceil(H / (W / k0)) * 3;   // só as últimas ~3 telas (o que o público viu); acima disso, fotos do mosaico
+  const cS = 0;   // a Fototeca de perto fica no canto esquerdo da grade grande (igual ao Mozaic)
+  const fL = ultima + 1;
   const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + (c - cS); return j >= 0 && j < M ? seqNormal[j] : ''; };
-  const nova = sN.slice(), ids = [], tinta = [];
+  const nova = sN.slice(), mz = new Array(N).fill(''), ids = [], tinta = [];
+  for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) nova[r * n + c] = faixa(r, c);   // camada 1: a Fototeca normal
   const cima = stPx() + 96, topo = Math.max(0, cima + (ultima + 1) * t - H);
   const janela = texto ? Math.max(2, Math.round(NP * 0.3)) : Math.max(2, Math.round(NP * 0.015));
   for (let r = primeira; r <= ultima; r++) {
@@ -352,10 +353,9 @@ async function prepararMosaico() {
       const cr = Math.min(255, Math.round((alvo[cel * 3] || 0) * kk)), cgc = Math.min(255, Math.round((alvo[cel * 3 + 1] || 0) * kk)), cb = Math.min(255, Math.round((alvo[cel * 3 + 2] || 0) * kk));
       let id = '';
       if (idx < N) {
-        if (c >= cS && c < cS + k0 && r > ultima - fL) { id = faixa(r, c); nova[idx] = id; }
-        else if (!NP) id = sN[idx];
+        if (!NP) id = sN[idx];
         else {
-          const esq = c > 0 ? nova[idx - 1] : '', cimaId = idx - n >= 0 ? nova[idx - n] : '';
+          const esq = c > 0 ? mz[idx - 1] : '', cimaId = idx - n >= 0 ? mz[idx - n] : '';
           if (porCor) {
             const cand = porCor(cr, cgc, cb);
             for (let k = 0; k < 8; k++) { id = cand[Math.floor(Math.random() * Math.min(6, cand.length))]; if (id !== esq && id !== cimaId) break; }
@@ -366,7 +366,7 @@ async function prepararMosaico() {
               id = porLuz[j].id; if (id !== esq && id !== cimaId) break;
             }
           }
-          nova[idx] = id;
+          mz[idx] = id;   // camada 2: o mosaico
         }
       }
       ids.push(id === '#piada' ? (arqPiada() ? 'arq:' + arqPiada() : '') : id);
@@ -736,7 +736,15 @@ function tocou(x, y) {
   if (i < 0 || i >= seq.length || !seq[i]) return;
   setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, noMosaico && cfg.fotoReal ? 330 : 0);
 }
-function tocouNativo(i, noMosaico) {
+function tocouNativo(i, noMosaico, emB) {
+  if (emB && comMosaico() && !emSelecao) {   // tocou numa foto do mosaico: abre essa foto
+    const id = mos.ids[i - mos.ini], j = id ? mos.normal.indexOf(id) : -1;
+    const agora = performance.now();
+    if (noMosaico && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
+    ultimoToque = agora;
+    if (j >= 0) setTimeout(() => { if (ultimoToque === agora) abrirFoto(i, j); }, noMosaico && cfg.fotoReal ? 330 : 0);
+    return;
+  }
   if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); enviarGaleria(); } return; }
   const agora = performance.now();
   if (noMosaico && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
@@ -821,18 +829,15 @@ function espiar(on) {
 
 /* lupa: busca (o nome digitado vira o famoso) */
 $('#lupa').addEventListener('click', () => { $('#busca').classList.add('on'); if (nativo) nat.call('galeria', { on: true, ativa: false }).catch(() => {}); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); });
-$('#bInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const v = $('#bInput').value.trim(); $('#bInput').blur();
-    if (v) { definirNome(v, 'busca'); $('#bMsg').innerHTML = '<b>Nenhum Resultado</b>Não há resultados para “' + esc(v) + '”. Tente uma nova pesquisa.'; }
-  }
-});
-$('#bCanc').addEventListener('click', () => {
+function fecharBusca(mandar) {   // janelinha "Pesquisar": o nome digitado vira o famoso (Cancelar também manda, escondido)
   const v = $('#bInput').value.trim(); $('#bInput').blur();
-  if (v && !$('#bMsg').innerHTML) definirNome(v, 'busca');
+  if (v && mandar !== false) definirNome(v, 'busca');
   $('#busca').classList.remove('on');
   if (nativo) nat.call('galeria', { on: telaAtual === 'fototeca', ativa: true }).catch(() => {});
-});
+}
+$('#bInput').addEventListener('keydown', e => { if (e.key === 'Enter') fecharBusca(); });
+$('#bCanc').addEventListener('click', () => fecharBusca());
+$('#bOk').addEventListener('click', () => fecharBusca());
 
 /* =====================================================================
    SELECIONAR e tirar fotos do app (nunca do iPhone)
@@ -1018,10 +1023,10 @@ function voar(de, para, src, fundoDe, fundoPara, fim) {
   setTimeout(() => { if (fim) fim(); setTimeout(() => { v.style.display = 'none'; }, 30); }, 360);
 }
 let abrindo = false;
-async function abrirFoto(i) {
+async function abrirFoto(i, jFixo) {
   if (abrindo) return; abrindo = true;
   listaVer();
-  const cel = i; i = verDeCel(cel); if (i < 0) { abrindo = false; return; }
+  const cel = i; i = jFixo != null ? jFixo : verDeCel(cel); if (i < 0) { abrindo = false; return; }
   verI = i; const it = vSeq[i];
   const de = nativo ? await rectNat(cel) : rectDoItem(cel), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
   let src = grandeEmCache(it) || srcMini(it);
@@ -1124,7 +1129,7 @@ $('#bSel').addEventListener('touchend', () => { selSegura = false; }, { passive:
 $('#bSel').addEventListener('touchcancel', () => { selSegura = false; }, { passive: true });
 window.__mzEvento = ev => {
   if (!ev || !ev.tipo) return;
-  if (ev.tipo === 'gTap') { tocouNativo(ev.i, !!ev.noMosaico); return; }
+  if (ev.tipo === 'gTap') { tocouNativo(ev.i, !!ev.noMosaico, !!ev.b); return; }
   if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) revelado = true; if (!naFace) animarReal(); return; }
   if (ev.tipo === 'gZoom') { realTrava = false; selSegura = false; animarReal(); return; }
   if (ev.tipo === 'volume') { if (telaAtual === 'fototeca' && podeReal()) { ultVol = performance.now(); animarReal(); } return; }
@@ -1201,6 +1206,7 @@ const IC_AJUSTES = 0, IC_NOTAS = 1, IC_FOTOS = 5, IC_INSTA = 18;
 function temInicio() { return !!(cfg.temFundo || cfg.icones.length); }
 function geoIcone(k) {   // grade de 4 colunas igual à do iPhone
   const lado = Math.round(W * 0.155), m = W * 0.068, gx = (W - 2 * m - 4 * lado) / 3, passo = Math.round(W * 0.262);
+  if (k >= 28) { const g = geoIcone(k - 28); return { x: g.x + W, y: g.y, lado: g.lado }; }
   if (k >= 24) { const d = k - 24; return { x: m + d * (lado + gx), y: H - Math.max(sbPx(), 20) - lado - 16, lado, doca: true }; }
   return { x: m + (k % 4) * (lado + gx), y: stPx() + 14 + Math.floor(k / 4) * passo, lado };
 }
@@ -1209,8 +1215,8 @@ function desenharInicio() {
   $('#iniFundo').style.backgroundImage = cfg.temFundo ? 'url("' + URLS.arq('inicio/fundo.jpg', cfg.ver) + '")' : '';
   let h = '';
   cfg.icones.forEach((a, k) => {
-    if (k >= 28) return;
-    const g = geoIcone(k), nome = k === IC_INSTA && atual ? atual.nome : (NOMES_IC[k] || '');
+    if (k >= 52) return;
+    const g = geoIcone(k), nome = k === IC_INSTA && atual ? atual.nome : (NOMES_IC[k] || (cfg.nomes2 && cfg.nomes2[k - 28]) || '');
     h += '<div class="ic" data-k="' + k + '" style="left:' + g.x + 'px;top:' + g.y + 'px;width:' + g.lado + 'px;height:' + g.lado + 'px">'
       + '<img src="' + URLS.arq('icones/' + a.id + '.jpg', cfg.ver) + '">'
       + (g.doca ? '' : '<div class="nm" style="top:' + (g.lado + 5) + 'px">' + esc(nome) + '</div>')
@@ -1223,9 +1229,27 @@ function desenharInicio() {
   b.style.display = cfg.icones.length ? 'flex' : 'none';
   b.style.top = ((doca ? g.y - 15 : H - Math.max(sbPx(), 20) - 20) - 42) + 'px';
 }
+/* deslizar para o lado na tela de início: mostra a página ao lado e volta sozinha */
+(function () {
+  const el = $('#inicio'); let x0 = 0, y0 = 0, dx = 0, modo = '';
+  const mover = (x, anim) => { const g = $('#iniGrade'); g.style.transition = anim ? 'transform .38s cubic-bezier(.25,.9,.3,1)' : 'none'; g.style.transform = 'translateX(' + x + 'px)'; };
+  el.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; modo = ''; }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    const t = e.touches[0]; dx = t.clientX - x0;
+    if (!modo && Math.hypot(dx, t.clientY - y0) > 10) modo = Math.abs(dx) > Math.abs(t.clientY - y0) ? 'lado' : 'outro';
+    if (modo === 'lado') mover(dx < 0 ? dx : dx * 0.3);
+  }, { passive: true });
+  el.addEventListener('touchend', () => {
+    if (modo !== 'lado') return;
+    if (dx < -W * 0.25) { mover(-W, true); setTimeout(() => mover(0, true), 1100); }   // vai para a página ao lado e volta sozinha
+    else mover(0, true);
+    el.dataset.arrastou = '1'; setTimeout(() => { el.dataset.arrastou = ''; }, 60);
+  }, { passive: true });
+})();
 function centroIcone(k) { const g = geoIcone(k); return { x: (g.x + g.lado / 2) / W, y: (g.y + g.lado / 2) / H }; }
 $('#inicio').addEventListener('click', e => {
   const ic = e.target.closest('.ic');
+  if ($('#inicio').dataset.arrastou) return;
   if (!temInicio()) { abrirAjustes(); return; }
   if (!ic) return;
   const k = +ic.dataset.k;
@@ -1462,7 +1486,7 @@ $('#aFundo').addEventListener('click', async () => {
 });
 $('#aIcones').addEventListener('click', async () => {
   try {
-    const r = await nat.call('escolherVarias', { pasta: 'icones', max: 28 });
+    const r = await nat.call('escolherVarias', { pasta: 'icones', max: 52 });
     if (Array.isArray(r) && r.length) { for (const a of cfg.icones) nat.call('apagar', { nome: 'icones/' + a.id + '.jpg' }).catch(() => {}); cfg.icones = r; cfg.ver++; salvar(); desenharInicio(); $('#aIcN').textContent = r.length + ' '; }
   } catch (_) {}
 });

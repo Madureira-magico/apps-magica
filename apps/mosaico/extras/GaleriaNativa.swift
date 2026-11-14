@@ -11,7 +11,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let capa = CapaToques()
     private let zoomer = UIScrollView()
     private let plano = UIView()
-    private let tiles = TilesMosaico()
+    private let tiles = TilesMosaico()      // camada 1: a Fototeca normal (grade grande)
+    private let tilesB = TilesMosaico()     // camada 2: o mosaico do rosto (aparece dissolvendo ao afastar)
+    private var bAtual: CGFloat = 0
     private let tinta = UIImageView()
     private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
     private let cobre = UIView()             // esconde as fotos de cima da cabeça quando o rosto aparece
@@ -81,6 +83,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.decelerationRate = .normal
         zoomer.addSubview(plano)
         plano.addSubview(tiles)
+        tilesB.isHidden = true
+        plano.addSubview(tilesB)
         tinta.layer.magnificationFilter = .nearest
         tinta.isUserInteractionEnabled = false
         plano.addSubview(tinta)
@@ -95,7 +99,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
         vista.layer.addSublayer(corCamada)
-        tiles.carregar = { [weak self] id, px, q in self?.imagem(id, px, q) }
+        tiles.carregar = { [weak self] id, px, q in self?.imagem(id, px, q, nil) }
+        tilesB.carregar = { [weak self] id, px, q in self?.imagem(id, px, q, true) }
         webView.insertSubview(vista, at: 0)
 
         capa.frame = webView.bounds
@@ -203,6 +208,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         vista.backgroundColor = escuro ? .black : .white
         tiles.backgroundColor = vista.backgroundColor
         tiles.cores = (escuro ? UIColor.black.cgColor : UIColor.white.cgColor, escuro ? UIColor(white: 0.12, alpha: 1).cgColor : UIColor(white: 0.9, alpha: 1).cgColor)
+        tilesB.backgroundColor = vista.backgroundColor
+        tilesB.cores = tiles.cores
         tiles.marcas = selecao ? selecionados : []
 
         // monta a imagem gigante
@@ -240,10 +247,15 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             UIView.animate(withDuration: 0.25, delay: 0.45, options: []) { foto.alpha = 0 } completion: { _ in foto.removeFromSuperview() }
         }
         let t = t0
-        tiles.dados = TilesMosaico.Dados(seq: seq, mos: mosIds, ini: ini, cols: C, linhas: linhas, t0: t)
+        tiles.dados = TilesMosaico.Dados(seq: seq, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
+        var idsB = [String](repeating: "", count: C * linhas)
+        if temMos { for (k, id) in mosIds.enumerated() where ini + k < idsB.count { idsB[ini + k] = id } }
+        tilesB.dados = TilesMosaico.Dados(seq: idsB, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
         zoomer.zoomScale = 1
         plano.frame = CGRect(x: 0, y: 0, width: W, height: CGFloat(linhas) * t)
         tiles.frame = plano.bounds
+        tilesB.frame = plano.bounds
+        tilesB.setNeedsDisplay()
         let faixa = CGRect(x: 0, y: CGFloat(primeira) * t, width: W, height: CGFloat(linhasMos) * t)
         tinta.frame = faixa
         magImg.frame = faixa
@@ -274,7 +286,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
 
     /// imagem pequenina com 1 ponto de cor por foto (a cor do rosto), esticada sem borrar
-    private var cS: Int { max(0, (C - Int(n0)) / 2) }
+    private var cS: Int { 0 }   // a Fototeca de perto fica no canto esquerdo da grade grande
     private func imagemTinta(_ soFaixa: Bool) -> UIImage? {
         guard mosCols > 0, linhasMos > 0, mosTinta.count >= 3 else { return nil }
         let w = mosCols, h = linhasMos
@@ -310,6 +322,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     /// rosto inteiro na tela: fica parado (só a pinça para aproximar funciona)
     private var travado = false
     private var trilho = false
+    private let usarTrilho = false
     private var ajustando = false
     private var dadosTrilho: (p: CGPoint, sf: CGPoint, ss: CGPoint, smax: CGFloat)?
     private func offsetInicio(_ smax: CGFloat) -> CGPoint {
@@ -321,6 +334,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         evento(["tipo": "gZoom"])
         trilho = false
         xTravado = nil
+        // pinça livre, presa nos dedos (como no Mozaic: puxa, pinça, puxa, pinça)
+        if !usarTrilho { return }
         guard temMos else { return }
         let smax = s.maximumZoomScale, oi = offsetInicio(smax), o = s.contentOffset
         let noInicio = abs(s.zoomScale - smax) < smax * 0.01 && abs(o.x - oi.x) < 6 && abs(o.y - oi.y) < 6
@@ -361,12 +376,18 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func suave(_ a: CGFloat, _ b: CGFloat, _ x: CGFloat) -> CGFloat { let u = min(1, max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u) }
     private func atualizar() {
         let v = visiveis, k = zoomer.zoomScale
-        let ramp = temMos ? suave(5, 13, v) : 0
+        let cc = CGFloat(C)
+        let b: CGFloat = temMos ? suave(0.22 * cc, 0.38 * cc, v) : 0   // dissolve da Fototeca para o mosaico
+        bAtual = b
+        tilesB.isHidden = b <= 0.001
+        tiles.isHidden = b >= 0.999
+        tilesB.alpha = b
+        let ramp = temMos ? suave(0.22 * cc, 0.6 * cc, v) * b : 0
         let mag: CGFloat = temMos ? min(1, max(0, (2.0 - k) / 0.6)) : 0
         CATransaction.begin(); CATransaction.setDisableActions(true)
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
-        tintaFaixa.alpha = 0.92 * suave(0.35 * CGFloat(C), 0.9 * CGFloat(C), v)
+        tintaFaixa.alpha = 0
         cobre.alpha = temMos ? suave(0.55 * CGFloat(C), 0.95 * CGFloat(C), v) : 0
         let face = temMos && v >= CGFloat(C) * 0.97
         if face != naFace { naFace = face; evento(["tipo": "gFace", "on": face]) }
@@ -417,7 +438,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     @objc private func tocou(_ g: UITapGestureRecognizer) {
         let p = g.location(in: vista)
         let i = indice(g.location(in: plano))
-        evento(["tipo": "gTap", "i": i, "x": p.x, "y": p.y, "noMosaico": temMos && visiveis > CGFloat(C) * 0.8])
+        evento(["tipo": "gTap", "i": i, "x": p.x, "y": p.y, "noMosaico": temMos && visiveis > CGFloat(C) * 0.8, "b": bAtual > 0.5])
     }
 
     // MARK: fotos (chamado pelos pedaços, fora da linha principal)
@@ -425,7 +446,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let travaPend = NSLock()
     private let filaImg: OperationQueue = { let q = OperationQueue(); q.maxConcurrentOperationCount = 4; q.qualityOfService = .userInitiated; return q }()
     /// devolve na hora a melhor foto que já tem (a miniatura do disco é instantânea) e busca a nítida por trás
-    func imagem(_ id: String, _ px: CGFloat, _ q: CGRect) -> CGImage? {
+    func imagem(_ id: String, _ px: CGFloat, _ q: CGRect, _ b: Bool?) -> CGImage? {
         let s = px <= 90 ? 64 : (px <= 300 ? 256 : 512)
         let k = "\(id)|\(s)" as NSString
         if let g = cache.object(forKey: k)?.img { return g }
@@ -444,7 +465,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
                 if let im = im { self.cache.setObject(Caixa(im), forKey: k, cost: im.width * im.height * 4) }
                 self.travaPend.lock(); self.pendentes.remove(k as String); if im == nil { self.falhas.insert(k as String) }; self.travaPend.unlock()
                 if im == nil { return }
-                DispatchQueue.main.async { self.tiles.setNeedsDisplay(q) }
+                DispatchQueue.main.async { if b == true { self.tilesB.setNeedsDisplay(q) } else { self.tiles.setNeedsDisplay(q) } }
             }
         }
         if s == 512, let g = cache.object(forKey: "\(id)|256" as NSString)?.img { return g }

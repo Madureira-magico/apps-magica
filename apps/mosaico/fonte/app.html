@@ -88,7 +88,13 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #fototeca.selecao #barraNormal{display:none}
 #barraSel .aba{color:var(--fg);font-weight:600}
 #barraSel .lixo{color:#ff453a}
-#busca{position:absolute;inset:0;background:var(--bg);display:none;z-index:20}
+#busca{position:absolute;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
+#busca .alerta{position:absolute;left:50%;top:36%;transform:translate(-50%,-50%);width:270px;border-radius:14px;background:var(--cel);color:var(--fg);text-align:center;overflow:hidden}
+#busca .atit{font-weight:600;font-size:17px;padding:19px 16px 12px}
+#busca input{width:calc(100% - 32px);margin:0 16px 16px;box-sizing:border-box;border:.5px solid rgba(128,128,128,.4);border-radius:7px;padding:7px 8px;font-size:15px;background:var(--cel2);color:var(--fg)}
+#busca .abts{display:flex;border-top:.5px solid rgba(128,128,128,.4)}
+#busca .abts div{flex:1;padding:11px 0;font-size:17px;color:#0a84ff}
+#busca .abts div+div{border-left:.5px solid rgba(128,128,128,.4);font-weight:600}
 #busca.on{display:block}
 .bbar{position:absolute;left:0;right:0;top:calc(var(--st) + 6px);display:flex;align-items:center;gap:10px;padding:0 16px}
 .bcampo{flex:1;height:44px;border-radius:22px;display:flex;align-items:center;gap:8px;padding:0 14px;color:var(--fg2)}
@@ -209,10 +215,12 @@ body:not(.claro) .nok{color:#000}
     <div class="redondo vid lixo" id="selLixo"><svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg></div>
   </div>
   <div class="canto" id="cTL"></div><div class="canto" id="cTR"></div><div class="canto" id="cBL"></div><div class="canto" id="cBR"></div>
-  <div id="busca">
-    <div class="bbar"><div class="bcampo vid"><svg width="18" height="18" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><path d="M17 17l6 6"/></svg><input id="bInput" type="text" placeholder="Pesquisar" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search"></div><div class="bcanc" id="bCanc">Cancelar</div></div>
-    <div class="bmsg" id="bMsg"></div>
-  </div>
+  <div id="busca"><div class="alerta">
+    <div class="atit">Pesquisar</div>
+    <input id="bInput" type="text" placeholder="Nome da celebridade" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <div class="abts"><div id="bCanc">Cancelar</div><div id="bOk">Pesquisar</div></div>
+    <div id="bMsg" style="display:none"></div>
+  </div></div>
 </div>
 
 <div class="tela" id="ver">
