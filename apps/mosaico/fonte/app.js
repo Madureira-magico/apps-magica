@@ -152,7 +152,7 @@ function montarSeq() {
   seqNormal = s;
   seq = (mos && mos.seq) ? mos.seq : seqNormal;
   $('#contagem').textContent = s.length + ' Itens';
-  pedirDesenho();
+  pedirDesenho(); enviarGaleria();
 }
 
 /* =====================================================================
@@ -356,7 +356,7 @@ async function prepararMosaico() {
   atual.pronto = true;
   $('#real').style.backgroundImage = atual.tipo === 'rosto' ? 'url("' + URLS.arq('real.jpg', versao) + '")' : '';
   mostrarAtual();
-  pedirDesenho();
+  pedirDesenho(); enviarGaleria();
 }
 prepararMosaico.vez = 0;
 
@@ -364,7 +364,7 @@ function limparNome() {
   preparo++; prepararMosaico.vez++;
   atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on');
   if (zoom > 5) irAoNivel(5);
-  mostrarAtual(); estado(''); pedirDesenho();
+  mostrarAtual(); estado(''); pedirDesenho(); enviarGaleria();
 }
 
 /* =====================================================================
@@ -452,7 +452,7 @@ function garantirVisivel(i) {   // grade parada: rola até a foto aparecer
   const topo = cimaPx() + Math.floor(i / n) * L.t - H / 2 + L.t / 2;
   doFim = Math.max(0, Math.min(Math.max(0, L.alt - H), L.alt - H - topo));
 }
-function irAoNivel(n) { cancelAnimationFrame(animZoom); anc = null; zoom = n; doFim = 0; pedirDesenho(); }
+function irAoNivel(n) { cancelAnimationFrame(animZoom); anc = null; zoom = n; doFim = 0; pedirDesenho(); if (nativo) nat.call('galeriaNivel', { n }).catch(() => {}); }
 
 function ajustarTamanho() {
   W = innerWidth; H = innerHeight;
@@ -511,7 +511,7 @@ let desenhoPedido = false;
 function pedirDesenho() { if (!desenhoPedido) { desenhoPedido = true; requestAnimationFrame(desenhar); } }
 function desenhar() {
   desenhoPedido = false;
-  if (!$('#fototeca').classList.contains('on')) return;
+  if (nativo || !$('#fototeca').classList.contains('on')) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.globalAlpha = 1; ctx.fillStyle = corFundo; ctx.fillRect(0, 0, W, H);
   const b = mistura();
@@ -704,7 +704,43 @@ function tocou(x, y) {
   if (i < 0 || i >= seq.length || !seq[i]) return;
   setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, noMosaico && cfg.fotoReal ? 330 : 0);
 }
+function tocouNativo(i, noMosaico) {
+  if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); enviarGaleria(); } return; }
+  const agora = performance.now();
+  if (noMosaico && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
+  ultimoToque = agora;
+  if (i < 0 || i >= seq.length || !seq[i]) return;
+  setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, noMosaico && cfg.fotoReal ? 330 : 0);
+}
 function alternarReal() { if (!cfg.fotoReal || !atual || atual.tipo !== 'rosto' || !mos) return; $('#real').classList.toggle('on'); }
+
+/* ---------- galeria nativa (Fototeca feita pelo próprio iPhone) ---------- */
+let nativo = false, envioPedido = false, zerarGal = true;
+function zonasGal() {
+  const z = [];
+  for (const s of ['#titulo', '#bOrdem', '#bSel', '#aba', '#meio', '#lupa', '#barraSel .redondo', '#barraSel .aba', '.canto']) {
+    $$(s).forEach(el => { const r = el.getBoundingClientRect(); if (r.width && r.height) z.push([r.left, r.top, r.width, r.height]); });
+  }
+  return z;
+}
+function enviarGaleria(zerar) {
+  if (!nativo) return;
+  if (zerar) zerarGal = true;
+  if (envioPedido) return;
+  envioPedido = true;
+  setTimeout(() => {
+    envioPedido = false;
+    const ap = arqPiada();
+    const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
+    const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, img: 'mosaico.jpg', v: String(mos.versao) } : null;
+    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on') };
+    nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
+    zerarGal = false;
+  }, 0);
+}
+async function rectNat(i) {
+  try { const r = await nat.call('galeriaRect', { i }); return r ? { x: r[0], y: r[1], w: r[2], h: r[3] } : null; } catch (_) { return null; }
+}
 
 /* cantos: trocar o bebê */
 [['#cTL', 0], ['#cTR', 1], ['#cBL', 2], ['#cBR', 3]].forEach(([s, k]) => {
@@ -752,7 +788,7 @@ function espiar(on) {
 }
 
 /* lupa: busca (o nome digitado vira o famoso) */
-$('#lupa').addEventListener('click', () => { $('#busca').classList.add('on'); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); });
+$('#lupa').addEventListener('click', () => { $('#busca').classList.add('on'); if (nativo) nat.call('galeria', { on: true, ativa: false }).catch(() => {}); $('#bMsg').innerHTML = ''; $('#bInput').value = ''; setTimeout(() => $('#bInput').focus(), 60); });
 $('#bInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const v = $('#bInput').value.trim(); $('#bInput').blur();
@@ -763,6 +799,7 @@ $('#bCanc').addEventListener('click', () => {
   const v = $('#bInput').value.trim(); $('#bInput').blur();
   if (v && !$('#bMsg').innerHTML) definirNome(v, 'busca');
   $('#busca').classList.remove('on');
+  if (nativo) nat.call('galeria', { on: telaAtual === 'fototeca', ativa: true }).catch(() => {});
 });
 
 /* =====================================================================
@@ -773,11 +810,11 @@ $('#bSel').addEventListener('click', () => { if (emSelecao) sairSelecao(); else 
 function entrarSelecao() {
   if (zoom > 5) irAoNivel(5);
   emSelecao = true; selecionados.clear(); $('#fototeca').classList.add('selecao');
-  $('#bSel').textContent = 'Cancelar'; $('#tituloTxt').textContent = 'Selecionar Itens'; contarSelecao(); pedirDesenho();
+  $('#bSel').textContent = 'Cancelar'; $('#tituloTxt').textContent = 'Selecionar Itens'; contarSelecao(); pedirDesenho(); setTimeout(() => enviarGaleria(), 30);
 }
 function sairSelecao() {
   emSelecao = false; selecionados.clear(); $('#fototeca').classList.remove('selecao');
-  $('#bSel').textContent = 'Selecionar'; $('#tituloTxt').textContent = 'Fototeca'; pedirDesenho();
+  $('#bSel').textContent = 'Selecionar'; $('#tituloTxt').textContent = 'Fototeca'; pedirDesenho(); setTimeout(() => enviarGaleria(), 30);
 }
 function contarSelecao() { const n = selecionados.size; $('#selConta').textContent = n ? n + (n === 1 ? ' Item Selecionado' : ' Itens Selecionados') : 'Selecionar Itens'; }
 $('#selLixo').addEventListener('click', () => {
@@ -892,7 +929,7 @@ let abrindo = false;
 async function abrirFoto(i) {
   if (abrindo) return; abrindo = true;
   verI = i; const it = seq[i];
-  const de = rectDoItem(i), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
+  const de = nativo ? await rectNat(i) : rectDoItem(i), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
   const src = grandeEmCache(it) || (it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : URLS.mini(it));
   $('#ver').classList.remove('limpo');
   if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
@@ -904,9 +941,9 @@ async function fecharFoto() {
   const src = im && im.src ? im.src : '';
   const [fw, fh] = await tamanhoFoto(it), de = encaixe(fw, fh);
   mostrar('fototeca');
-  garantirVisivel(verI);
-  desenhar();
-  const para = rectDoItem(verI);
+  let para;
+  if (nativo) { await nat.call('galeriaVer', { i: verI }).catch(() => {}); para = await rectNat(verI); }
+  else { garantirVisivel(verI); desenhar(); para = rectDoItem(verI); }
   if (!para || !src) return;
   voar(de, para, src, 1, 0, null);
 }
@@ -969,6 +1006,7 @@ const PALAVRAS_SOBRA = new Set(('o a os as e é de da do dos das um uma esse ess
   'ele ela the bebe bebê desenhado desenhada desenho quando pequeno pequena com meses mes foto ne né tá ta que quem').split(' ').map(semAcento));
 window.__mzEvento = ev => {
   if (!ev || !ev.tipo) return;
+  if (ev.tipo === 'gTap') { tocouNativo(ev.i, !!ev.noMosaico); return; }
   if (ev.tipo === 'texto' && camLigada) {
     const linhas = (ev.linhas || []).filter(l => l && l.t);
     let f = acharFamosoEm(linhas.map(l => l.t).join(' '));
@@ -1093,6 +1131,7 @@ function mostrar(id, guardaAnterior) {
   if (guardaAnterior && telaAtual && telaAtual !== id && telaAtual !== 'ajustes' && telaAtual !== 'marcar') telaAnterior = telaAtual;
   $$('.tela').forEach(t => t.classList.toggle('on', t.id === id));
   telaAtual = id;
+  if (nativo) { document.documentElement.classList.toggle('transp', id === 'fototeca'); nat.call('galeria', { on: id === 'fototeca', ativa: !$('#busca').classList.contains('on') }).catch(() => {}); if (id === 'fototeca') enviarGaleria(); }
   const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
   nat.msg('barra', id === 'marcar');
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
@@ -1106,7 +1145,7 @@ $('#aFecha').addEventListener('click', () => {
 });
 function aplicarTema() {
   const claro = !escuroAgora();
-  document.body.classList.toggle('claro', claro); corFundo = claro ? '#fff' : '#000';
+  document.body.classList.toggle('claro', claro); corFundo = claro ? '#fff' : '#000'; enviarGaleria();
   if (telaAtual) mostrar(telaAtual);
   pedirDesenho();
 }
@@ -1227,13 +1266,13 @@ $('#aCor').addEventListener('change', e => { cfg.cor = e.target.value; refazer()
 $('#aEnq').addEventListener('change', e => { cfg.enq = e.target.value; refazer(); });
 $('#aFiltro').addEventListener('change', e => { cfg.filtro = e.target.checked; refazer(); });
 $('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%'; });
-$('#aRef').addEventListener('change', refazer);
+$('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });
 $('#aTema').addEventListener('change', e => { cfg.tema = e.target.value; salvar(); aplicarTema(); });
-$('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; zoom = cfg.n0; doFim = 0; salvar(); montarSeq(); if (atual) prepararMosaico(); });
+$('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; zoom = cfg.n0; doFim = 0; enviarGaleria(true); salvar(); montarSeq(); if (atual) prepararMosaico(); });
 $('#aPrint').addEventListener('click', async () => {
   try { const r = await nat.call('escolher', { nome: 'inicio/print.jpg', rosto: false }); if (r && r.ok) { cfg.temPrint = true; cfg.ver++; salvar(); aplicarPrint(); iniciarMarcar(); } } catch (_) {}
 });
@@ -1277,8 +1316,13 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { in
 /* =====================================================================
    INÍCIO
    ===================================================================== */
-window.addEventListener('resize', () => { ajustarTamanho(); });
+window.addEventListener('resize', () => { ajustarTamanho(); enviarGaleria(); });
+async function testarNativo() {
+  if (!nat.tem) return;
+  try { await nat.call('galeriaEstado'); nativo = true; document.documentElement.classList.add('galNat'); enviarGaleria(true); if (telaAtual) mostrar(telaAtual); } catch (_) { nativo = false; }
+}
 function iniciar() {
+  testarNativo();
   ajustarTamanho(); aplicarTema(); aplicarPrint();
   zoom = +cfg.n0 || 3;
   mostrar(cfg.abrir === 'inicio' && cfg.temPrint ? 'inicio' : 'fototeca');

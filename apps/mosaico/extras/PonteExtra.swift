@@ -58,7 +58,12 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         web = webView
         self.tela = tela
         esconderBarraDoTeclado(webView)
+        galeria.urlMini = { [weak self] id in self?.nomeMini(id) ?? URL(fileURLWithPath: "/") }
+        galeria.urlArq = { [weak self] n in self?.arq(n) ?? URL(fileURLWithPath: "/") }
+        galeria.evento = { [weak self] d in self?.evento(d) }
+        galeria.instalar(em: webView)
     }
+    private let galeria = GaleriaNativa()
 
     /// Tira a barrinha "∧ ∨ OK" que o iPhone põe em cima do teclado (o Notas falso tem a própria barra).
     private func esconderBarraDoTeclado(_ webView: WKWebView) {
@@ -173,7 +178,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             pararVoz(avisar: false)
             responder(true, nil)
         default:
-            responder(nil, "recado desconhecido: \(cmd)")
+            if !galeria.recado(cmd, m, responder) { responder(nil, "recado desconhecido: \(cmd)") }
         }
     }
 
