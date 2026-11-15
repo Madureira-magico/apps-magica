@@ -439,12 +439,26 @@ async function prepararMosaico() {
   const meu = ++prepararMosaico.vez;
   const n = atual.tipo === 'texto' ? colsTexto(atual.nome) : (+cfg.colsM || 60), t = W / n;
   const rowsVis = Math.ceil(H / t) + 1;
+  const k00 = +cfg.n0 || 3, G = Math.ceil(H / (W / k00)) + 1;   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
   let sN = seqNormal.slice();
-  if (sN.length < rowsVis * n) sN = new Array(rowsVis * n - sN.length).fill('').concat(sN);   // galeria pequena: repete fotos
+  const precisa = (rowsVis + G + 2) * n;
+  if (sN.length < precisa) sN = new Array(precisa - sN.length).fill('').concat(sN);   // galeria pequena: lugares a mais (preenchidos abaixo)
   if (sN.length % n) sN = new Array(n - sN.length % n).fill('').concat(sN);   // última linha sempre cheia
+  // lugares vazios recebem fotos da galeria repetidas e embaralhadas (nunca branco; nunca a mesma foto do lado ou em cima)
+  {
+    const fonte = seqNormal.filter(id => id && id !== '#piada' && !String(id).startsWith('arq:'));
+    if (fonte.length) {
+      let saco = [], k = 0;
+      const tirar = () => { if (k >= saco.length) { saco = fonte.slice(); for (let i = saco.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [saco[i], saco[j]] = [saco[j], saco[i]]; } k = 0; } return saco[k++]; };
+      for (let i = 0; i < sN.length; i++) if (!sN[i]) {
+        const esq = i % n ? sN[i - 1] : '', cimaId = i >= n ? sN[i - n] : '';
+        let id = tirar(); for (let tt = 0; tt < 4 && fonte.length > 2 && (id === esq || id === cimaId); tt++) id = tirar();
+        sN[i] = id;
+      }
+    }
+  }
   const N = sN.length;
   if (!N) return;
-  const k00 = +cfg.n0 || 3, G = Math.ceil(H / (W / k00)) + 1;   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
   const ultima = Math.floor((N - 1) / n), ultimaF = Math.max(0, ultima - G), primeira = Math.max(0, ultimaF - rowsVis + 1), linhas = ultimaF - primeira + 1;
   const rg = Math.ceil(H / t);
   let alvo = [];
@@ -468,7 +482,7 @@ async function prepararMosaico() {
   const fL = ultima + 1;
   const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + (c - cS); return j >= 0 && j < M ? seqNormal[j] : ''; };
   const nova = sN.slice(), mz = new Array(N).fill(''), ids = [], tinta = [];
-  for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) nova[r * n + c] = faixa(r, c);   // camada 1: a Fototeca normal
+  for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) { const f = faixa(r, c); if (f) nova[r * n + c] = f; }   // camada 1: a Fototeca normal (sem buraco no alto)
   const cima = stPx() + 96, topo = Math.max(0, cima + (ultimaF + 1) * t - H);
   const janela = texto ? Math.max(2, Math.round(NP * 0.06)) : Math.max(2, Math.round(NP * 0.015));   // nome escrito: só as mais claras e as mais escuras
   for (let r = primeira; r <= ultimaF; r++) {

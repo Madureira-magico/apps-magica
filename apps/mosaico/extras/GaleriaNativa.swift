@@ -458,7 +458,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func atualizar() {
         let v = visiveis, k = zoomer.zoomScale
         let cc = CGFloat(C)
-        var b: CGFloat = 0, ramp: CGFloat = 0, segura: CGFloat = 1
+        var b: CGFloat = 0, ramp: CGFloat = 0, segura: CGFloat = 1, cobreIni: CGFloat = 0.55 * cc
         if temMos && trocaNova {
             // igual ao original: as fotos ficam com as cores de verdade enquanto dá para ver cada uma;
             // pequenininhas, viram as fotinhas do mosaico (rápido) e só depois a cor pinta o rosto.
@@ -468,6 +468,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             b = suave(ini, fim, v)
             ramp = suave(fim, max(fim + 0.05 * cc, 0.9 * cc), v) * b
             segura = suave(fim, min(0.95 * cc, fim + 0.15 * cc), v)   // o rosto pronto (já pintado) só entra depois das fotinhas
+            cobreIni = min(0.9 * cc, max(0.55 * cc, fim + 0.12 * cc))     // a cobertura de cima da cabeça só no fim, junto com o rosto
         } else if temMos {
             b = suave(0.22 * cc, 0.38 * cc, v)   // dissolve da Fototeca para o mosaico (como na 3.11)
             ramp = suave(0.22 * cc, 0.6 * cc, v) * b
@@ -481,7 +482,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
         tintaFaixa.alpha = 0
-        cobre.alpha = temMos ? suave(0.55 * CGFloat(C), 0.95 * CGFloat(C), v) : 0
+        cobre.alpha = temMos ? suave(cobreIni, 0.97 * cc, v) : 0
         cobreBaixo.alpha = cobre.alpha
         let face = temMos && v >= CGFloat(C) * 0.97
         if face != naFace { naFace = face; evento(["tipo": "gFace", "on": face]) }
