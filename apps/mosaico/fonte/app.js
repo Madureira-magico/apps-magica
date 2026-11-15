@@ -253,8 +253,17 @@ async function definirNome(txt, origem) {
       if (meu !== preparo) return;
       if (certo && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
         let g = acharFamoso(certo);
+        const fotosIA = perguntarIA.fotos || [];
         if (!g || !g.f) g = await baixarFamoso(g || { n: certo, w: '', a: [], b: -1, f: '', r: null }, !g, false);
         if (meu !== preparo) return;
+        if (!g && fotosIA.length) {      // a Wikipédia não tem foto: usa a que o intermediário mandou
+          const novo = { n: certo, w: '', a: [], b: -1, f: '', r: null }, nomeArq = 'famosos/' + slug(certo) + '.jpg';
+          for (const u of fotosIA.slice(0, 3)) {
+            try { const r = await nat.call('baixarRosto', { url: u, nome: nomeArq }); novo.f = nomeArq; novo.r = !!(r && r.rosto); if (r && Array.isArray(r.pele)) novo.p = r.pele; if (novo.r) break; } catch (_) {}
+          }
+          if (novo.f) { famosos.push(novo); salvarFam(); g = novo; }
+          if (meu !== preparo) return;
+        }
         if (g) {                         // aprende: da próxima vez já sai da lista
           if (!(g.a || []).some(x => semAcento(x) === semAcento(limpo))) { g.a = (g.a || []).concat(limpo.toLowerCase()); salvarFam(); }
           fam = g; escolherBebe(g, g.n);
@@ -1657,15 +1666,28 @@ $('#aFundoOrig').addEventListener('click', () => { cfg.temFundo = false; cfg.ver
    ===================================================================== */
 const baseWk = () => { let w = String(cfg.wk || '').trim(); if (w && !/^https?:\/\//.test(w)) w = 'https://' + w; return w.replace(/\/+$/, ''); };
 const IA_PADRAO = 'O texto "{x}" é o nome de uma pessoa famosa, talvez escrito errado, por apelido ou incompleto. Responda apenas com o nome completo correto como ela é mais conhecida, sem aspas, sem explicação. Se não souber, repita o texto.';
+async function pegarJSON(u, ms) {   // pelo iPhone (sem bloqueio de outro site); no navegador, fetch normal
+  if (nat.tem) { const r = await nat.call('pegar', { url: u, tempo: ms / 1000 }); return JSON.parse(r.texto); }
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
+  try { const r = await fetch(u, { cache: 'no-store', signal: ac.signal }); return await r.json(); } finally { clearTimeout(t); }
+}
+/* aceita os dois intermediários: o do Listas (/ai?q=&p=) e o do app famosos (?nome=) */
 async function perguntarIA(q) {
-  const w = baseWk(), p = String(cfg.iaPrompt || IA_PADRAO).trim(); if (!w || !q) return '';
-  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 15000);
-  try {
-    const r = await fetch(w + '/ai?q=' + encodeURIComponent(q) + '&p=' + encodeURIComponent(p), { cache: 'no-store', signal: ac.signal });
-    const d = await r.json(); const a = String((d && d.answer) || '').split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim();
-    const e = $('#aIaUlt'); if (e) e.textContent = q + ' → ' + (a || '?');
-    return a;
-  } catch (_) { return ''; } finally { clearTimeout(t); }
+  const w = baseWk(), p = String(cfg.iaPrompt || IA_PADRAO).trim(); perguntarIA.fotos = [];
+  if (!w || !q) return '';
+  const limpa = x => String(x || '').split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim();
+  let a = '';
+  const doListas = async () => { const d = await pegarJSON(w + '/ai?q=' + encodeURIComponent(q) + '&p=' + encodeURIComponent(p), 15000); return d && !d.error ? limpa(d.answer) : ''; };
+  const doFamosos = async () => {
+    const d = await pegarJSON(w + (w.includes('?') ? '&' : '?') + 'nome=' + encodeURIComponent(q), 20000);
+    if (!d || d.erro) return '';
+    perguntarIA.fotos = (Array.isArray(d.fotos) ? d.fotos : []).map(f => typeof f === 'string' ? f : (f && (f.url || f.src))).filter(Boolean);
+    return limpa(d.nome_canonico || d.nome);
+  };
+  const ordem = /famosos/i.test(w) ? [doFamosos, doListas] : [doListas, doFamosos];
+  for (const f of ordem) { try { a = await f(); } catch (_) { a = ''; } if (a) break; }
+  const e = $('#aIaUlt'); if (e) e.textContent = q + ' → ' + (a || '?');
+  return a;
 }
 async function lerInject() {   // direto no Inject (11z.co), sem intermediário
   const u = 'https://11z.co/_w/' + encodeURIComponent(cfg.injId) + '/selection?_=' + Date.now();
