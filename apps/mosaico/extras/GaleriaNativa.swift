@@ -181,7 +181,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             realImg.alpha = max(0, min(1, num("a", 0)))
             r(true, nil)
         case "galeriaEstado":
-            r(["zoom": visiveis, "mag": temMos && visiveis > 13.5, "k": zoomer.zoomScale], nil)
+            r(["zoom": visiveis, "mag": temMos && visiveis > 13.5, "k": zoomer.zoomScale,
+               "C": C, "seq": seq.count, "linhas": linhas, "mos": temMos, "ligada": ligada, "oculta": vista.isHidden,
+               "y": Int(zoomer.contentOffset.y), "alt": Int(zoomer.contentSize.height), "planoH": Int(plano.bounds.height)], nil)
         default:
             return false
         }
@@ -189,6 +191,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
 
     private func ligar(_ on: Bool) {
+        if on && !ligada && mudouFechada { mudouFechada = false; tiles.setNeedsDisplay() }   // mudou com a galeria fechada: redesenha ao abrir
         ligada = on
         if let w = web, on {
             w.isOpaque = false
@@ -288,7 +291,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         atualizar()
     }
 
+    private var mudouFechada = false
     private func montarPlano() {
+        if !ligada { mudouFechada = true }
         // segura a imagem antiga na tela enquanto a nova se desenha (sem piscar branco)
         if ligada, !vista.isHidden, plano.bounds.width > 0, let foto = vista.snapshotView(afterScreenUpdates: false) {
             vista.addSubview(foto)
@@ -299,6 +304,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         var seq1 = seq
         if temMos { for (k, id) in mosIds.enumerated() where ini + k < seq1.count && !id.isEmpty { seq1[ini + k] = id } }
         tiles.dados = TilesMosaico.Dados(seq: seq1, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
+        if temMos { aquecer(seq1) }
         var idsB = [String](repeating: "", count: C * linhas)
         if temMos { for (k, id) in mosIds.enumerated() where ini + k < idsB.count { idsB[ini + k] = id } }
         tilesB.dados = TilesMosaico.Dados(seq: idsB, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
@@ -564,6 +570,24 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         guard let mini = carregar(id, 64) else { return nil }
         cache.setObject(Caixa(mini), forKey: "\(id)|64" as NSString, cost: mini.width * mini.height * 4)
         return mini
+    }
+    /// carrega por trás as miniaturas de todas as fotos do mosaico: na pinça elas já estão prontas (sem blocos brancos)
+    private var aquecida = ""
+    private func aquecer(_ ids: [String]) {
+        let chave = "\(mosV)|\(ids.count)"
+        guard chave != aquecida else { return }
+        aquecida = chave
+        let unicos = Array(Set(ids.filter { !$0.isEmpty }))
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            for id in unicos {
+                guard let self = self, self.aquecida == chave else { return }
+                let k = "\(id)|64" as NSString
+                if self.cache.object(forKey: k) != nil { continue }
+                autoreleasepool {
+                    if let im = self.carregar(id, 64) { self.cache.setObject(Caixa(im), forKey: k, cost: im.width * im.height * 4) }
+                }
+            }
+        }
     }
     private func carregar(_ id: String, _ s: Int) -> CGImage? {
         if id.hasPrefix("arq:") {

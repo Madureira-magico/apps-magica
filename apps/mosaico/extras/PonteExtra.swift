@@ -143,6 +143,12 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             fila.async { responder(self.info(id), nil) }
         case "baixarRosto":
             baixarRosto(txt("url"), nome: txt("nome"), responder)
+        case "telaCobrir":   // congela o que está na tela (a tela de início) por cima de tudo, para trocar por baixo
+            telaCobrir(); responder(true, nil)
+        case "telaAbrir":    // o app novo cresce do ícone até a tela cheia, por cima da tela de início
+            telaAbrir(CGFloat(num("x", 0)), CGFloat(num("y", 0)), CGFloat(num("s", 60)), responder)
+        case "telaFechar":   // o app encolhe até o ícone, com a tela de início por trás
+            telaFechar(CGFloat(num("x", 0)), CGFloat(num("y", 0)), CGFloat(num("s", 60)), responder)
         case "pegar":   // texto de um endereço, sem bloqueio de outro site (Inject direto)
             guard let url = URL(string: txt("url")) else { return responder(nil, "endereço inválido") }
             var pedido = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: max(2, num("tempo", 6)))
@@ -200,6 +206,65 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             responder(true, nil)
         default:
             if !galeria.recado(cmd, m, responder) { responder(nil, "recado desconhecido: \(cmd)") }
+        }
+    }
+
+    // MARK: abrir e fechar apps como no iPhone (cresce do ícone / encolhe até o ícone)
+    private var capaTela: UIView?
+    private func janela() -> UIWindow? { web?.window }
+    private func telaCobrir() {
+        capaTela?.removeFromSuperview(); capaTela = nil
+        guard let w = web, let jan = janela(), let foto = w.snapshotView(afterScreenUpdates: false) else { return }
+        foto.frame = w.convert(w.bounds, to: jan)
+        jan.addSubview(foto)
+        capaTela = foto
+    }
+    private func telaAbrir(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat, _ r: @escaping Resposta) {
+        guard let w = web, let jan = janela() else { capaTela?.removeFromSuperview(); capaTela = nil; return r(true, nil) }
+        // o app novo já está desenhado por baixo da capa: tira uma foto dele e faz ela crescer do ícone
+        guard let novo = w.snapshotView(afterScreenUpdates: true) else { capaTela?.removeFromSuperview(); capaTela = nil; return r(true, nil) }
+        let B = w.convert(w.bounds, to: jan)
+        novo.frame = B
+        novo.layer.masksToBounds = true
+        jan.addSubview(novo)
+        let k = max(0.05, s / B.width)
+        novo.transform = CGAffineTransform(translationX: x - B.midX, y: y - B.midY).scaledBy(x: k, y: k)
+        novo.layer.cornerRadius = 0.2237 * s / k
+        novo.alpha = 0.4
+        r(true, nil)
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.2, options: [.curveEaseOut]) {
+            novo.transform = .identity
+            novo.alpha = 1
+        }
+        let raio = CABasicAnimation(keyPath: "cornerRadius")
+        raio.fromValue = 0.2237 * s / k; raio.toValue = 0; raio.duration = 0.42
+        raio.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        novo.layer.cornerRadius = 0
+        novo.layer.add(raio, forKey: "raio")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) { [weak self] in
+            novo.removeFromSuperview()
+            self?.capaTela?.removeFromSuperview(); self?.capaTela = nil
+        }
+    }
+    private func telaFechar(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat, _ r: @escaping Resposta) {
+        guard let w = web, let jan = janela(), let velho = w.snapshotView(afterScreenUpdates: false) else { return r(true, nil) }
+        let B = w.convert(w.bounds, to: jan)
+        velho.frame = B
+        velho.layer.masksToBounds = true
+        jan.addSubview(velho)
+        r(true, nil)   // a página já pode trocar para a tela de início por baixo
+        let k = max(0.05, s / B.width)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
+            UIView.animate(withDuration: 0.42, delay: 0, usingSpringWithDamping: 0.92, initialSpringVelocity: 0, options: [.curveEaseInOut]) {
+                velho.transform = CGAffineTransform(translationX: x - B.midX, y: y - B.midY).scaledBy(x: k, y: k)
+            }
+            UIView.animate(withDuration: 0.16, delay: 0.26, options: [.curveEaseIn]) { velho.alpha = 0 }
+            let raio = CABasicAnimation(keyPath: "cornerRadius")
+            raio.fromValue = 0; raio.toValue = 0.2237 * s / k; raio.duration = 0.36
+            raio.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            velho.layer.cornerRadius = 0.2237 * s / k
+            velho.layer.add(raio, forKey: "raio")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.46) { velho.removeFromSuperview() }
         }
     }
 

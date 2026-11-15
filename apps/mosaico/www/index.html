@@ -342,6 +342,7 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Usar<select id="aOrigem"><option value="">Todas as fotos</option></select></div>
     <div class="lin">Preparar para o mosaico<select id="aLimite"><option value="3000">3.000 mais recentes</option><option value="5000">5.000 mais recentes</option><option value="8000">8.000 mais recentes</option><option value="12000">12.000 mais recentes</option></select></div>
     <div class="lin"><span class="estado" id="aAnalise">—</span><button class="bt cinza" id="aReanalisar" style="margin-left:auto">Atualizar</button></div>
+    <div class="lin" style="display:block"><div style="font-size:13px;color:#8e8e93">Diagnóstico (última abertura)</div><div id="aDiag" style="font-size:12px;color:#8e8e93;margin-top:4px">—</div></div>
     <div class="lin"><span class="estado" id="aTirados">—</span><button class="bt cinza" id="aDevolver" style="margin-left:auto">Devolver todas</button></div>
   </div><div class="nota">Fotos tiradas pela lixeira ou por Selecionar somem só do app, nunca do iPhone.</div></div>
 
@@ -831,7 +832,7 @@ async function analisarFotos() {
   }
   analisando = false;
   mostrarAnalise(alvo.length, alvo.length);
-  if (atual && atual.pronto) prepararMosaico();
+  if (atual && atual.pronto && !mos) prepararMosaico();   // mosaico pronto não muda sozinho (só com um nome novo)
 }
 function mostrarAnalise(f, t) {
   const e = $('#aAnalise'); if (!e) return;
@@ -1958,9 +1959,18 @@ function passoReal(t) {
 let realNatA = -1;
 function mudarRealNat(a) { a = Math.round(a * 100) / 100; if (a === realNatA) return; realNatA = a; nat.call('galeriaReal', { a }).catch(() => {}); }
 function animarReal() { if (!realLoop) { realT = 0; realLoop = requestAnimationFrame(passoReal); } }
-function saiuDasFotos() {   // depois de mostrar o rosto inteiro, ao sair das Fotos começa tudo do zero
+function saiuDasFotos() {   // o mosaico fica guardado: dá para voltar e mostrar de novo (só muda com um nome novo)
   realTrava = false; realP = 0; $('#real').style.opacity = 0; if (nativo) mudarRealNat(0);
-  if (revelado) { revelado = false; limparNome(); }
+  revelado = false;
+}
+/* diagnóstico da galeria (Ajustes › Fototeca): como ela estava na última vez que abriu */
+async function guardarDiag() {
+  if (!nativo) return;
+  try {
+    const e = await nat.call('galeriaEstado');
+    const t = fmtHora.format(new Date()) + ' · col ' + e.C + ' · fotos ' + e.seq + ' · ' + (e.mos ? 'mosaico' : 'normal') + ' · ' + (e.ligada ? 'aberta' : 'FECHADA') + (e.oculta ? ' OCULTA' : '') + ' · y ' + e.y + '/' + e.alt + ' · zoom ' + Math.round(e.zoom);
+    guarda.set('diag', t); const d = $('#aDiag'); if (d) d.textContent = t;
+  } catch (_) {}
 }
 $('#bSel').addEventListener('touchstart', () => { if (podeReal()) { selSegura = true; animarReal(); } }, { passive: true });
 $('#bSel').addEventListener('touchend', () => { selSegura = false; }, { passive: true });
@@ -2066,6 +2076,7 @@ const PI = {
   bolinha: { x: 0.6900, y: 0.5637, d: 0.0642 },
   hora: [0.0800, 0.0190, 0.2850, 0.0550], bat: [0.6950, 0.0190, 0.9350, 0.0550]   // hora e bateria do print
 };
+if (!cfg.a319) { cfg.a319 = true; cfg.ajuda = 0; }   // 3.19: ajuda na volta desligada (a galeria já é o mosaico)
 if (!cfg.r316) { cfg.r316 = true; cfg.reforco = 0.15; }   // 3.16: pintura fraca (as próprias fotos formam o rosto)
 if (!cfg.ini36) { cfg.ini36 = true; cfg.temFundo = false; }   // 3.6: começa com o papel de parede original
 function temInicio() { return true; }   // a tela de início já vem pronta dentro do app (ícones transparentes)
@@ -2145,7 +2156,24 @@ $('#inicio').addEventListener('click', e => {
   else if (perto(PI.notas)) abrirDoIcone('notas', PI.notas);
   else if (perto(PI.fotos)) abrirDoIcone('fototeca', PI.fotos);
 });
-function abrirDoIcone(qual, p) {
+/* posição do ícone na tela (centro e tamanho), para o app crescer dele e voltar para ele */
+function iconeNaTela(p) { return { x: pal.x + p.x * pal.w, y: pal.y + p.y * pal.h, s: 0.1588 * pal.w }; }
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const doisQuadros = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+let animando = false;
+async function abrirDoIcone(qual, p) {
+  if (nat.tem) {   // igual ao iPhone: o app cresce do ícone (com as fotos juntas), a tela de início fica por trás
+    if (animando) return; animando = true;
+    try {
+      await nat.call('telaCobrir').catch(() => {});
+      if (qual === 'notas') abrirNotas(); else { $('#busca').classList.remove('on'); mostrar('fototeca', true); enviarGaleria(); }
+      await doisQuadros(); await espera(qual === 'fototeca' ? 90 : 30);
+      const ic = iconeNaTela(p);
+      await nat.call('telaAbrir', ic).catch(() => {});
+      if (qual === 'fototeca') setTimeout(() => { enviarGaleria(); guardarDiag(); }, 600);
+    } catch (_) {} finally { animando = false; }
+    return;
+  }
   const el = qual === 'notas' ? $('#notas') : $('#fototeca');
   el.style.transformOrigin = ((pal.x + p.x * pal.w) / W * 100) + '% ' + ((pal.y + p.y * pal.h) / H * 100) + '%';
   el.style.transition = 'none'; el.style.transform = 'scale(.12)'; el.style.opacity = '0.3';
@@ -2154,11 +2182,20 @@ function abrirDoIcone(qual, p) {
   requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'transform .34s cubic-bezier(.2,.9,.25,1), opacity .2s'; el.style.transform = 'none'; el.style.opacity = '1'; }));
 }
 /* deslizar de baixo para cima (a partir da borda): volta à tela de início falsa */
-function voltarInicio() {
+async function voltarInicio() {
   if (!temInicio()) return;
   const qual = telaAtual, el = $('#' + qual), p = qual === 'notas' ? PI.notas : PI.fotos;
   if (qual === 'notas') { $('#ntexto').blur(); enviarNota(); }
   if (window.voltarPagina1) voltarPagina1();
+  if (nat.tem && (qual === 'notas' || qual === 'fototeca')) {   // igual ao iPhone: o app inteiro encolhe até o ícone, com a tela de início por trás
+    if (animando) return; animando = true;
+    try {
+      await nat.call('telaFechar', iconeNaTela(p)).catch(() => {});
+      if (nativo && qual === 'fototeca') nat.call('galeria', { on: false }).catch(() => {});
+      mostrar('inicio'); saiuDasFotos();
+    } catch (_) { mostrar('inicio'); } finally { animando = false; }
+    return;
+  }
   el.style.transformOrigin = ((pal.x + p.x * pal.w) / W * 100) + '% ' + ((pal.y + p.y * pal.h) / H * 100) + '%';
   el.style.transition = 'transform .3s cubic-bezier(.3,.6,.3,1), opacity .3s'; el.style.transform = 'scale(.12)'; el.style.opacity = '0';
   if (nativo && qual === 'fototeca') nat.call('galeria', { on: false }).catch(() => {});
@@ -2184,7 +2221,7 @@ function mostrar(id, guardaAnterior) {
   const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
   nat.msg('barra', id === 'marcar');
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
-  if (id === 'fototeca') { pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (atual && iniciado) bebeTravado = true; }
+  if (id === 'fototeca') { pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (iniciado) bebeTravado = true; }   // o público viu a Fototeca: o bebê não muda mais nesta apresentação
 }
 function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); menuInicio(); encherAjustes(); }
 /* menu no estilo dos Ajustes do iPhone: painel + lista de seções que abrem numa página */
@@ -2227,6 +2264,7 @@ if (window.matchMedia) { try { matchMedia('(prefers-color-scheme: dark)').addEve
 const ROT_BEBE = ['Menino branco', 'Menina branca', 'Menino negro', 'Menina negra'];
 const CURTO_BEBE = ['Men. br.', 'Mna. br.', 'Men. ng.', 'Mna. ng.'];
 async function encherAjustes() {
+  { const d = $('#aDiag'); if (d) d.textContent = guarda.get('diag', '—'); }
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
@@ -2461,7 +2499,7 @@ function iniciarInject() {
   };
   passo();
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) { saiuDasFotos(); return; } iniciarInject(); if (nat.tem) carregarFotos(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saiuDasFotos(); bebeTravado = false; return; } iniciarInject(); if (nat.tem) carregarFotos(); });
 
 /* =====================================================================
    INÍCIO
