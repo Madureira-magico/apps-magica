@@ -295,7 +295,10 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             UIView.animate(withDuration: 0.25, delay: 0.45, options: []) { foto.alpha = 0 } completion: { _ in foto.removeFromSuperview() }
         }
         let t = t0
-        tiles.dados = TilesMosaico.Dados(seq: seq, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
+        // a galeria JÁ É o mosaico: as fotos do rosto entram direto na camada de fotos (nada por cima, nada troca)
+        var seq1 = seq
+        if temMos { for (k, id) in mosIds.enumerated() where ini + k < seq1.count && !id.isEmpty { seq1[ini + k] = id } }
+        tiles.dados = TilesMosaico.Dados(seq: seq1, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
         var idsB = [String](repeating: "", count: C * linhas)
         if temMos { for (k, id) in mosIds.enumerated() where ini + k < idsB.count { idsB[ini + k] = id } }
         tilesB.dados = TilesMosaico.Dados(seq: idsB, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
@@ -303,6 +306,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         plano.frame = CGRect(x: 0, y: 0, width: W, height: CGFloat(linhas) * t)
         tiles.frame = plano.bounds
         tilesB.frame = plano.bounds
+        tiles.setNeedsDisplay()
         tilesB.setNeedsDisplay()
         let faixa = CGRect(x: 0, y: CGFloat(primeira) * t, width: W, height: CGFloat(linhasMos) * t)
         tinta.frame = faixa
@@ -464,9 +468,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let segura = ramp
         let cobreIni = min(0.9 * cc, max(0.55 * cc, ini + 0.2 * cc))
         bAtual = b
-        tilesB.isHidden = !temMos
+        tilesB.isHidden = true   // a camada do mosaico é opaca: as fotos do rosto já estão na camada de fotos
         tiles.isHidden = false
-        tilesB.alpha = 1
         let mag: CGFloat = temMos ? min(1, max(0, (2.0 - k) / 0.6)) * segura : 0
         CATransaction.begin(); CATransaction.setDisableActions(true)
         magImg.alpha = mag
