@@ -527,7 +527,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     @objc private func tocou(_ g: UITapGestureRecognizer) {
         let p = g.location(in: vista)
         let i = indice(g.location(in: plano))
-        evento(["tipo": "gTap", "i": i, "x": p.x, "y": p.y, "noMosaico": temMos && visiveis > CGFloat(C) * 0.8, "b": bAtual > 0.5])
+        // é foto do rosto (mosaico) ou da primeira tela? decide pelo lugar tocado
+        let k = i - ini, doRosto = temMos && k >= 0 && k < mosIds.count && !mosIds[k].isEmpty
+        evento(["tipo": "gTap", "i": i, "x": p.x, "y": p.y, "noMosaico": temMos && visiveis > CGFloat(C) * 0.8, "b": doRosto])
     }
 
     // MARK: fotos (chamado pelos pedaços, fora da linha principal)

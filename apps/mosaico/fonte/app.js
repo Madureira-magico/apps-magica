@@ -30,7 +30,7 @@ const guarda = {
   set(k, v) { try { localStorage.setItem('mz_' + k, JSON.stringify(v)); } catch (_) {} }
 };
 const cfg = Object.assign({
-  abrir: 'fototeca', tema: 'auto', n0: 3, colsM: 60, cor: 'cor', reforco: 0.4, enq: 'perto', filtro: true, aviso: true,
+  abrir: 'fototeca', tema: 'auto', n0: 3, colsM: 60, cor: 'cor', reforco: 0.15, enq: 'perto', filtro: true, aviso: true,
   fotoReal: false, vibrar: true, origem: '', limite: 8000, inj: false, injId: '', wk: '', ia: true, iaPrompt: '', troca: 'nova', momento: 5, temPrint: false, zonas: {},
   piada: 'bebes', bebe: 0, bebes: [false, false, false, false], fixas: [], fixa: 0, tirados: [], abert: [], ver: 1, v: 2
 }, guarda.get('cfg', {}));
@@ -52,7 +52,7 @@ function slotBebe() {   // em qual dos 18 quadrados entra a foto da piada
 }
 function srcMini(it) { return it === '#piada' ? URLS.arq(arqPiada(), cfg.ver) : String(it).startsWith('arq:') ? URLS.arq(it.slice(4), cfg.ver) : URLS.mini(it); }
 if ((cfg.v || 1) < 2) {   // vindo da versão 1.0
-  Object.assign(cfg, { colsM: 60, cor: 'cor', reforco: 0.4, limite: 8000, tema: 'auto', enq: 'perto', filtro: true, aviso: true,
+  Object.assign(cfg, { colsM: 60, cor: 'cor', reforco: 0.15, limite: 8000, tema: 'auto', enq: 'perto', filtro: true, aviso: true,
     piada: 'bebes', fixas: cfg.fixas || [], fixa: 0, tirados: cfg.tirados || [], v: 2 });
 }
 const salvar = () => guarda.set('cfg', cfg);
@@ -162,7 +162,7 @@ async function analisarFotos() {
     const lote = alvo.slice(i, i + 120);
     try {
       const res = await nat.call('analisar', { ids: lote });
-      lote.forEach((id, k) => { const c = res[k]; if (c) cores.set(id, { c: [c[0], c[1], c[2]], ok: c.length > 3 ? c[3] : 1 }); });
+      lote.forEach((id, k) => { const c = res[k]; if (c) cores.set(id, { c: [c[0], c[1], c[2]], ok: c.length > 3 ? c[3] : 1, q: c.length >= 16 ? c.slice(4, 16) : null }); });
     } catch (_) { break; }
     mostrarAnalise(Math.min(alvo.length, i + 120), alvo.length);
     if (i % 1200 === 0) pedirDesenho();
@@ -414,7 +414,7 @@ function hsl(h, s, l) { const f = n => { const k = (n + h * 12) % 12, a = s * Ma
 /* fotos disponíveis para o mosaico */
 function pool() {
   const todas = [], boas = [];
-  for (const [id, v] of cores) { if (tirados.has(id)) continue; const p = { id, c: v.c, l: lum(v.c) }; todas.push(p); if (v.ok) boas.push(p); }
+  for (const [id, v] of cores) { if (tirados.has(id)) continue; const p = { id, c: v.c, q: v.q || null, l: lum(v.c) }; todas.push(p); if (v.ok) boas.push(p); }
   return cfg.filtro && boas.length >= 300 ? boas : todas;
 }
 /* para cada cor (8x8x8 caixinhas), as fotos de cor mais parecida */
@@ -427,8 +427,8 @@ function indiceCores(P) {
       const m = [];
       for (const p of P) {
         const d = 2 * (p.c[0] - cr) ** 2 + 4 * (p.c[1] - cg) ** 2 + 3 * (p.c[2] - cb) ** 2;
-        if (m.length < 14) { m.push([d, p.id]); m.sort((a, z) => a[0] - z[0]); }
-        else if (d < m[13][0]) { m[13] = [d, p.id]; m.sort((a, z) => a[0] - z[0]); }
+        if (m.length < 28) { m.push([d, p]); m.sort((a, z) => a[0] - z[0]); }
+        else if (d < m[27][0]) { m[27] = [d, p]; m.sort((a, z) => a[0] - z[0]); }
       }
       tab[k] = m.map(x => x[1]);
     }
@@ -463,8 +463,17 @@ async function prepararMosaico() {
   if (!N) return;
   const ultima = Math.floor((N - 1) / n), ultimaF = Math.max(0, ultima - G), primeira = Math.max(0, ultimaF - rowsVis + 1), linhas = ultimaF - primeira + 1;
   const rg = Math.ceil(H / t);
-  let alvo = [];
-  if (atual.tipo === 'rosto' && atual.arq) { try { alvo = await nat.call('grade', { nome: atual.arq, cols: n, rows: rg, enq: cfg.enq, real: 'real.jpg' }); } catch (_) { alvo = []; } }
+  let alvo = [], A4 = null;   // A4: a foto do famoso com o dobro de detalhe (4 pedaços por quadradinho)
+  if (atual.tipo === 'rosto' && atual.arq) {
+    try { A4 = await nat.call('grade', { nome: atual.arq, cols: n * 2, rows: rg * 2, enq: cfg.enq, real: 'real.jpg' }); } catch (_) { A4 = null; }
+    if (A4 && A4.length >= n * rg * 12) {
+      const n2 = n * 2; alvo = new Array(n * rg * 3);
+      for (let y = 0; y < rg; y++) for (let x = 0; x < n; x++) for (let ch = 0; ch < 3; ch++) {
+        const a = ((2 * y) * n2 + 2 * x) * 3 + ch, b = ((2 * y + 1) * n2 + 2 * x) * 3 + ch;
+        alvo[(y * n + x) * 3 + ch] = (A4[a] + A4[a + 3] + A4[b] + A4[b + 3]) / 4;
+      }
+    } else A4 = null;
+  }
   if (!alvo || alvo.length < n * rg * 3) {
     if (atual.tipo === 'rosto') atual.tipo = 'texto';
     try { await document.fonts.load('800 100px MzLetra'); } catch (_) {}
@@ -490,17 +499,38 @@ async function prepararMosaico() {
   for (let r = primeira; r <= ultimaF; r++) {
     const yc = cima + r * t - topo + t / 2, gy = Math.min(rg - 1, Math.max(0, Math.floor(yc / H * rg)));
     for (let c = 0; c < n; c++) {
-      const idx = r * n + c, cel = gy * n + c, v = V[cel] == null ? 0 : V[cel];
-      const l0 = Math.max(1, L[cel] || 1), kk = texto ? 1 : (v * 255) / l0;   // cor do rosto com a claridade esticada
-      const cr = Math.min(255, Math.round((alvo[cel * 3] || 0) * kk)), cgc = Math.min(255, Math.round((alvo[cel * 3 + 1] || 0) * kk)), cb = Math.min(255, Math.round((alvo[cel * 3 + 2] || 0) * kk));
+      const idx = r * n + c, cel = gy * n + c;
+      // 4 pedaços do quadradinho (em cima/embaixo × esquerda/direita), quando a foto do famoso tem o dobro de detalhe
+      let sub = null, base = [alvo[cel * 3] || 0, alvo[cel * 3 + 1] || 0, alvo[cel * 3 + 2] || 0];
+      if (A4 && !texto) {
+        const n2 = n * 2, rg2 = rg * 2, gA = Math.min(rg2 - 1, Math.max(0, Math.floor((yc - t / 4) / H * rg2))), gB = Math.min(rg2 - 1, Math.max(0, Math.floor((yc + t / 4) / H * rg2)));
+        sub = [];
+        for (const [yy, xx] of [[gA, 2 * c], [gA, 2 * c + 1], [gB, 2 * c], [gB, 2 * c + 1]]) { const o = (yy * n2 + xx) * 3; sub.push(A4[o], A4[o + 1], A4[o + 2]); }
+        base = [0, 1, 2].map(ch => (sub[ch] + sub[3 + ch] + sub[6 + ch] + sub[9 + ch]) / 4);
+      }
+      const l0 = Math.max(1, lum(base));
+      let v = texto ? (V[cel] == null ? 0 : V[cel]) : Math.min(1, Math.max(0, (l0 - p2) / Math.max(1, p98 - p2)));
+      if (!texto) v = v * v * (3 - 2 * v);
+      // a claridade do rosto usa o claro e o escuro que existem nas fotos da galeria (do mais escuro ao mais claro)
+      const kk = texto ? 1 : (NP ? porLuz[Math.min(NP - 1, Math.round(v * (NP - 1)))].l : v * 255) / l0;
+      const cr = Math.min(255, Math.round(base[0] * kk)), cgc = Math.min(255, Math.round(base[1] * kk)), cb = Math.min(255, Math.round(base[2] * kk));
       let id = '';
       if (idx < N) {
         if (!NP) id = sN[idx];
         else {
           const esq = c > 0 ? mz[idx - 1] : '', cimaId = idx - n >= 0 ? mz[idx - n] : '';
           if (porCor) {
-            const cand = porCor(cr, cgc, cb);
-            for (let k = 0; k < 8; k++) { id = cand[Math.floor(Math.random() * Math.min(6, cand.length))]; if (id !== esq && id !== cimaId) break; }
+            let cand = porCor(cr, cgc, cb);
+            if (sub && cand.length && cand[0].q) {   // a mais parecida também nos 4 pedaços (sombra embaixo, luz em cima…)
+              const alvoQ = sub.map(x => Math.min(255, x * kk));
+              cand = cand.map(p => {
+                let d = 2 * (p.c[0] - cr) ** 2 + 4 * (p.c[1] - cgc) ** 2 + 3 * (p.c[2] - cb) ** 2;
+                if (p.q) for (let k = 0; k < 4; k++) d += 0.6 * (2 * (p.q[k * 3] - alvoQ[k * 3]) ** 2 + 4 * (p.q[k * 3 + 1] - alvoQ[k * 3 + 1]) ** 2 + 3 * (p.q[k * 3 + 2] - alvoQ[k * 3 + 2]) ** 2);
+                return [d, p];
+              }).sort((a, z) => a[0] - z[0]).map(x => x[1]);
+            }
+            const leque = texto ? 6 : 2;   // rosto: entre as 2 melhores (repete à vontade, só não encosta na mesma)
+            for (let k = 0; k < 10; k++) { id = cand[k < 6 ? Math.floor(Math.random() * Math.min(leque, cand.length)) : Math.min(cand.length - 1, k - 4)].id; if (id !== esq && id !== cimaId) break; }
           } else {
             const alvoI = texto ? (v > 0.5 ? NP - 1 - janela : janela) : Math.round(v * (NP - 1));
             for (let k = 0; k < 8; k++) {
@@ -872,29 +902,19 @@ function itemNoPonto(x, y) { return pontoAgora(x, y).i; }
 function tocou(x, y) {
   const i = itemNoPonto(x, y);
   if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); pedirDesenho(); } return; }
-  const agora = performance.now(), noMosaico = emMag() && kAtual() < 1.05;
-  if (noMosaico && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
-  ultimoToque = agora;
   if (i < 0 || i >= seq.length || !seq[i]) return;
-  setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, noMosaico && cfg.fotoReal ? 330 : 0);
+  abrirFoto(i);
 }
 function tocouNativo(i, noMosaico, emB) {
   if (emB && comMosaico() && !emSelecao) {   // tocou numa foto do mosaico: abre essa foto
     const id = mos.ids[i - mos.ini], j = id ? mos.normal.indexOf(id) : -1;
-    const agora = performance.now();
-    if (noMosaico && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
-    ultimoToque = agora;
-    if (j >= 0) setTimeout(() => { if (ultimoToque === agora) abrirFoto(i, j); }, noMosaico && cfg.fotoReal ? 330 : 0);
+    if (j >= 0) abrirFoto(i, j);
     return;
   }
   if (emSelecao) { if (i >= 0 && i < seq.length && seq[i] && seq[i] !== '#piada') { if (selecionados.has(i)) selecionados.delete(i); else selecionados.add(i); contarSelecao(); enviarGaleria(); } return; }
-  const agora = performance.now();
-  if (noMosaico && agora - ultimoToque < 320) { ultimoToque = 0; alternarReal(); return; }
-  ultimoToque = agora;
   if (i < 0 || i >= seq.length || !seq[i]) return;
-  setTimeout(() => { if (ultimoToque === agora) abrirFoto(i); }, noMosaico && cfg.fotoReal ? 330 : 0);
+  abrirFoto(i);
 }
-function alternarReal() { if (!cfg.fotoReal || !podeReal()) return; realTrava = !realTrava; if (realTrava) { selSegura = false; ultVol = 0; realP = Math.max(realP, 0.001); } animarReal(); if (realTrava) { const sobe = () => { if (realTrava && realP < 1) { realP = Math.min(1, realP + 0.02); $('#real').style.opacity = realP; requestAnimationFrame(sobe); } }; sobe(); } }
 
 /* ---------- galeria nativa (Fototeca feita pelo próprio iPhone) ---------- */
 let nativo = false, envioPedido = false, zerarGal = true;
@@ -1377,6 +1397,7 @@ const PI = {
   bolinha: { x: 0.6900, y: 0.5637, d: 0.0642 },
   hora: [0.0800, 0.0190, 0.2850, 0.0550], bat: [0.6950, 0.0190, 0.9350, 0.0550]   // hora e bateria do print
 };
+if (!cfg.r316) { cfg.r316 = true; cfg.reforco = 0.15; }   // 3.16: pintura fraca (as próprias fotos formam o rosto)
 if (!cfg.ini36) { cfg.ini36 = true; cfg.temFundo = false; }   // 3.6: começa com o papel de parede original
 function temInicio() { return true; }   // a tela de início já vem pronta dentro do app (ícones transparentes)
 function carregarImg(src) { return new Promise(ok => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; }); }
@@ -1446,27 +1467,6 @@ async function desenharInicio() {
     el.dataset.arrastou = '1'; setTimeout(() => { el.dataset.arrastou = ''; }, 60);
   }, { passive: true });
   window.voltarPagina1 = () => { clearTimeout(tVolta); na2 = false; pos(0); ponto(0); bu.classList.remove('pg'); };
-})();
-/* segurar o Instagram: cartão de "notificação" com a foto e o nome da personalidade */
-(function () {
-  const el = $('#inicio'); let t = 0;
-  const perto = e => { const p = noPalco(e.touches ? e.touches[0] : e); return Math.abs(p.x - PI.insta.x) < 0.09 && Math.abs(p.y - PI.insta.y) < 0.05; };
-  const fechar = () => { clearTimeout(t); t = 0; $('#cartaoIg').classList.remove('on'); };
-  el.addEventListener('touchstart', e => {
-    if (!temInicio() || !perto(e)) return;
-    t = setTimeout(() => {
-      t = 0; vibrar('media');
-      const fam = atual && acharFamoso(atual.nome), arq = atual && atual.tipo === 'rosto' ? atual.arq : (fam && fam.f);
-      $('#cigNome').textContent = atual ? atual.nome : 'Instagram';
-      $('#cigTxt').textContent = atual ? 'começou a seguir você · agora' : 'Nenhuma notificação';
-      $('#cigFoto').style.backgroundImage = arq ? 'url("' + URLS.arq(arq, cfg.ver) + '")' : '';
-      $('#cigFoto').classList.toggle('vazia', !arq);
-      const c = $('#cartaoIg'); c.style.top = Math.max(stPx() + 10, pal.y + PI.insta.y * pal.h - 0.06 * pal.h - 230) + 'px';
-      c.classList.add('on');
-    }, 450);
-  }, { passive: true });
-  el.addEventListener('touchmove', e => { if (t && !perto(e)) { clearTimeout(t); t = 0; } }, { passive: true });
-  el.addEventListener('touchend', fechar); el.addEventListener('touchcancel', fechar);
 })();
 $('#inicio').addEventListener('click', e => {
   if ($('#inicio').dataset.arrastou) return;

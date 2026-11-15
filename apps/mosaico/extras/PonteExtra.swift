@@ -294,8 +294,22 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     private func analisar(_ ids: [String]) -> [Any] {
         travaCores.lock()
         lerCores()
-        let faltam = ids.filter { (cores[$0]?.count ?? 0) < 4 || !FileManager.default.fileExists(atPath: nomeMini($0).path) }
+        var faltam = ids.filter { (cores[$0]?.count ?? 0) < 4 || !FileManager.default.fileExists(atPath: nomeMini($0).path) }
+        // já analisadas no formato antigo (só a cor média): os 4 pedaços saem da miniatura guardada, sem ir na Fototeca
+        let soQuad = ids.filter { c in (cores[c]?.count ?? 0) >= 4 && (cores[c]?.count ?? 0) < 16 && FileManager.default.fileExists(atPath: nomeMini(c).path) }
         travaCores.unlock()
+        if !soQuad.isEmpty {
+            var novas: [String: [Int]] = [:]
+            for id in soQuad {
+                autoreleasepool {
+                    if let im = UIImage(contentsOfFile: nomeMini(id).path) { novas[id] = quadrantes(im) } else { faltam.append(id) }
+                }
+            }
+            travaCores.lock()
+            for (k, q) in novas { if var c = cores[k], c.count >= 4 { c = Array(c.prefix(4)) + q; cores[k] = c } }
+            if let d = try? JSONSerialization.data(withJSONObject: cores) { _ = gravar(d, arqCores) }
+            travaCores.unlock()
+        }
 
         if !faltam.isEmpty {
             let res = PHAsset.fetchAssets(withLocalIdentifiers: faltam, options: nil)
@@ -314,6 +328,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
                     if let d = q.jpegData(compressionQuality: 0.8) { _ = self.gravar(d, self.nomeMini(a.localIdentifier)) }
                     var c = self.media(q)
                     c.append(im.cgImage.map { self.fotoBoa(a, $0) } ?? 1)
+                    c += self.quadrantes(q)
                     novas[a.localIdentifier] = c
                 }
             }
@@ -390,6 +405,14 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         return saida
     }
 
+    /// cor de cada quarto da foto (em cima à esq., em cima à dir., embaixo à esq., embaixo à dir.): 12 números
+    private func quadrantes(_ im: UIImage) -> [Int] {
+        guard let cg = im.cgImage else { return [Int](repeating: 128, count: 12) }
+        let p = pixels(cg, 2, 2)
+        var out: [Int] = []
+        for i in 0..<4 { out += [Int(p[i * 4]), Int(p[i * 4 + 1]), Int(p[i * 4 + 2])] }
+        return out
+    }
     private func media(_ im: UIImage) -> [Int] {
         guard let cg = im.cgImage else { return [128, 128, 128] }
         let p = pixels(cg, 4, 4)
