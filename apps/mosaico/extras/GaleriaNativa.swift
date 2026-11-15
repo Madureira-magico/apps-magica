@@ -177,6 +177,10 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         case "galeriaTroca":
             trocar(Int(num("i", -1)), (m["id"] as? String) ?? "")
             r(true, nil)
+        case "galeriaInicio":   // volta às 18 fotos (3 colunas, lá embaixo) e mostra elas já desenhadas, inteiras
+            posicaoInicial()
+            mostrarCapaInicio()
+            r(true, nil)
         case "galeriaReal":
             realImg.alpha = max(0, min(1, num("a", 0)))
             r(true, nil)
@@ -190,7 +194,60 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         return true
     }
 
+    /// "capa" com a primeira tela já pronta: as fotos aparecem inteiras na hora, enquanto a grade termina de se desenhar por baixo
+    private let capaInicio = UIImageView()
+    private func mostrarCapaInicio() {
+        guard let d = tiles.dados, d.t0 > 0, vista.bounds.width > 0 else { return }
+        let z = zoomer.zoomScale, off = zoomer.contentOffset, B = vista.bounds
+        let g = d.t0 * 0.07, lado = d.t0 - g
+        let visivel = CGRect(x: off.x / z, y: off.y / z, width: B.width / z, height: B.height / z)
+        let c0 = max(0, Int(floor(visivel.minX / d.t0))), c1 = min(d.cols - 1, Int(floor(visivel.maxX / d.t0)))
+        let r0 = max(0, Int(floor(visivel.minY / d.t0))), r1 = min(d.linhas - 1, Int(floor(visivel.maxY / d.t0)))
+        guard c0 <= c1, r0 <= r1 else { return }
+        let (corFundo, _) = tiles.cores
+        let fmt = UIGraphicsImageRendererFormat.preferred()
+        let t0c = CACurrentMediaTime()
+        let img = UIGraphicsImageRenderer(size: B.size, format: fmt).image { cx in
+            let ctx = cx.cgContext
+            ctx.setFillColor(corFundo); ctx.fill(CGRect(origin: .zero, size: B.size))
+            for r in r0...r1 {
+                for c in c0...c1 {
+                    let i = r * d.cols + c
+                    guard i < d.seq.count else { continue }
+                    let m = i - d.ini
+                    let id = (m >= 0 && m < d.mos.count && !d.mos[m].isEmpty) ? d.mos[m] : d.seq[i]
+                    guard !id.isEmpty else { continue }
+                    let q = CGRect(x: CGFloat(c) * d.t0 * z - off.x, y: CGFloat(r) * d.t0 * z - off.y, width: lado * z, height: lado * z)
+                    let k512 = cache.object(forKey: "\(id)|512" as NSString)?.img, k256 = cache.object(forKey: "\(id)|256" as NSString)?.img
+                    var im = k512 ?? k256
+                    if im == nil, CACurrentMediaTime() - t0c < 0.45, let novo = carregar(id, 256) { cache.setObject(Caixa(novo), forKey: "\(id)|256" as NSString, cost: novo.width * novo.height * 4); im = novo }
+                    if im == nil { im = cache.object(forKey: "\(id)|64" as NSString)?.img ?? carregar(id, 64) }   // sem tempo: a miniatura (a grade completa por baixo)
+                    guard let cg = im else { continue }
+                    // recorte quadrado do meio (como a grade)
+                    let w = CGFloat(cg.width), h = CGFloat(cg.height), l = min(w, h)
+                    if let quad = cg.cropping(to: CGRect(x: (w - l) / 2, y: (h - l) / 2, width: l, height: l)) {
+                        UIImage(cgImage: quad).draw(in: q)
+                    }
+                }
+            }
+        }
+        capaInicio.image = img
+        capaInicio.frame = B
+        capaInicio.alpha = 1
+        capaInicio.isUserInteractionEnabled = false
+        if capaInicio.superview !== vista { vista.addSubview(capaInicio) }
+        vista.bringSubviewToFront(capaInicio)
+        capaVez += 1; let v = capaVez
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in if self?.capaVez == v { self?.tirarCapaInicio() } }
+    }
+    private var capaVez = 0
+    private func tirarCapaInicio() {
+        guard capaInicio.superview != nil, capaInicio.alpha > 0 else { return }
+        capaVez += 1
+        UIView.animate(withDuration: 0.2, animations: { self.capaInicio.alpha = 0 }) { _ in if self.capaInicio.alpha == 0 { self.capaInicio.removeFromSuperview() } }
+    }
     private func ligar(_ on: Bool) {
+        if !on { capaInicio.removeFromSuperview(); capaVez += 1 }
         if on && !ligada && mudouFechada { mudouFechada = false; tiles.setNeedsDisplay() }   // mudou com a galeria fechada: redesenha ao abrir
         ligada = on
         if let w = web, on {
@@ -420,6 +477,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         return CGPoint(x: -zoomer.contentInset.left, y: fim - H)
     }
     func scrollViewWillBeginZooming(_ s: UIScrollView, with v: UIView?) {
+        tirarCapaInicio()
         evento(["tipo": "gZoom"])
         trilho = false
         xTravado = nil
@@ -449,7 +507,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetRosto() }
     }
     /// arrastar só para cima e para baixo (como no app Fotos); de lado só a pinça mexe
-    func scrollViewWillBeginDragging(_ s: UIScrollView) { if !s.isZooming { xTravado = s.contentOffset.x } }
+    func scrollViewWillBeginDragging(_ s: UIScrollView) { tirarCapaInicio(); if !s.isZooming { xTravado = s.contentOffset.x } }
     func scrollViewDidScroll(_ s: UIScrollView) {
         if let x = xTravado, !s.isZooming, !ajustando, s.contentOffset.x != x {
             ajustando = true; s.contentOffset.x = x; ajustando = false

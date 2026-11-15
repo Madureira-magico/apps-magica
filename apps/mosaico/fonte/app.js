@@ -211,7 +211,8 @@ function montarSeq() {
 /* =====================================================================
    ALVO: rosto do famoso (ou o nome escrito) e montagem do mosaico
    ===================================================================== */
-let atual = guarda.get('atual', null);   // {nome, tipo:'rosto'|'texto', arq, pronto}
+let atual = null;   // {nome, tipo:'rosto'|'texto', arq, pronto} — abrir o app do zero começa sem artista
+guarda.set('atual', null);
 let mos = null;
 let preparo = 0;
 if (atual) atual.pronto = false;
@@ -1505,7 +1506,8 @@ async function abrirDoIcone(qual, p) {
     try {
       await nat.call('telaCobrir').catch(() => {});
       if (qual === 'notas') abrirNotas(); else { $('#busca').classList.remove('on'); mostrar('fototeca', true); enviarGaleria(); }
-      await doisQuadros(); await espera(qual === 'fototeca' ? 90 : 30);
+      if (qual === 'fototeca' && nativo) await Promise.race([nat.call('galeriaInicio').catch(() => {}), espera(800)]);   // as 18 fotos prontas, inteiras
+      await doisQuadros(); await espera(30);
       const ic = iconeNaTela(p);
       await nat.call('telaAbrir', ic).catch(() => {});
       if (qual === 'fototeca') setTimeout(() => { enviarGaleria(); guardarDiag(); }, 600);
@@ -1815,10 +1817,11 @@ async function lerInject() {   // direto no Inject (11z.co), sem intermediário
   try { const r = await fetch(u, { cache: 'no-store', signal: ac.signal }); return await r.json(); } finally { clearTimeout(t); }
 }
 let injTimer = 0, injGen = 0, injUlt = null;
+let injZerar = true;
 function iniciarInject() {
   clearTimeout(injTimer); const g = ++injGen;
   if (!cfg.inj || !cfg.injId) return;
-  const chave = 'injUlt_' + cfg.injId; injUlt = guarda.get(chave, null);
+  const chave = 'injUlt_' + cfg.injId; injUlt = injZerar ? null : guarda.get(chave, null); injZerar = false;   // do zero: o último nome do Inject não vale
   const passo = async () => {
     if (g !== injGen) return;
     if (!document.hidden) {
@@ -1840,7 +1843,17 @@ function iniciarInject() {
   };
   passo();
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) { saiuDasFotos(); bebeTravado = false; return; } iniciarInject(); if (nat.tem) carregarFotos(); });
+let saiuEm = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { saiuDasFotos(); saiuEm = Date.now(); return; }
+  if (saiuEm && Date.now() - saiuEm > 3 * 60 * 1000) {   // ficou fora mais de 3 minutos: começa do zero
+    if (atual) limparNome();
+    bebeTravado = false; injZerar = true;
+    if (telaAtual === 'fototeca' && nativo) nat.call('galeriaInicio').catch(() => {});
+  }
+  saiuEm = 0;
+  iniciarInject(); if (nat.tem) carregarFotos();
+});
 
 /* =====================================================================
    INÍCIO
