@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 ///   escolherVideo           -> abre a galeria (só vídeos) e guarda o escolhido como abertura.mov
 ///   temVideo                -> true/false
 ///   tocarVideo              -> toca o vídeo da abertura por cima de tudo, em tela cheia; responde quando acaba
+///   vibrar                  -> uma vibração curta (bilhete completo no modo mágica)
 /// Arquivos guardados aparecem para a página pelo endereço ltarq://f/nome
 @objc(PonteExtra)
 final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, WKURLSchemeHandler,
@@ -84,6 +85,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             escolherVideo(responder)
         case "tocarVideo":
             tocarVideo(responder)
+        case "vibrar":
+            DispatchQueue.main.async {
+                let g = UIImpactFeedbackGenerator(style: .heavy)
+                g.prepare()
+                g.impactOccurred(intensity: 1.0)
+                responder(true, nil)
+            }
         default:
             responder(nil, "desconhecido")
         }

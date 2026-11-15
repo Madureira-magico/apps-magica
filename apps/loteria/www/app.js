@@ -551,6 +551,7 @@ function toqueMagico() {
   const n = falta[Math.floor(Math.random() * falta.length)];
   sel.add(n); magia.porMagia.add(n); avisoMostrado = true;
   atualizarVolante();
+  if (bilhete().every(x => sel.has(x))) nativo('vibrar').catch(() => {});   // 6º número: avisa só quem segura o celular
   const el = grade.querySelector('.vn[data-n="' + n + '"]');
   if (el) {
     const a = grade.getBoundingClientRect(), b = el.getBoundingClientRect();
