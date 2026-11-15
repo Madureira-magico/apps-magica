@@ -250,10 +250,12 @@ async function definirNome(txt, origem) {
     if (meu !== preparo) return;
     if (!fam && temIA) {                // 3) nem lista nem Wikipédia: a IA corrige o nome
       estado('corrigindo o nome…');
-      const certo = maiusculas(limparPedido(await perguntarIA(limpo)));
+      const resp = await perguntarIA(limpo);
       if (meu !== preparo) return;
+      const naLista = acharFamoso(resp) || acharFamosoEm(perguntarIA.bruta || '');   // nome conhecido em qualquer parte da resposta
+      const certo = naLista ? naLista.n : maiusculas(limparPedido(resp));
       if (certo && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
-        let g = acharFamoso(certo);
+        let g = naLista || acharFamoso(certo);
         const fotosIA = perguntarIA.fotos || [];
         if (!g || !g.f) g = await baixarFamoso(g || { n: certo, w: '', a: [], b: -1, f: '', r: null }, !g, false);
         if (meu !== preparo) return;
@@ -332,7 +334,7 @@ function escolherBebe(f, nome) {
 async function infoWiki(lang, titulo, busca) {
   const u = 'https://' + lang + '.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages|pageprops&ppprop=wikibase_item&piprop=thumbnail&pithumbsize=1400&pilicense=any&'
     + (titulo ? 'titles=' + encodeURIComponent(titulo) : 'generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(busca));
-  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 9000);
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), titulo ? 9000 : 4500);   // busca de nome desconhecido: desiste rápido
   try {
     const r = await fetch(u, { signal: ac.signal, cache: 'no-store' }); const d = await r.json();
     const pags = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
@@ -1663,7 +1665,7 @@ $('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salva
 $('#aIa').addEventListener('change', e => { cfg.ia = e.target.checked; salvar(); });
 $('#aIaPrompt').addEventListener('input', e => { cfg.iaPrompt = e.target.value; salvar(); });
 $('#aIaPadrao').addEventListener('click', () => { cfg.iaPrompt = IA_PADRAO; $('#aIaPrompt').value = IA_PADRAO; salvar(); });
-$('#aIaTestar').addEventListener('click', async () => { const q = $('#aIaTeste').value.trim(); if (!q) return; $('#aIaUlt').textContent = 'perguntando…'; const a = await perguntarIA(limparPedido(q)); if (!a) $('#aIaUlt').textContent = 'sem resposta (confira o intermediário)'; });
+$('#aIaTestar').addEventListener('click', async () => { const q = $('#aIaTeste').value.trim(); if (!q) return; await perguntarIA(limparPedido(q)); });
 $('#aOrigem').addEventListener('change', e => { cfg.origem = e.target.value; salvar(); carregarFotos(); });
 $('#aLimite').addEventListener('change', e => { cfg.limite = +e.target.value; salvar(); analisarFotos(); });
 $('#aReanalisar').addEventListener('click', () => carregarFotos());
@@ -1697,21 +1699,34 @@ async function pegarJSON(u, ms) {   // pelo iPhone (sem bloqueio de outro site);
   try { const r = await fetch(u, { cache: 'no-store', signal: ac.signal }); return await r.json(); } finally { clearTimeout(t); }
 }
 /* aceita os dois intermediários: o do Listas (/ai?q=&p=) e o do app famosos (?nome=) */
+function limparResposta(x) {   // só o nome principal: "Tom Hanks, Thomas Jeffrey Hanks" / "Tom Hanks (…)" → "Tom Hanks"
+  let t = String(x || '').replace(/\*+/g, '').split('\n').map(l => l.trim()).find(Boolean) || '';
+  t = t.replace(/^(?:o nome (?:correto )?é|resposta:?|nome:?)\s*/i, '');
+  t = t.split(/\s*(?:[,;(\[]|\s[-–—]\s|\sou\s|\/)\s*/)[0];
+  return t.replace(/^["'“”‘’]+|["'“”‘’.!]+$/g, '').trim();
+}
 async function perguntarIA(q) {
-  const w = baseWk(), p = String(cfg.iaPrompt || IA_PADRAO).trim(); perguntarIA.fotos = [];
-  if (!w || !q) return '';
-  const limpa = x => String(x || '').split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim();
-  let a = '';
-  const doListas = async () => { const d = await pegarJSON(w + '/ai?q=' + encodeURIComponent(q) + '&p=' + encodeURIComponent(p), 15000); return d && !d.error ? limpa(d.answer) : ''; };
+  const w = baseWk(), p = String(cfg.iaPrompt || IA_PADRAO).trim(); perguntarIA.fotos = []; perguntarIA.bruta = '';
+  const ult = t => { const e = $('#aIaUlt'); if (e) e.textContent = t; };
+  if (!w || !q) { ult(q + ' → falta o intermediário'); return ''; }
+  const t0 = Date.now(), seg = () => Math.round((Date.now() - t0) / 1000) + ' s';
+  ult(q + ' → perguntando…');
+  const doListas = async () => { const d = await pegarJSON(w + '/ai?q=' + encodeURIComponent(q) + '&p=' + encodeURIComponent(p), 40000); if (!d || d.error) throw new Error((d && d.error) || 'sem resposta'); return String(d.answer || ''); };
   const doFamosos = async () => {
-    const d = await pegarJSON(w + (w.includes('?') ? '&' : '?') + 'nome=' + encodeURIComponent(q), 20000);
-    if (!d || d.erro) return '';
+    const d = await pegarJSON(w + (w.includes('?') ? '&' : '?') + 'nome=' + encodeURIComponent(q), 40000);
+    if (!d || d.erro) throw new Error((d && d.erro) || 'sem resposta');
     perguntarIA.fotos = (Array.isArray(d.fotos) ? d.fotos : []).map(f => typeof f === 'string' ? f : (f && (f.url || f.src))).filter(Boolean);
-    return limpa(d.nome_canonico || d.nome);
+    return String(d.nome_canonico || d.nome || '');
   };
   const ordem = /famosos/i.test(w) ? [doFamosos, doListas] : [doListas, doFamosos];
-  for (const f of ordem) { try { a = await f(); } catch (_) { a = ''; } if (a) break; }
-  const e = $('#aIaUlt'); if (e) e.textContent = q + ' → ' + (a || '?');
+  let bruta = '', erro = '';
+  for (const f of ordem) {
+    try { bruta = await f(); } catch (e) { bruta = ''; erro = e && (e.name === 'AbortError' || /tempo|timed? ?out|demor|expir/i.test(e.message || '')) ? 'demorou demais' : ((e && e.message) || 'erro'); }
+    if (bruta.trim()) break;
+  }
+  perguntarIA.bruta = bruta;
+  const a = limparResposta(bruta);
+  ult(q + ' → ' + (a ? a + ' (' + seg() + ')' : (erro || 'sem resposta') + ' (' + seg() + ')'));
   return a;
 }
 async function lerInject() {   // direto no Inject (11z.co), sem intermediário
