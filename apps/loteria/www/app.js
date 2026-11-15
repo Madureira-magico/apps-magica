@@ -405,7 +405,7 @@ let volJogo = null, sel = new Set(), avisoMostrado = false, sorte = null, volInf
 const grade = $('#vGrade');
 
 function abrirVolante(j) {
-  volJogo = j; sel = new Set(); avisoMostrado = false; sorte = null; magia.fila = null;
+  volJogo = j; sel = new Set(); avisoMostrado = false; sorte = null; desligarMagia();
   volInfo = info(j);
   const cab = $('#vCab');
   cab.style.background = j.virada ? j.cor2 : j.cor;
@@ -484,7 +484,7 @@ grade.addEventListener('click', e => {
   const el = e.target.closest('.vn');
   if (!el) return;
   const n = +el.dataset.n, j = volJogo;
-  if (sel.has(n)) sel.delete(n);
+  if (sel.has(n)) { sel.delete(n); magia.porMagia.delete(n); }
   else {
     if (sel.size >= j.max) return;
     sel.add(n);
@@ -498,12 +498,22 @@ $('#vBtn1').addEventListener('click', () => {
   const j = volJogo, n = sel.size;
   if (n < j.base) { sortearAte(j.base); atualizarVolante(); }
 });
+let ultimoLimpar = 0;
 $('#vBtn2').addEventListener('click', () => {
-  if (gestoUsado || magia.virado || !sel.size) return;
-  sel.clear(); avisoMostrado = false; magia.fila = null;
+  if (gestoUsado || magia.virado) return;
+  const agora = Date.now(), seguido = agora - ultimoLimpar < 1500;
+  ultimoLimpar = agora;
+  if (magia.ativo) {
+    if (seguido) { sel.clear(); desligarMagia(); }                       // duas vezes: apaga tudo e desliga
+    else sel = new Set([...sel].filter(n => magia.porMagia.has(n)));      // uma vez: tira só os tocados à mão
+  } else {
+    if (!sel.size) return;
+    sel.clear();
+  }
+  avisoMostrado = false;
   atualizarVolante();
 });
-$('#vVoltar').addEventListener('click', () => { if (!gestoUsado) irCartoes(); });
+$('#vVoltar').addEventListener('click', () => { if (!gestoUsado) { desligarMagia(); irCartoes(); } });
 
 /* aviso "Atenção" */
 function posicionarAviso() { $('.avcaixa').style.top = Math.max(ST + 80, (H - 309) / 2 + 14) + 'px'; }
@@ -513,57 +523,57 @@ $('#avOk').addEventListener('click', () => $('#aviso').classList.remove('on'));
 /* ======================================================================
    MODO MÁGICA — celular virado para baixo
    ====================================================================== */
-const magia = {virado: false, fila: null, beta: 0};
+const magia = {virado: false, ativo: false, porMagia: new Set()};
 function bilhete() { const b = guarda.ler('bilhete', [5, 12, 23, 34, 41, 58]); return b.filter(n => n >= 1 && n <= 60).slice(0, 6); }
 function magiaPode() {
   return guarda.ler('magica', true) && telaAtual === 'volante' && volJogo && volJogo.total === 60 && !$('#ajustes').classList.contains('on');
 }
+function desligarMagia() { magia.ativo = false; magia.porMagia = new Set(); }
 function mudouVirado(v) {
   if (v === magia.virado) return;
   magia.virado = v;
   if (v && magiaPode()) {
     $('#aviso').classList.remove('on');
-    // começa (ou continua) a marcar os números do bilhete que ainda faltam, em ordem sorteada
-    const b = bilhete();
-    const soBilhete = [...sel].every(n => b.includes(n));
-    if (!soBilhete) { magia.limpar = true; magia.fila = embaralhar(b.slice()); }
-    else { magia.limpar = false; magia.fila = embaralhar(b.filter(n => !sel.has(n))); }
+    if (!magia.ativo) {
+      magia.ativo = true;
+      // começo da mágica: se houver números de antes que não são do bilhete, saem no primeiro toque
+      magia.limparAntes = [...sel].some(n => !bilhete().includes(n));
+    }
   }
 }
-function embaralhar(a) { for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; } return a; }
-function visivel(n) {
-  const el = grade.querySelector('.vn[data-n="' + n + '"]');
-  if (!el) return false;
-  const a = grade.getBoundingClientRect(), b = el.getBoundingClientRect();
-  const dentro = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-  return dentro >= b.height * .6;
-}
+/* celular virado para baixo: qualquer toque, em qualquer lugar, marca um número do bilhete que falta (ordem aleatória).
+   Se ele estiver fora da tela, a lista rola sozinha até ele, como se a pessoa tivesse rolado. */
 function toqueMagico() {
-  if (!magia.fila || !magia.fila.length) return;
-  const vis = magia.fila.filter(visivel);
-  if (!vis.length) return;                       // nenhum número do bilhete à vista: espera rolar
-  if (magia.limpar) { sel.clear(); magia.limpar = false; }
-  const n = vis[Math.floor(Math.random() * vis.length)];
-  magia.fila = magia.fila.filter(x => x !== n);
-  sel.add(n); avisoMostrado = true; atualizarVolante();
+  if (!magia.ativo) return;
+  if (magia.limparAntes) { sel.clear(); magia.limparAntes = false; }
+  const falta = bilhete().filter(n => !sel.has(n));
+  if (!falta.length) return;
+  const n = falta[Math.floor(Math.random() * falta.length)];
+  sel.add(n); magia.porMagia.add(n); avisoMostrado = true;
+  atualizarVolante();
+  const el = grade.querySelector('.vn[data-n="' + n + '"]');
+  if (el) {
+    const a = grade.getBoundingClientRect(), b = el.getBoundingClientRect();
+    if (b.top < a.top + 4 || b.bottom > a.bottom - 4) {
+      const alvo = el.offsetTop - (grade.clientHeight - el.offsetHeight) / 2;
+      grade.scrollTop = Math.max(0, Math.min(alvo, grade.scrollHeight - grade.clientHeight));
+    }
+  }
 }
-/* com o celular virado: toque rápido marca; arrastar rola a lista de verdade e não marca nada */
-let mt = null;
+let toqueVirado = false;
 document.addEventListener('touchstart', e => {
   if (!(magia.virado && magiaPode())) return;
-  const t = e.touches[0];
-  mt = e.touches.length === 1 ? {x: t.clientX, y: t.clientY, t: Date.now(), mexeu: false} : null;
-}, {capture: true, passive: true});
+  e.preventDefault(); e.stopPropagation();          // virado: nada de rolar nem apertar botões
+  if (e.touches.length === 1) toqueVirado = true;
+}, {capture: true, passive: false});
 document.addEventListener('touchmove', e => {
-  if (mt && e.touches.length === 1) { const t = e.touches[0]; if (Math.hypot(t.clientX - mt.x, t.clientY - mt.y) > 10) mt.mexeu = true; }
-  else mt = null;
-}, {capture: true, passive: true});
+  if (magia.virado && magiaPode()) e.preventDefault();
+}, {capture: true, passive: false});
 document.addEventListener('touchend', e => {
-  if (!(magia.virado && magiaPode()) || !mt) return;
-  const ok = !mt.mexeu && Date.now() - mt.t < 700;
-  mt = null;
-  if (ok) toqueMagico();
-}, {capture: true, passive: true});
+  if (!(magia.virado && magiaPode())) { toqueVirado = false; return; }
+  e.preventDefault();
+  if (toqueVirado && e.touches.length === 0) { toqueVirado = false; toqueMagico(); }
+}, {capture: true, passive: false});
 document.addEventListener('click', e => {
   if (magia.virado && magiaPode()) { e.preventDefault(); e.stopPropagation(); }
 }, true);
@@ -755,6 +765,11 @@ function aplicarImagens() {
   atualizarTudo().then(() => { preencherCartoes(); });
 })();
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && volJogo) {
+    sel.clear(); sorte = null; avisoMostrado = false; desligarMagia();
+    $('#aviso').classList.remove('on');
+    if (telaAtual === 'volante') { grade.scrollTop = 0; atualizarVolante(); }
+  }
   if (document.visibilityState === 'visible') {
     const q = guarda.ler('net_quando', null);
     if (!q || Date.now() - q.quando > 20 * 60e3) atualizarTudo().then(() => preencherCartoes());
