@@ -2377,7 +2377,11 @@ async function perguntarIA(q) {
     const d = await pegarJSON(w + (w.includes('?') ? '&' : '?') + 'nome=' + encodeURIComponent(q), 40000);
     if (!d || d.erro) throw new Error((d && d.erro) || 'sem resposta');
     perguntarIA.fotos = (Array.isArray(d.fotos) ? d.fotos : []).map(f => typeof f === 'string' ? f : (f && (f.url || f.src))).filter(Boolean);
-    return String(d.nome_canonico || d.nome || '');
+    // dois nomes: o conhecido (d.nome, "Tom Hanks") e o de registro (d.nome_canonico, "Thomas Jeffrey Hanks")
+    const nomes = [d.nome, d.nome_canonico].map(x => String(x || '').trim()).filter(Boolean);
+    const daLista = nomes.find(x => acharFamoso(x));
+    const conhecido = nomes.find(x => semAcento(x) !== semAcento(q));
+    return [daLista || conhecido || nomes[0] || ''].concat(nomes).join('\n');   // 1ª linha = o escolhido; o resto ajuda a achar na lista
   };
   const ordem = /famosos/i.test(w) ? [doFamosos, doListas] : [doListas, doFamosos];
   let bruta = '', erro = '';
