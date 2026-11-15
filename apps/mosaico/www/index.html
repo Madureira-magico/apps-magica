@@ -1170,7 +1170,7 @@ async function prepararMosaico() {
   const img = new Image();
   await new Promise(ok => { img.onload = ok; img.onerror = ok; img.src = URLS.arq('mosaico.jpg', versao); });
   if (meu !== prepararMosaico.vez) return;
-  mos = { seq: nova, img, primeira, linhas, cols: n, versao, N, ids, tinta, px, ultima, ini: primeira * n, tintaIdx: tinta, cS, k0, uN, fL, normal: seqNormal.slice() };
+  mos = { seq: nova, img, primeira, linhas, cols: n, versao, realRow: (topo - cima) / t, realRows: H / t, real: atual.tipo === 'rosto' ? 'real.jpg' : '', N, ids, tinta, px, ultima, ini: primeira * n, tintaIdx: tinta, cS, k0, uN, fL, normal: seqNormal.slice() };
   seq = nova;
   atual.pronto = true;
   $('#real').style.backgroundImage = atual.tipo === 'rosto' ? 'url("' + URLS.arq('real.jpg', versao) + '")' : '';
@@ -1559,7 +1559,7 @@ function enviarGaleria(zerar) {
     envioPedido = false;
     const ap = arqPiada();
     const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
-    const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, img: 'mosaico.jpg', v: String(mos.versao) } : null;
+    const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, img: 'mosaico.jpg', v: String(mos.versao), real: mos.real || '', realRow: mos.realRow || 0, realRows: mos.realRows || 0 } : null;
     const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.ajuda == null ? 3 : +cfg.ajuda };
     nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
     zerarGal = false;
@@ -1900,12 +1900,16 @@ function passoReal(t) {
   if (segura) { realP = Math.min(1, realP + dt / 2.4); if (realP >= 1 && cfg.fotoReal) realTrava = true; }
   else if (!realTrava) realP = Math.max(0, realP - dt / 0.8);
   if (!podeReal() && !realTrava) realP = 0;
-  const r = $('#real'); r.style.transition = 'none'; r.style.opacity = realP;
+  const r = $('#real'); r.style.transition = 'none';
+  if (nativo) { r.style.opacity = 0; mudarRealNat(realP); }   // a foto real fica dentro da galeria, grudada no mosaico
+  else r.style.opacity = realP;
   if (realP > 0 || segura) realLoop = requestAnimationFrame(passoReal); else { realLoop = 0; realT = 0; }
 }
+let realNatA = -1;
+function mudarRealNat(a) { a = Math.round(a * 100) / 100; if (a === realNatA) return; realNatA = a; nat.call('galeriaReal', { a }).catch(() => {}); }
 function animarReal() { if (!realLoop) { realT = 0; realLoop = requestAnimationFrame(passoReal); } }
 function saiuDasFotos() {   // depois de mostrar o rosto inteiro, ao sair das Fotos começa tudo do zero
-  realTrava = false; realP = 0; $('#real').style.opacity = 0;
+  realTrava = false; realP = 0; $('#real').style.opacity = 0; if (nativo) mudarRealNat(0);
   if (revelado) { revelado = false; limparNome(); }
 }
 $('#bSel').addEventListener('touchstart', () => { if (podeReal()) { selSegura = true; animarReal(); } }, { passive: true });

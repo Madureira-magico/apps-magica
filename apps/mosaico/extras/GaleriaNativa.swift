@@ -21,6 +21,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var naFace = false
     private var xTravado: CGFloat?
     private let magImg = UIImageView()
+    private let realImg = UIImageView()     // a foto real, grudada no mosaico (mesmo lugar e tamanho do rosto montado)
+    private var realRow: CGFloat = 0, realRows: CGFloat = 0
     private let corCamada = CALayer()
     private var toque: UITapGestureRecognizer!
     private weak var web: WKWebView?
@@ -98,6 +100,10 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         plano.addSubview(cobre)
         cobreBaixo.isUserInteractionEnabled = false
         plano.addSubview(cobreBaixo)
+        realImg.contentMode = .scaleToFill
+        realImg.alpha = 0
+        realImg.isUserInteractionEnabled = false
+        plano.addSubview(realImg)
         vista.addSubview(zoomer)
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
@@ -170,6 +176,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         case "galeriaTroca":
             trocar(Int(num("i", -1)), (m["id"] as? String) ?? "")
             r(true, nil)
+        case "galeriaReal":
+            realImg.alpha = max(0, min(1, num("a", 0)))
+            r(true, nil)
         case "galeriaEstado":
             r(["zoom": visiveis, "mag": temMos && visiveis > 13.5, "k": zoomer.zoomScale], nil)
         default:
@@ -209,16 +218,22 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             linhasMos = (d["linhas"] as? NSNumber)?.intValue ?? 0
             ini = (d["ini"] as? NSNumber)?.intValue ?? 0
             faixaL = (d["faixaL"] as? NSNumber)?.intValue ?? 0
+            realRow = CGFloat((d["realRow"] as? NSNumber)?.doubleValue ?? 0)
+            realRows = CGFloat((d["realRows"] as? NSNumber)?.doubleValue ?? 0)
+            let real = (d["real"] as? String) ?? ""
             let img = (d["img"] as? String) ?? "", v = "\(d["v"] ?? "")"
             if v != mosV || img != mosImg || magImg.image == nil {
                 mosImg = img; mosV = v
                 magImg.image = UIImage(contentsOfFile: urlArq(img).path)
+                realImg.image = real.isEmpty ? nil : UIImage(contentsOfFile: urlArq(real).path)
+                realImg.alpha = 0
                 tinta.image = imagemTinta(false)
                 tintaFaixa.image = imagemTinta(true)
             }
         } else if m["mos"] != nil {
             mosIds = []; mosTinta = []; mosCols = 0; mosV = ""
             magImg.image = nil; tinta.image = nil; tintaFaixa.image = nil
+            realImg.image = nil; realImg.alpha = 0
         }
         let selAntes = selecao ? selecionados : []
         if let c = m["cfg"] as? [String: Any] {
@@ -301,6 +316,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tinta.isHidden = !temMos
         tintaFaixa.isHidden = !temMos
         magImg.isHidden = !temMos
+        realImg.frame = CGRect(x: 0, y: realRow * t, width: W, height: realRows * t)
+        realImg.isHidden = !temMos || realImg.image == nil
         zoomer.contentSize = plano.frame.size
         zoomer.contentInset = UIEdgeInsets(top: cima, left: 0, bottom: sb + 70, right: 0)
         zoomer.minimumZoomScale = 1
