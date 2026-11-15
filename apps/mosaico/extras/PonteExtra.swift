@@ -267,7 +267,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     }
     /// Fechamento como no iOS 26 (medido quadro a quadro num iPhone):
     /// o app encolhe rápido até o ícone; ali vira o próprio ícone, maior e esticado, que "chacoalha" até o tamanho normal;
-    /// a tela de início começa desfocada e um pouco ampliada, e volta ao normal.
+    /// a tela de início começa desfocada e um pouco menor, e cresce até o normal.
     private func telaFecharVai(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) {
         guard let w = web, let jan = janela(), let velho = velhoTela else { return }
         velhoTela = nil
@@ -283,7 +283,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             jan.insertSubview(f, belowSubview: velho)
             desfoque.frame = B
             jan.insertSubview(desfoque, belowSubview: velho)
-            f.transform = CGAffineTransform(scaleX: 1.07, y: 1.07)
+            f.transform = CGAffineTransform(scaleX: 0.94, y: 0.94)   // a tela de início começa um pouco menor e cresce (medido no iPhone)
         }
         if let ic = icone {
             ic.frame = rIcone
@@ -309,8 +309,8 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             UIView.animate(withDuration: 0.5, delay: dur - 0.04, usingSpringWithDamping: 0.52, initialSpringVelocity: 0.6, options: []) { ic.transform = .identity }
         }
         // 3) a tela de início perde o desfoque e volta ao tamanho normal
-        UIView.animate(withDuration: 0.42, delay: dur - 0.06, options: [.curveEaseOut]) {
-            fundo?.transform = .identity
+        UIView.animate(withDuration: 0.4, delay: dur - 0.08, options: [.curveEaseOut]) {
+            fundo?.transform = .identity   // cresce até o tamanho normal
             desfoque.alpha = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + dur + 0.55) {
