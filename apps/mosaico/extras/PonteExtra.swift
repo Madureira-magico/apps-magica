@@ -247,25 +247,26 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         }
     }
     private func telaFechar(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat, _ r: @escaping Resposta) {
-        guard let w = web, let jan = janela(), let velho = w.snapshotView(afterScreenUpdates: false) else { return r(true, nil) }
+        // a página (Notas) é desenhada fora do app: a foto precisa ser tirada "depois de atualizar", senão sai vazia
+        guard let w = web, let jan = janela(), let velho = w.snapshotView(afterScreenUpdates: true) else { return r(true, nil) }
         let B = w.convert(w.bounds, to: jan)
         velho.frame = B
         velho.layer.masksToBounds = true
         jan.addSubview(velho)
         r(true, nil)   // a página já pode trocar para a tela de início por baixo
-        let k = max(0.05, s / B.width)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) {
-            UIView.animate(withDuration: 0.42, delay: 0, usingSpringWithDamping: 0.92, initialSpringVelocity: 0, options: [.curveEaseInOut]) {
-                velho.transform = CGAffineTransform(translationX: x - B.midX, y: y - B.midY).scaledBy(x: k, y: k)
-            }
-            UIView.animate(withDuration: 0.16, delay: 0.26, options: [.curveEaseIn]) { velho.alpha = 0 }
-            let raio = CABasicAnimation(keyPath: "cornerRadius")
-            raio.fromValue = 0; raio.toValue = 0.2237 * s / k; raio.duration = 0.36
-            raio.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            velho.layer.cornerRadius = 0.2237 * s / k
-            velho.layer.add(raio, forKey: "raio")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.46) { velho.removeFromSuperview() }
-        }
+        let k = max(0.05, s / B.width), raioFim = 0.2237 * s / k
+        let fim = CGAffineTransform(translationX: x - B.midX, y: y - B.midY).scaledBy(x: k, y: k)
+        let dur = 0.42
+        // encolhe sem quicar e some exatamente ao chegar no ícone (sem o "tiquezinho" no final)
+        UIView.animateKeyframes(withDuration: dur, delay: 0.02, options: [.calculationModeCubic]) {
+            UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 1) { velho.transform = fim }
+            UIView.addKeyframe(withRelativeStartTime: 0.55, relativeDuration: 0.45) { velho.alpha = 0 }
+        } completion: { _ in velho.removeFromSuperview() }
+        let raio = CABasicAnimation(keyPath: "cornerRadius")
+        raio.fromValue = 0; raio.toValue = raioFim; raio.duration = dur * 0.8
+        raio.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        velho.layer.cornerRadius = raioFim
+        velho.layer.add(raio, forKey: "raio")
     }
 
     // MARK: permissão e lista de fotos
