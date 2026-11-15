@@ -143,6 +143,14 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             fila.async { responder(self.info(id), nil) }
         case "baixarRosto":
             baixarRosto(txt("url"), nome: txt("nome"), responder)
+        case "pegar":   // texto de um endereço, sem bloqueio de outro site (Inject direto)
+            guard let url = URL(string: txt("url")) else { return responder(nil, "endereço inválido") }
+            var pedido = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: max(2, num("tempo", 6)))
+            pedido.setValue("application/json", forHTTPHeaderField: "Accept")
+            URLSession.shared.dataTask(with: pedido) { dados, resp, erro in
+                guard let d = dados, let s = String(data: d, encoding: .utf8) else { return responder(nil, erro?.localizedDescription ?? "sem resposta") }
+                responder(["status": (resp as? HTTPURLResponse)?.statusCode ?? 0, "texto": s], nil)
+            }.resume()
         case "pele":
             let n = txt("nome")
             fila.async {

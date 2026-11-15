@@ -31,7 +31,7 @@ const guarda = {
 };
 const cfg = Object.assign({
   abrir: 'fototeca', tema: 'auto', n0: 3, colsM: 60, cor: 'cor', reforco: 0.4, enq: 'perto', filtro: true, aviso: true,
-  fotoReal: false, vibrar: true, origem: '', limite: 8000, inj: false, injId: '', wk: '', temPrint: false, zonas: {},
+  fotoReal: false, vibrar: true, origem: '', limite: 8000, inj: false, injId: '', wk: '', ia: true, iaPrompt: '', temPrint: false, zonas: {},
   piada: 'bebes', bebe: 0, bebes: [false, false, false, false], fixas: [], fixa: 0, tirados: [], abert: [], ver: 1, v: 2
 }, guarda.get('cfg', {}));
 if (!Array.isArray(cfg.abert)) cfg.abert = [];
@@ -72,14 +72,40 @@ function listaPadrao() {
 let famosos = guarda.get('famosos', null);
 if (!Array.isArray(famosos) || !famosos.length) famosos = listaPadrao();
 const salvarFam = () => guarda.set('famosos', famosos);
+/* lista nova do app: junta com a que já está no iPhone (sem perder fotos, bebês e famosos que você incluiu) */
+(function juntarLista() {
+  const VER = 2; if (guarda.get('famVer', 0) >= VER) return;
+  const pos = new Map(famosos.map((f, i) => [semAcento(f.n), i]));
+  for (const d of listaPadrao()) {
+    const i = pos.get(semAcento(d.n));
+    if (i === undefined) { famosos.push(d); pos.set(semAcento(d.n), famosos.length - 1); continue; }
+    const f = famosos[i]; f.a = Array.isArray(f.a) ? f.a : [];
+    if (!f.w && d.w) f.w = d.w;
+    const tem = new Set(f.a.map(semAcento));
+    for (const x of d.a) if (!tem.has(semAcento(x))) { f.a.push(x); tem.add(semAcento(x)); }
+    if (semAcento(f.n) === 'dwayne johnson') f.a = f.a.filter(x => semAcento(x) !== 'rock');
+  }
+  salvarFam(); guarda.set('famVer', VER);
+})();
 function nomesDe(f) { return [f.n, (f.w || '').replace(/\s*\(.*\)$/, ''), ...(f.a || [])].map(semAcento).filter(x => x.length >= 2); }
-function distancia(a, b) {
+function distancia(a, b) {   // letras a mais, a menos, trocadas ou invertidas ("smtih") contam 1 erro cada
   if (Math.abs(a.length - b.length) > 2) return 9;
   const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]);
   for (let j = 1; j <= n; j++) d[0][j] = j;
-  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
     d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
   return d[m][n];
+}
+/* tira o que a pessoa escreve junto: "imagens do Neymar", "quem é a Anitta", "Will Smith idade" */
+const PRE_PEDIDO = /^(?:(?:me\s+)?(?:mostra|mostre|ver|veja)\s+|(?:quem\s+(?:e|é|foi)|como\s+(?:esta|está)|onde\s+(?:mora|nasceu))\s+|(?:as\s+|os\s+)?(?:fotos?|imagens?|imagem|pics?|fotografias?|wallpapers?|pap[eé]is\s+de\s+parede|v[ií]deos?|not[ií]cias?|biografia|vida)\s+(?:de|do|da|dos|das|of)?\s*|(?:o|a|os|as)\s+(?=\S{2}))/i;
+const POS_PEDIDO = /\s+(?:fotos?|imagens?|imagem|pics?|images?|photos?|idade|altura|peso|esposa|esposo|marido|mulher|namorada|namorado|filhos?|filhas?|pai|m[ãa]e|jovem|novo|nova|crian[çc]a|antes|depois|hoje|agora|atual|atualmente|instagram|insta|tiktok|twitter|wikipedia|wiki|morreu|morte|vivo|viva|nasceu|nascimento|biografia|ator|atriz|cantor|cantora|jogador|apresentador|apresentadora|famos[oa]|real|2\d{3})$/i;
+function limparPedido(txt) {
+  let t = String(txt || '').replace(/[?!.,;:"“”]+/g, ' ').replace(/\s+/g, ' ').trim(), antes;
+  do { antes = t; const u = t.replace(PRE_PEDIDO, '').trim(); if (u) t = u; } while (t !== antes);
+  do { antes = t; if (t.split(' ').length > 1) t = t.replace(POS_PEDIDO, '').trim(); } while (t !== antes);
+  return t || String(txt || '').trim();
 }
 const limiteErro = q => q.length >= 10 ? 2 : q.length >= 5 ? 1 : 0;
 /* o texto inteiro é o nome (digitado, Notas, Inject) */
@@ -193,7 +219,7 @@ if (atual) atual.pronto = false;
 function estado(t, cls) { const e = $('#aEstado'); if (e) { e.textContent = t; e.className = 'r ' + (cls || ''); } }
 function mostrarAtual() {
   const e = $('#aAtual'); if (e) e.textContent = atual ? atual.nome + (atual.tipo === 'texto' ? ' (nome escrito)' : '') : '—';
-  if (typeof desenharInicio === 'function' && $('#iniGrade')) desenharInicio();
+  if (typeof desenharInicio === 'function' && $('#cvIni')) desenharInicio();
   $('#ponto').classList.toggle('on', !!(cfg.aviso && atual && atual.pronto && mos));
 }
 
@@ -201,8 +227,9 @@ async function definirNome(txt, origem) {
   txt = String(txt || '').replace(/\s+/g, ' ').trim();
   if (txt.length < 2 || txt.length > 60) return;
   const meu = ++preparo;
-  const f = acharFamoso(txt);
-  const nome = f ? f.n : maiusculas(txt);
+  const limpo = limparPedido(txt);
+  const f = acharFamoso(txt) || acharFamoso(limpo);
+  const nome = f ? f.n : maiusculas(limpo);
   escolherBebe(f, nome);
   atual = { nome, tipo: 'texto', pronto: false, origem };
   pontos(1, false);
@@ -217,8 +244,25 @@ async function definirNome(txt, origem) {
   }
   if (!fam || !fam.f) {
     estado('procurando foto…');
-    fam = await baixarFamoso(fam || { n: nome, w: '', a: [], b: -1, f: '', r: null }, !fam);
+    const temIA = !fam && cfg.ia !== false && !!cfg.wk;
+    fam = await baixarFamoso(fam || { n: nome, w: '', a: [], b: -1, f: '', r: null }, !fam, temIA);
     if (meu !== preparo) return;
+    if (!fam && temIA) {                // 3) nem lista nem Wikipédia: a IA corrige o nome
+      estado('corrigindo o nome…');
+      const certo = maiusculas(limparPedido(await perguntarIA(limpo)));
+      if (meu !== preparo) return;
+      if (certo && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
+        let g = acharFamoso(certo);
+        if (!g || !g.f) g = await baixarFamoso(g || { n: certo, w: '', a: [], b: -1, f: '', r: null }, !g, false);
+        if (meu !== preparo) return;
+        if (g) {                         // aprende: da próxima vez já sai da lista
+          if (!(g.a || []).some(x => semAcento(x) === semAcento(limpo))) { g.a = (g.a || []).concat(limpo.toLowerCase()); salvarFam(); }
+          fam = g; escolherBebe(g, g.n);
+          atual = { nome: g.n, tipo: 'texto', pronto: false, origem };
+          if (!g.f) await prepararMosaico();
+        }
+      }
+    }
   }
   if (fam) { await completarFamoso(fam); if (meu !== preparo) return; escolherBebe(fam, nome); }
   if (fam && fam.f) {                   // 2) troca pelo rosto
@@ -283,18 +327,28 @@ async function infoWiki(lang, titulo, busca) {
     const pags = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
     const p = pags.find(x => x.thumbnail && x.thumbnail.source);
     if (p && p.pageprops && p.pageprops.wikibase_item) infoWiki.q = p.pageprops.wikibase_item;
+    infoWiki.t = p ? p.title : '';
     return p ? p.thumbnail.source : '';
   } catch (_) { return ''; } finally { clearTimeout(t); }
 }
-async function baixarFamoso(f, novo) {
+/* a página que a Wikipédia achou é mesmo a pessoa pedida? (senão, a IA corrige o nome) */
+function tituloBate(titulo, pedido) {
+  const t = semAcento(String(titulo || '').replace(/\s*\(.*\)$/, '')), q = semAcento(pedido);
+  if (!t || !q) return false;
+  if (t === q || distancia(t, q) <= limiteErro(q)) return true;
+  const pt = t.split(' '), pq = q.split(' ').filter(x => x.length > 1);
+  return pq.length > 0 && pq.every(x => pt.some(y => y === x || (x.length >= 5 && distancia(x, y) <= 1)));
+}
+async function baixarFamoso(f, novo, estrito) {
   const tentativas = [];
   if (f.w) tentativas.push(['pt', f.w, '']);
   tentativas.push(['pt', '', f.n], ['en', f.w && !/\(/.test(f.w) ? f.w : '', f.n]);
   let feito = null;
   for (const [lang, tit, busca] of tentativas) {
-    infoWiki.q = '';
+    infoWiki.q = ''; infoWiki.t = '';
     const url = await infoWiki(lang, tit, busca);
     if (!url) continue;
+    if (estrito && busca && !tituloBate(infoWiki.t, busca)) continue;
     if (infoWiki.q) f.q = infoWiki.q;
     const nome = 'famosos/' + slug(f.n) + '.jpg';
     try {
@@ -1261,61 +1315,80 @@ const PI = {
   bolinha: { x: 0.6900, y: 0.5637, d: 0.0642 },
   hora: [0.0800, 0.0190, 0.2850, 0.0550], bat: [0.6950, 0.0190, 0.9350, 0.0550]   // hora e bateria do print
 };
-function temInicio() { return !!cfg.temPrint; }
+if (!cfg.ini36) { cfg.ini36 = true; cfg.temFundo = false; }   // 3.6: começa com o papel de parede original
+function temInicio() { return true; }   // a tela de início já vem pronta dentro do app (ícones transparentes)
 function carregarImg(src) { return new Promise(ok => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; }); }
+/* palco = área do print (1184 x 2576), cobrindo a tela; tudo dentro dele em frações */
+const PALCO = 1184 / 2576;
+let pal = { x: 0, y: 0, w: 1, h: 1 };
+function ajustarInicio() {
+  let w = W, h = W / PALCO; if (h < H) { h = H; w = H * PALCO; }
+  pal = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+  Object.assign($('#iniPalco').style, { left: pal.x + 'px', top: pal.y + 'px', width: w + 'px', height: h + 'px' });
+  $('#iniVidroDock').style.borderRadius = (0.1014 * w) + 'px';
+  // "Buscar" na letra do iPhone, da mesma largura do print
+  const g = document.createElement('canvas').getContext('2d'); g.font = '600 10px -apple-system, system-ui';
+  const f = 10 * (0.0946 * w) / g.measureText('Buscar').width;
+  const t = $('#iniVidroBusca .txt'); t.style.fontSize = f + 'px';
+  const sv = t.querySelector('svg'); sv.style.width = sv.style.height = (0.0233 * w) + 'px'; sv.style.marginRight = (0.0135 * w) + 'px';
+  $$('#iniVidroBusca .pts i').forEach((i, k) => { const d = 0.0195 * w; Object.assign(i.style, { width: d + 'px', height: d + 'px', margin: '0 ' + (0.0105 * w) + 'px' }); });
+}
+const noPalco = p => ({ x: (p.clientX - pal.x) / pal.w, y: (p.clientY - pal.y) / pal.h });
 let iniVez = 0;
 async function desenharInicio() {
   const vez = ++iniVez;
-  $('#inicioVazio').style.display = temInicio() ? 'none' : 'flex';
-  $('#iniFundo').style.backgroundImage = cfg.temFundo ? 'url("' + URLS.arq('inicio/fundo.jpg', cfg.ver) + '")' : '';
-  const c = $('#cvIni');
-  if (!temInicio()) { c.width = 1; c.height = 1; return; }
-  const pr = await carregarImg(URLS.arq('inicio/print.jpg', cfg.ver));
-  if (vez !== iniVez || !pr) return;
-  const cw = Math.round(W * DPR), ch = Math.round(H * DPR);
+  ajustarInicio();
+  $('#iniFundo').style.backgroundImage = 'url("' + (cfg.temFundo ? URLS.arq('inicio/fundo.jpg', cfg.ver) : 'ini/papel.jpg') + '")';
+  const c = $('#cvIni'), cw = Math.round(pal.w * DPR), ch = Math.round(pal.h * DPR);
+  if (vez !== iniVez) return;
   c.width = cw; c.height = ch;
-  const g = c.getContext('2d');
-  const cobrir = (ctx, im) => { const k = Math.max(cw / im.naturalWidth, ch / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k; ctx.drawImage(im, (cw - w) / 2, (ch - h) / 2, w, h); };
-  cobrir(g, pr);
-  // o print já vem limpo (sem hora, bateria e sem o nome do Instagram): o app só escreve por cima
-  {
-    const n = PI.nome;
-    // nome do famoso, na fonte do iPhone, do mesmo tamanho do "Instagram"
-    g.font = '500 10px -apple-system, system-ui'; const base = g.measureText('Instagram').width;
-    const f = 10 * (n.larg * cw) / base;
-    g.font = '500 ' + f + 'px -apple-system, system-ui';
-    let txt = atual ? atual.nome : 'Instagram'; const max = 0.205 * cw;
-    if (g.measureText(txt).width > max) { while (txt.length > 1 && g.measureText(txt + '…').width > max) txt = txt.slice(0, -1); txt = txt.trimEnd() + '…'; }
-    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    g.fillText(txt, n.cx * cw, n.topo * ch + 0.705 * f);
-    // bolinha vermelha com o 1 (só com nome recebido)
-    if (!atual) return;
-    const b = PI.bolinha, r = b.d * cw / 2;
-    g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(b.x * cw, b.y * ch, r, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#fff'; g.font = '500 ' + (r * 1.15) + 'px -apple-system, system-ui'; g.textBaseline = 'middle'; g.fillText('1', b.x * cw, b.y * ch + r * 0.04);
-  }
+  const g = c.getContext('2d'); g.clearRect(0, 0, cw, ch);
+  const n = PI.nome;
+  // nome do famoso (ou "Instagram"), na fonte do iPhone, do mesmo tamanho do "Instagram"
+  g.font = '500 10px -apple-system, system-ui'; const base = g.measureText('Instagram').width;
+  const f = 10 * (n.larg * cw) / base;
+  g.font = '500 ' + f + 'px -apple-system, system-ui';
+  let txt = atual ? atual.nome : 'Instagram'; const max = 0.205 * cw;
+  if (g.measureText(txt).width > max) { while (txt.length > 1 && g.measureText(txt + '…').width > max) txt = txt.slice(0, -1); txt = txt.trimEnd() + '…'; }
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.fillText(txt, n.cx * cw, n.topo * ch + 0.705 * f);
+  if (!atual) return;   // bolinha vermelha com o 1 (só com nome recebido)
+  const b = PI.bolinha, r = b.d * cw / 2;
+  g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(b.x * cw, b.y * ch, r, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff'; g.font = '500 ' + (r * 1.15) + 'px -apple-system, system-ui'; g.textBaseline = 'middle'; g.fillText('1', b.x * cw, b.y * ch + r * 0.04);
 }
-/* deslizar para o lado na tela de início: mostra a página ao lado e volta sozinha */
+/* deslizar para o lado: só os ícones andam (papel de parede, Buscar e dock ficam); a 2ª página volta sozinha */
 (function () {
-  const el = $('#inicio'); let x0 = 0, y0 = 0, dx = 0, modo = '';
-  const mover = (x, anim) => { const g = $('#cvIni'); g.style.transition = anim ? 'transform .38s cubic-bezier(.25,.9,.3,1)' : 'none'; g.style.transform = 'translateX(' + x + 'px)'; };
-  el.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; modo = ''; }, { passive: true });
+  const el = $('#inicio'), pg = $('#iniPags'), bu = $('#iniVidroBusca'), pts = $$('#iniVidroBusca .pts i');
+  let x0 = 0, y0 = 0, dx = 0, modo = '', na2 = false, tVolta = 0, tPts = 0, t0 = 0;
+  const pos = (x, anim) => { pg.style.transition = anim ? 'transform .42s cubic-bezier(.25,.95,.3,1)' : 'none'; pg.style.transform = 'translate3d(' + x + 'px,0,0)'; };
+  const ponto = i => pts.forEach((p, k) => p.classList.toggle('on', k === i));
+  const mostrarPts = () => { clearTimeout(tPts); bu.classList.add('pg'); };
+  const esconderPts = () => { clearTimeout(tPts); tPts = setTimeout(() => bu.classList.remove('pg'), 700); };
+  const voltar = () => { clearTimeout(tVolta); mostrarPts(); na2 = false; pos(0, true); ponto(0); esconderPts(); };
+  el.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; modo = ''; t0 = Date.now(); }, { passive: true });
   el.addEventListener('touchmove', e => {
     const t = e.touches[0]; dx = t.clientX - x0;
-    if (!modo && Math.hypot(dx, t.clientY - y0) > 10) modo = Math.abs(dx) > Math.abs(t.clientY - y0) ? 'lado' : 'outro';
-    if (modo === 'lado') mover(dx < 0 ? dx : dx * 0.3);
+    if (!modo && Math.hypot(dx, t.clientY - y0) > 10) { modo = Math.abs(dx) > Math.abs(t.clientY - y0) ? 'lado' : 'outro'; if (modo === 'lado') { clearTimeout(tVolta); mostrarPts(); } }
+    if (modo !== 'lado') return;
+    const base = na2 ? -pal.w : 0; let x = base + dx;
+    if (x > 0) x = x * 0.3; if (x < -pal.w) x = -pal.w + (x + pal.w) * 0.3;   // borrachinha nas pontas, igual ao iPhone
+    pos(x); ponto(x < -pal.w / 2 ? 1 : 0);
   }, { passive: true });
   el.addEventListener('touchend', () => {
     if (modo !== 'lado') return;
-    if (dx < -W * 0.25) { mover(-W, true); setTimeout(() => mover(0, true), 1100); }   // vai para a página ao lado e volta sozinha
-    else mover(0, true);
+    const rapido = Math.abs(dx) / Math.max(1, Date.now() - t0) > 0.4;
+    if (!na2 && (dx < -pal.w * 0.4 || (rapido && dx < -30))) { na2 = true; pos(-pal.w, true); ponto(1); tVolta = setTimeout(voltar, 1000 + 420); }
+    else if (na2 && (dx > pal.w * 0.4 || (rapido && dx > 30))) voltar();
+    else { pos(na2 ? -pal.w : 0, true); ponto(na2 ? 1 : 0); if (na2) tVolta = setTimeout(voltar, 1000); else esconderPts(); }
     el.dataset.arrastou = '1'; setTimeout(() => { el.dataset.arrastou = ''; }, 60);
   }, { passive: true });
+  window.voltarPagina1 = () => { clearTimeout(tVolta); na2 = false; pos(0); ponto(0); bu.classList.remove('pg'); };
 })();
 /* segurar o Instagram: cartão de "notificação" com a foto e o nome da personalidade */
 (function () {
   const el = $('#inicio'); let t = 0;
-  const perto = e => { const p = e.touches ? e.touches[0] : e; return Math.abs(p.clientX / W - PI.insta.x) < 0.09 && Math.abs(p.clientY / H - PI.insta.y) < 0.05; };
+  const perto = e => { const p = noPalco(e.touches ? e.touches[0] : e); return Math.abs(p.x - PI.insta.x) < 0.09 && Math.abs(p.y - PI.insta.y) < 0.05; };
   const fechar = () => { clearTimeout(t); t = 0; $('#cartaoIg').classList.remove('on'); };
   el.addEventListener('touchstart', e => {
     if (!temInicio() || !perto(e)) return;
@@ -1326,7 +1399,7 @@ async function desenharInicio() {
       $('#cigTxt').textContent = atual ? 'começou a seguir você · agora' : 'Nenhuma notificação';
       $('#cigFoto').style.backgroundImage = arq ? 'url("' + URLS.arq(arq, cfg.ver) + '")' : '';
       $('#cigFoto').classList.toggle('vazia', !arq);
-      const c = $('#cartaoIg'); c.style.top = Math.max(stPx() + 10, PI.insta.y * H - 0.06 * H - 230) + 'px';
+      const c = $('#cartaoIg'); c.style.top = Math.max(stPx() + 10, pal.y + PI.insta.y * pal.h - 0.06 * pal.h - 230) + 'px';
       c.classList.add('on');
     }, 450);
   }, { passive: true });
@@ -1335,15 +1408,15 @@ async function desenharInicio() {
 })();
 $('#inicio').addEventListener('click', e => {
   if ($('#inicio').dataset.arrastou) return;
-  if (!temInicio()) { abrirAjustes(); return; }
-  const x = e.clientX / W, y = e.clientY / H, perto = p => Math.abs(p.x - x) < 0.095 && Math.abs(p.y - y) < 0.05;
+  if ($('#iniPags').style.transform.includes('-')) return;   // na 2ª página nada abre
+  const { x, y } = noPalco(e), perto = p => Math.abs(p.x - x) < 0.095 && Math.abs(p.y - y) < 0.05;
   if (perto(PI.ajustes)) abrirAjustes();
   else if (perto(PI.notas)) abrirDoIcone('notas', PI.notas);
   else if (perto(PI.fotos)) abrirDoIcone('fototeca', PI.fotos);
 });
 function abrirDoIcone(qual, p) {
   const el = qual === 'notas' ? $('#notas') : $('#fototeca');
-  el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
+  el.style.transformOrigin = ((pal.x + p.x * pal.w) / W * 100) + '% ' + ((pal.y + p.y * pal.h) / H * 100) + '%';
   el.style.transition = 'none'; el.style.transform = 'scale(.12)'; el.style.opacity = '0.3';
   if (qual === 'notas') abrirNotas(); else { $('#busca').classList.remove('on'); mostrar('fototeca', true); }
   setTimeout(() => { el.style.transform = 'none'; if (qual === 'fototeca') enviarGaleria(); }, 420);   // botões no lugar certo depois da animação
@@ -1354,7 +1427,8 @@ function voltarInicio() {
   if (!temInicio()) return;
   const qual = telaAtual, el = $('#' + qual), p = qual === 'notas' ? PI.notas : PI.fotos;
   if (qual === 'notas') { $('#ntexto').blur(); enviarNota(); }
-  el.style.transformOrigin = (p.x * 100) + '% ' + (p.y * 100) + '%';
+  if (window.voltarPagina1) voltarPagina1();
+  el.style.transformOrigin = ((pal.x + p.x * pal.w) / W * 100) + '% ' + ((pal.y + p.y * pal.h) / H * 100) + '%';
   el.style.transition = 'transform .3s cubic-bezier(.3,.6,.3,1), opacity .3s'; el.style.transform = 'scale(.12)'; el.style.opacity = '0';
   if (nativo && qual === 'fototeca') nat.call('galeria', { on: false }).catch(() => {});
   setTimeout(() => { mostrar('inicio'); el.style.transition = 'none'; el.style.transform = 'none'; el.style.opacity = '1'; saiuDasFotos(); }, 300);
@@ -1393,7 +1467,6 @@ function menuInicio() {
     + l('Mosaico', pronto ? 'Pronto ✓' : atual ? 'Montando…' : '—', pronto ? 'v' : atual ? 'a' : '')
     + l('Fotos da galeria', base.length ? base.length.toLocaleString('pt-BR') + ' ✓' : 'Sem acesso', base.length ? 'v' : 'a')
     + l('Primeira tela', sl + ' de 17 fotos', sl ? 'v' : 'a')
-    + l('Tela de início', temInicio() ? 'Pronta ✓' : 'Falta configurar', temInicio() ? 'v' : 'a')
     + l('Internet', navigator.onLine ? 'Ligada ✓' : 'Sem internet', navigator.onLine ? 'v' : 'a');
   $('#aIndice').innerHTML = $$('#ajustes .sec').map((x, i) => '<div class="it" data-i="' + i + '"><b style="background:' + (x.dataset.cor || '#8e8e93') + '">' + (x.dataset.ic || '•') + '</b><span>' + x.querySelector('h3').textContent + '</span></div>').join('');
 }
@@ -1424,7 +1497,7 @@ const ROT_BEBE = ['Menino branco', 'Menina branca', 'Menino negro', 'Menina negr
 const CURTO_BEBE = ['Men. br.', 'Mna. br.', 'Men. ng.', 'Mna. ng.'];
 async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
-  $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
+  $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
   $('#aEspiaBebe').checked = !!cfg.espiaBebe; if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
@@ -1552,7 +1625,11 @@ $('#aBaixar').addEventListener('click', async () => {
 $('#aLimpar').addEventListener('click', limparNome);
 $('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
 $('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
-$('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); iniciarInject(); });
+$('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); });
+$('#aIa').addEventListener('change', e => { cfg.ia = e.target.checked; salvar(); });
+$('#aIaPrompt').addEventListener('input', e => { cfg.iaPrompt = e.target.value; salvar(); });
+$('#aIaPadrao').addEventListener('click', () => { cfg.iaPrompt = IA_PADRAO; $('#aIaPrompt').value = IA_PADRAO; salvar(); });
+$('#aIaTestar').addEventListener('click', async () => { const q = $('#aIaTeste').value.trim(); if (!q) return; $('#aIaUlt').textContent = 'perguntando…'; const a = await perguntarIA(limparPedido(q)); if (!a) $('#aIaUlt').textContent = 'sem resposta (confira o intermediário)'; });
 $('#aOrigem').addEventListener('change', e => { cfg.origem = e.target.value; salvar(); carregarFotos(); });
 $('#aLimite').addEventListener('change', e => { cfg.limite = +e.target.value; salvar(); analisarFotos(); });
 $('#aReanalisar').addEventListener('click', () => carregarFotos());
@@ -1573,27 +1650,39 @@ $('#aN0').addEventListener('change', e => { cfg.n0 = +e.target.value; zoom = cfg
 $('#aFundo').addEventListener('click', async () => {
   try { const r = await nat.call('escolher', { nome: 'inicio/fundo.jpg', rosto: false }); if (r && r.ok) { cfg.temFundo = true; cfg.ver++; salvar(); desenharInicio(); } } catch (_) {}
 });
-$('#aPrint').addEventListener('click', async () => {
-  try { const r = await nat.call('escolher', { nome: 'inicio/print.jpg', rosto: false }); if (r && r.ok) { cfg.temPrint = true; cfg.ver++; salvar(); desenharInicio(); } } catch (_) {}
-});
+$('#aFundoOrig').addEventListener('click', () => { cfg.temFundo = false; cfg.ver++; salvar(); desenharInicio(); toast('Papel de parede original'); });
 
 /* =====================================================================
-   INJECT (o mesmo intermediário do app Listas)
+   INJECT (direto no 11z.co) e IA (intermediário do app Listas)
    ===================================================================== */
+const baseWk = () => { let w = String(cfg.wk || '').trim(); if (w && !/^https?:\/\//.test(w)) w = 'https://' + w; return w.replace(/\/+$/, ''); };
+const IA_PADRAO = 'O texto "{x}" é o nome de uma pessoa famosa, talvez escrito errado, por apelido ou incompleto. Responda apenas com o nome completo correto como ela é mais conhecida, sem aspas, sem explicação. Se não souber, repita o texto.';
+async function perguntarIA(q) {
+  const w = baseWk(), p = String(cfg.iaPrompt || IA_PADRAO).trim(); if (!w || !q) return '';
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 15000);
+  try {
+    const r = await fetch(w + '/ai?q=' + encodeURIComponent(q) + '&p=' + encodeURIComponent(p), { cache: 'no-store', signal: ac.signal });
+    const d = await r.json(); const a = String((d && d.answer) || '').split('\n')[0].replace(/^["'“”]+|["'“”.]+$/g, '').trim();
+    const e = $('#aIaUlt'); if (e) e.textContent = q + ' → ' + (a || '?');
+    return a;
+  } catch (_) { return ''; } finally { clearTimeout(t); }
+}
+async function lerInject() {   // direto no Inject (11z.co), sem intermediário
+  const u = 'https://11z.co/_w/' + encodeURIComponent(cfg.injId) + '/selection?_=' + Date.now();
+  if (nat.tem) { const r = await nat.call('pegar', { url: u, tempo: 4 }); return JSON.parse(r.texto); }
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 4000);
+  try { const r = await fetch(u, { cache: 'no-store', signal: ac.signal }); return await r.json(); } finally { clearTimeout(t); }
+}
 let injTimer = 0, injGen = 0, injUlt = null;
 function iniciarInject() {
   clearTimeout(injTimer); const g = ++injGen;
-  if (!cfg.inj || !cfg.injId || !cfg.wk) return;
-  let w = cfg.wk.trim(); if (!/^https?:\/\//.test(w)) w = 'https://' + w; w = w.replace(/\/+$/, '');
+  if (!cfg.inj || !cfg.injId) return;
   const chave = 'injUlt_' + cfg.injId; injUlt = guarda.get(chave, null);
   const passo = async () => {
     if (g !== injGen) return;
     if (!document.hidden) {
       try {
-        const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
-        const r = await fetch(w + '/inject?id=' + encodeURIComponent(cfg.injId) + '&_=' + Date.now(), { cache: 'no-store', signal: ac.signal });
-        clearTimeout(t);
-        const d = await r.json();
+        const d = await lerInject();
         if (g !== injGen) return;
         if (d && !d.error) {
           if (injUlt === null) { injUlt = d.count; guarda.set(chave, d.count); }
@@ -1606,7 +1695,7 @@ function iniciarInject() {
         }
       } catch (_) {}
     }
-    if (g === injGen) injTimer = setTimeout(passo, 1000);
+    if (g === injGen) injTimer = setTimeout(passo, 500);
   };
   passo();
 }
@@ -1615,7 +1704,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { sai
 /* =====================================================================
    INÍCIO
    ===================================================================== */
-window.addEventListener('resize', () => { ajustarTamanho(); enviarGaleria(); });
+window.addEventListener('resize', () => { ajustarTamanho(); enviarGaleria(); desenharInicio(); });
 async function testarNativo() {
   if (!nat.tem) return;
   try { await nat.call('galeriaEstado'); nativo = true; document.documentElement.classList.add('galNat'); enviarGaleria(true); if (telaAtual) mostrar(telaAtual); } catch (_) { nativo = false; }
