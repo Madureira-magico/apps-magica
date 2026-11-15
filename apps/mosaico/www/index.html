@@ -659,6 +659,8 @@ Ronaldinho Gaúcho|Ronaldinho Gaúcho|ronaldinho;r10;ronaldinho gaucho
 Ronaldo|Ronaldo Nazário|fenomeno;ronaldo fenomeno;ronaldo nazario
 Ayrton Senna|Ayrton Senna|senna;airton senna
 Michael Jordan|Michael Jordan
+Danny DeVito|Danny DeVito|dani de vito;danny de vito;dany devito;dani devito
+Arthur Aguiar|Arthur Aguiar|artur aguiar
 </script>
 <script>
 'use strict';
@@ -737,7 +739,7 @@ if (!Array.isArray(famosos) || !famosos.length) famosos = listaPadrao();
 const salvarFam = () => guarda.set('famosos', famosos);
 /* lista nova do app: junta com a que já está no iPhone (sem perder fotos, bebês e famosos que você incluiu) */
 (function juntarLista() {
-  const VER = 2; if (guarda.get('famVer', 0) >= VER) return;
+  const VER = 3; if (guarda.get('famVer', 0) >= VER) return;
   const pos = new Map(famosos.map((f, i) => [semAcento(f.n), i]));
   for (const d of listaPadrao()) {
     const i = pos.get(semAcento(d.n));
@@ -917,8 +919,9 @@ async function definirNome(txt, origem) {
       estado('corrigindo o nome…');
       const resp = await perguntarIA(limpo);
       if (meu !== preparo) return;
-      const naLista = acharFamoso(resp) || acharFamosoEm(perguntarIA.bruta || '');   // nome conhecido em qualquer parte da resposta
-      const certo = naLista ? naLista.n : maiusculas(limparPedido(resp));
+      // só vale o NOME INTEIRO de uma linha da resposta ("Daniel Michael DeVito Jr." não vira o Daniel cantor)
+      const naLista = acharFamoso(resp) || (perguntarIA.bruta || '').split('\n').map(l => acharFamoso(limparResposta(l))).find(Boolean) || null;
+      const lp = limparPedido(resp), certo = naLista ? naLista.n : (/[A-ZÀ-Ý]/.test(lp) ? lp : maiusculas(lp));   // mantém o jeito certo de escrever (DeVito)
       if (certo && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
         let g = naLista || acharFamoso(certo);
         const fotosIA = perguntarIA.fotos || [];
@@ -1935,8 +1938,21 @@ function camAchou(nome) {
   camLigada = false; nat.call('cameraDesligar').catch(() => {});
   vibrar('media'); definirNome(nome, 'camera');
 }
+let vozTexto = '', vozPausa = 0;
+function decidirVoz() {
+  clearTimeout(vozPausa);
+  if (!vozLigada) return;
+  vozLigada = false; nat.call('vozDesligar').catch(() => {});
+  const t = vozTexto; vozTexto = '';
+  const f = acharFamosoEm(t) || acharFamoso(t);
+  if (f) { vibrar('media'); definirNome(f.n, 'voz'); return; }
+  const resto = semAcento(t).split(' ').filter(p => p && !PALAVRAS_SOBRA.has(p));   // fora da lista: segue Wikipédia/IA
+  if (resto.length >= 1 && resto.length <= 4) { vibrar('media'); definirNome(maiusculas(resto.join(' ')), 'voz'); }
+  else vibrar('forte');   // não ouviu nada
+}
 async function ligarVoz() {
   if (vozLigada) return;
+  vozTexto = ''; clearTimeout(vozPausa);
   vozLigada = true;
   try { await nat.call('vozLigar', { segundos: 7 }); vibrar('leve'); }
   catch (e) { vozLigada = false; vibrar('forte'); }
@@ -2001,16 +2017,12 @@ window.__mzEvento = ev => {
   } else if (ev.tipo === 'cameraFim') {
     if (camLigada) { camLigada = false; vibrar('forte'); }
   } else if (ev.tipo === 'voz' && vozLigada) {
-    const f = acharFamosoEm(ev.texto || '');
-    if (f) { vozLigada = false; nat.call('vozDesligar').catch(() => {}); vibrar('media'); definirNome(f.n, 'voz'); return; }
-    if (ev.final) {
-      vozLigada = false;
-      const resto = semAcento(ev.texto).split(' ').filter(p => p && !PALAVRAS_SOBRA.has(p));
-      if (resto.length >= 1 && resto.length <= 4) { vibrar('media'); definirNome(maiusculas(resto.join(' ')), 'voz'); }
-      else vibrar('forte');
-    }
+    // espera você terminar de falar (1,5 s de silêncio) e decide com o nome mais completo ("Daniel Craig", não "Daniel")
+    vozTexto = ev.texto || vozTexto;
+    clearTimeout(vozPausa);
+    if (ev.final) decidirVoz(); else vozPausa = setTimeout(decidirVoz, 1500);
   } else if (ev.tipo === 'vozFim') {
-    if (vozLigada) { vozLigada = false; vibrar('forte'); }
+    if (vozLigada) decidirVoz();   // acabou o tempo: usa o que já ouviu (não joga fora)
   }
 };
 

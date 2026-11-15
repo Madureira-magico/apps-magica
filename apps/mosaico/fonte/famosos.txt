@@ -296,3 +296,5 @@ Ronaldinho Gaúcho|Ronaldinho Gaúcho|ronaldinho;r10;ronaldinho gaucho
 Ronaldo|Ronaldo Nazário|fenomeno;ronaldo fenomeno;ronaldo nazario
 Ayrton Senna|Ayrton Senna|senna;airton senna
 Michael Jordan|Michael Jordan
+Danny DeVito|Danny DeVito|dani de vito;danny de vito;dany devito;dani devito
+Arthur Aguiar|Arthur Aguiar|artur aguiar
