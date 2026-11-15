@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Loterias</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 1. Abertura (animação) -->
+  <section id="abertura" class="tela">
+    <div class="ab-fundo"></div>
+    <div class="ab-trevos" id="abTrevos"></div>
+    <svg id="abAnim" viewBox="0 0 402 874" preserveAspectRatio="xMidYMid slice"></svg>
+    <img id="abLogo" alt="">
+    <img id="abPrint" class="print" alt="">
+  </section>
+
+  <!-- 2. Tela azul -->
+  <section id="azul" class="tela">
+    <img id="azLogo" alt="">
+    <div id="azExperimente">Experimente</div>
+    <div id="azVersao">v. 1.25.2</div>
+    <img id="azPrint" class="print" alt="">
+    <div id="azZona"></div>
+  </section>
+
+  <!-- 3. Cartões dos jogos -->
+  <section id="cartoes" class="tela">
+    <div class="topo">
+      <div class="menu"><i></i><i></i><i></i></div>
+      <div class="circulo" id="topoIcone"></div>
+      <div class="linha"></div>
+    </div>
+    <div id="carrossel"></div>
+  </section>
+
+  <!-- 4. Volante -->
+  <section id="volante" class="tela">
+    <div class="vcab" id="vCab">
+      <div class="vvoltar" id="vVoltar"><svg viewBox="0 0 24 24"><path d="M15.5 3.5 7 12l8.5 8.5" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="vtitulo" id="vTitulo">mega da virada</div>
+      <div class="vinfo vconc"><span>Concurso</span><b id="vConc">3100</b></div>
+      <div class="vinfo vsort"><span>Sorteio</span><b id="vSort">01/01</b></div>
+      <div class="vajuda">?</div>
+    </div>
+    <div class="vpainel">
+      <div class="vpcab">
+        <div class="vtoggle"><div class="vknob"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="14" height="10" rx="1.5" fill="none" stroke="#fff" stroke-width="1.8"/><path d="M5 13h14M12 9v10M9 9c-2-2 0-4 1.5-3S12 9 12 9s.5-2 2-3 3.5 1 1.5 3" fill="none" stroke="#fff" stroke-width="1.6"/></svg></div></div>
+        <div class="vsurp">Surpresin...</div>
+        <div class="vcomo">Como jogar <span class="vi">i</span></div>
+      </div>
+      <div class="vpills">
+        <div class="vpill" id="vQtd">6 números <s></s></div>
+        <div class="vteim">Teimosinha <s></s></div>
+      </div>
+      <div class="vcont" id="vCont">Selecione os números:</div>
+      <div class="vgrade" id="vGrade"></div>
+    </div>
+    <div class="vbtn vbtn1" id="vBtn1">Aposta aleatória</div>
+    <div class="vbtn vbtn2 off" id="vBtn2">Limpar</div>
+    <div class="vadd off" id="vAdd">Adicionar ao carrinho</div>
+    <div class="vrod">
+      <div class="vcol1"><span>Valor dessa ap...</span><b id="vValor">R$ 6,00</b></div>
+      <div class="vsep vsep1"></div>
+      <div class="vcol2"><span>Total do carrinho</span><b>R$ 0,00</b></div>
+      <div class="vsep vsep2"></div>
+      <div class="vcarro"><svg viewBox="0 0 40 40"><path d="M3 7h5l5 18h19l4-13H11" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="15" cy="32" r="3" fill="none" stroke="#333" stroke-width="2.6"/><circle cx="29" cy="32" r="3" fill="none" stroke="#333" stroke-width="2.6"/></svg><em>0</em></div>
+    </div>
+  </section>
+
+  <!-- aviso "Atenção" -->
+  <div id="aviso">
+    <div class="avcaixa">
+      <div class="avtit">Atenção</div>
+      <div class="avlinha"></div>
+      <div class="avtxt">Você aumentou a quantidade de números, o valor será alterado. Fique atento ao valor final da sua aposta.</div>
+      <div class="avok" id="avOk">Entendi</div>
+    </div>
+  </div>
+
+  <!-- Ajustes secretos -->
+  <section id="ajustes">
+    <div class="aj-topo"><b>Ajustes</b><span id="ajFechar">Fechar</span></div>
+    <div class="aj-rolo">
+      <div class="aj-grupo">
+        <div class="aj-linha"><span>Modo mágica (celular virado)</span><label class="aj-chave"><input type="checkbox" id="ajMagica"><i></i></label></div>
+        <div class="aj-nota">Só na Mega da Virada e na Mega-Sena. Com o celular virado para baixo, cada toque marca um dos números do bilhete.</div>
+      </div>
+      <div class="aj-grupo">
+        <div class="aj-tit">Números do bilhete <em id="ajNumsTxt"></em></div>
+        <div class="aj-grade" id="ajGrade"></div>
+        <div class="aj-nota">Toque para escolher exatamente 6 números.</div>
+      </div>
+      <div class="aj-grupo">
+        <div class="aj-tit">Mega da Virada</div>
+        <div class="aj-seg" id="ajVirada"><span data-v="auto">Automático</span><span data-v="sim">Mostrar</span><span data-v="nao">Esconder</span></div>
+        <div class="aj-nota">Automático: aparece de 1º de novembro até o sorteio de 1º de janeiro.</div>
+      </div>
+      <div class="aj-grupo">
+        <div class="aj-tit">Imagens</div>
+        <div class="aj-img" data-k="logo"><span>Logo da tela azul</span><b></b><button data-a="trocar">Trocar logo</button><button data-a="tirar">Tirar</button></div>
+        <div class="aj-img" data-k="icone"><span>Ícone do topo e dos jogos (PNG sem fundo)</span><b></b><button data-a="trocar">Trocar ícone</button><button data-a="tirar">Tirar</button></div>
+        <div class="aj-img" data-k="printAzul"><span>Tela azul (print)</span><b></b><button data-a="trocar">Escolher print</button><button data-a="tirar">Restaurar padrão</button></div>
+        <div class="aj-img" data-k="printAbertura"><span>Abertura (print)</span><b></b><button data-a="trocar">Escolher print</button><button data-a="tirar">Restaurar padrão</button></div>
+        <div class="aj-img" data-k="video"><span>Abertura (vídeo)</span><b></b><button data-a="trocar">Incluir vídeo</button><button data-a="tirar">Tirar</button></div>
+        <div class="aj-nota">Prints e vídeo: a faixa de cima (hora, Wi-Fi, bateria) é coberta sozinha.</div>
+      </div>
+      <div class="aj-grupo">
+        <div class="aj-tit">Prêmios e datas</div>
+        <div class="aj-nota" id="ajPremios">—</div>
+        <button class="aj-bt" id="ajAtualizar">Atualizar agora</button>
+      </div>
+      <div class="aj-grupo">
+        <button class="aj-bt" id="ajReiniciar">Recomeçar do início (abertura)</button>
+      </div>
+      <div class="aj-rodape">Loterias · versão 1.0</div>
+    </div>
+    <input type="file" id="ajArquivo" accept="image/*" hidden>
+  </section>
+
+</div>
+<script src="dados.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
