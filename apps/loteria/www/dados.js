@@ -10,9 +10,7 @@ const JOGOS = [
   {id:'lotomania', api:'lotomania', nome:'lotomania', cor:'#c45a01', cor2:'#e26500', premioCor:'#e76400', total:100, zero:true, base:50, max:50, preco:3, dias:[1,3,5], ref:[3000,'2026-11-16'], premio:6e5, faixa:[5e5,5e6,1e5]},
   {id:'timemania', api:'timemania', nome:'timemania', cor:'#e0d417', cor2:'#feee00', premioCor:'#007738', texto:'#287000', trevoA:'#047638', trevoB:'#74c399', total:80, base:10, max:10, preco:3.5, dias:[0,2,4], ref:[2469,'2026-11-17'], premio:28e6, faixa:[1e6,30e6,1e5]},
   {id:'duplasena', api:'duplasena', nome:'dupla sena', cor:'#8d2134', cor2:'#9d253b', premioCor:'#a2233b', total:50, base:6, max:15, preco:3, dias:[1,3,5], ref:[3033,'2026-11-16'], premio:13.3e6, faixa:[2e5,15e6,1e5]},
-  {id:'loteca', api:'loteca', nome:'loteca', cor:'#bf1016', cor2:'#ec1820', premioCor:'#f11720', preco:4, dias:[1], hora:[15,45], encerramento:true, ref:[1283,'2026-11-16'], premio:5e5, faixa:[5e5,3e6,1e5]},
   {id:'diadesorte', api:'diadesorte', nome:'dia de sorte', cor:'#a38818', cor2:'#e1b61c', premioCor:'#755c02', nomeCor:'#725b01', total:31, base:7, max:15, preco:2.5, dias:[0,1,2,3,4,5], ref:[1349,'2026-11-16'], premio:9e5, faixa:[1.5e5,3e6,5e4]},
-  {id:'supersete', api:'supersete', nome:'super sete', cor:'#789432', cor2:'#b6d129', premioCor:'#01773a', nomeCor:'#256e02', preco:3, dias:[1,3,5], ref:[923,'2026-11-16'], premio:4.5e5, faixa:[2e5,3e6,5e4]},
 ];
 const JOGO = Object.fromEntries(JOGOS.map(j => [j.id, j]));
 
@@ -142,12 +140,10 @@ async function buscarJogo(j) {
       const r = {conc, iso, premio, quando: Date.now()};
       if (j.id === 'megasena') {
         // Mega da Virada: concurso que termina em 0 ou 5 e, se vier, o valor do especial
-        const cv = num(o.numeroConcursoFinal_0_5 || o.numeroConcursoFinal05);
         const est = Object.keys(o).filter(k => /especial/i.test(k) && /estimad/i.test(k)).map(k => num(o[k])).find(v => v > 1e8);
         const agora = new Date();
         let ano = agora.getFullYear(); if (agora > new Date(ano, 0, 1, 11)) ano += 1;
         const v = {ano};
-        if (cv && cv % 10 === 0) v.conc = cv;
         if (est) v.premio = est;
         guarda.pôr('net_virada', v);
       }

@@ -22,13 +22,8 @@ function medir() {
   document.body.style.zoom = Z;
   H = window.innerHeight / Z;
   app.style.height = H + 'px';
-  const t = document.createElement('div');
-  t.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top);width:1px;visibility:hidden';
-  document.body.appendChild(t);
-  const st = t.getBoundingClientRect().height;
-  t.remove();
-  ST = st > 5 ? st : (NATIVO ? 20 : 62);
-  app.style.setProperty('--st', ST + 'px');
+  app.style.setProperty('--z', Z);
+  if (!NATIVO) app.style.setProperty('--st', '62px');   // teste no computador: como um iPhone com ilha
 }
 medir();
 window.addEventListener('resize', () => { medir(); posicionarAviso(); });
@@ -55,37 +50,89 @@ function carregarImagem(src) {
   return new Promise((ok, erro) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = erro; im.src = src; });
 }
 
-/* ícone do usuário repintado para a faixa de cada jogo: partes claras -> branco, partes coloridas -> tom claro do jogo */
+/* ícone do usuário: corta as bordas vazias, gira para as folhas laranja ficarem nas diagonais
+   (em cima à direita e embaixo à esquerda) e repinta: na bolinha, laranja fica e o resto vira quase branco;
+   nas faixas dos jogos, laranja vira o tom claro do jogo e o resto vira branco */
 const cacheIcone = {};
-let iconeBase = null;
+let iconeBase = null, iconeTemQuente = false, iconeTopo = null;
+const quente = (r, g, b) => r > b + 40;
+function cortar(c) {
+  const x = c.getContext('2d'), d = x.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < c.height; y++) for (let k = 0; k < c.width; k++) {
+    if (d[(y * c.width + k) * 4 + 3] > 20) { if (k < x0) x0 = k; if (k > x1) x1 = k; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) return c;
+  const lado = Math.max(x1 - x0, y1 - y0) + 1, o = document.createElement('canvas');
+  o.width = o.height = lado;
+  o.getContext('2d').drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, (lado - (x1 - x0 + 1)) / 2, (lado - (y1 - y0 + 1)) / 2, x1 - x0 + 1, y1 - y0 + 1);
+  return o;
+}
 async function prepararIcone() {
   Object.keys(cacheIcone).forEach(k => delete cacheIcone[k]);
-  iconeBase = null;
+  iconeBase = null; iconeTopo = null; iconeTemQuente = false;
   const u = imgURL('icone');
   if (!u) return;
-  try { iconeBase = await carregarImagem(u); } catch (e) { iconeBase = null; }
+  let im;
+  try { im = await carregarImagem(u); } catch (e) { return; }
+  try {
+    const L = 300, r = L / Math.max(im.width, im.height);
+    let c = document.createElement('canvas'); c.width = c.height = L;
+    c.getContext('2d').drawImage(im, (L - im.width * r) / 2, (L - im.height * r) / 2, im.width * r, im.height * r);
+    c = cortar(c);
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, m = c.width / 2;
+    let S = 0, C = 0, n = 0;
+    for (let y = 0; y < c.height; y += 2) for (let k = 0; k < c.width; k += 2) {
+      const i = (y * c.width + k) * 4;
+      if (d[i + 3] > 128 && quente(d[i], d[i + 1], d[i + 2])) { const f = Math.atan2(y - m, k - m); S += Math.sin(2 * f); C += Math.cos(2 * f); n++; }
+    }
+    if (n > 50) {
+      iconeTemQuente = true;
+      const giro = -Math.PI / 4 - Math.atan2(S, C) / 2;
+      const g = document.createElement('canvas'); const G = Math.ceil(c.width * 1.5);
+      g.width = g.height = G;
+      const x = g.getContext('2d');
+      x.translate(G / 2, G / 2); x.rotate(giro); x.drawImage(c, -c.width / 2, -c.height / 2);
+      c = cortar(g);
+    }
+    iconeBase = c;
+    iconeTopo = iconeTemQuente ? repintar(null, '#e8f5f2') : c.toDataURL('image/png');
+  } catch (e) { iconeBase = null; iconeTopo = u; }
+}
+function repintar(corQuente, corResto) {
+  const c = document.createElement('canvas'); c.width = c.height = 96;
+  const x = c.getContext('2d');
+  x.drawImage(iconeBase, 0, 0, 96, 96);
+  const d = x.getImageData(0, 0, 96, 96), p = d.data;
+  const Q = corQuente && hex2rgb(corQuente), F = hex2rgb(corResto);
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] < 8) continue;
+    const alvo = quente(p[i], p[i + 1], p[i + 2]) ? Q : F;
+    if (!alvo) continue;
+    p[i] = alvo[0]; p[i + 1] = alvo[1]; p[i + 2] = alvo[2];
+  }
+  x.putImageData(d, 0, 0);
+  return c.toDataURL('image/png');
 }
 function iconeDoJogo(j) {
   if (!iconeBase) return null;
   if (cacheIcone[j.id]) return cacheIcone[j.id];
-  const lado = 96, c = document.createElement('canvas');
-  c.width = c.height = lado;
-  const x = c.getContext('2d');
-  const r = Math.min(lado / iconeBase.width, lado / iconeBase.height);
-  const w = iconeBase.width * r, h = iconeBase.height * r;
-  x.drawImage(iconeBase, (lado - w) / 2, (lado - h) / 2, w, h);
+  const A = j.trevoA || '#ffffff', B = j.trevoB || mistura(j.cor2, '#ffffff', .5);
   try {
-    const d = x.getImageData(0, 0, lado, lado), p = d.data;
-    const A = hex2rgb(j.trevoA || '#ffffff'), B = hex2rgb(j.trevoB || mistura(j.cor2, '#ffffff', .5));
-    for (let i = 0; i < p.length; i += 4) {
-      if (p[i + 3] < 8) continue;
-      const mx = Math.max(p[i], p[i + 1], p[i + 2]), mn = Math.min(p[i], p[i + 1], p[i + 2]);
-      const sat = mx ? (mx - mn) / mx : 0, claro = mx / 255;
-      const alvo = (sat < .28 && claro > .62) ? A : B;
-      p[i] = alvo[0]; p[i + 1] = alvo[1]; p[i + 2] = alvo[2];
+    if (iconeTemQuente) cacheIcone[j.id] = repintar(B, A);
+    else {
+      const c = document.createElement('canvas'); c.width = c.height = 96;
+      const x = c.getContext('2d'); x.drawImage(iconeBase, 0, 0, 96, 96);
+      const d = x.getImageData(0, 0, 96, 96), p = d.data, a = hex2rgb(A), b = hex2rgb(B);
+      for (let i = 0; i < p.length; i += 4) {
+        if (p[i + 3] < 8) continue;
+        const mx = Math.max(p[i], p[i + 1], p[i + 2]), mn = Math.min(p[i], p[i + 1], p[i + 2]);
+        const alvo = ((mx ? (mx - mn) / mx : 0) < .28 && mx > 158) ? a : b;
+        p[i] = alvo[0]; p[i + 1] = alvo[1]; p[i + 2] = alvo[2];
+      }
+      x.putImageData(d, 0, 0);
+      cacheIcone[j.id] = c.toDataURL('image/png');
     }
-    x.putImageData(d, 0, 0);
-    cacheIcone[j.id] = c.toDataURL('image/png');
   } catch (e) { cacheIcone[j.id] = imgURL('icone'); }
   return cacheIcone[j.id];
 }
@@ -207,8 +254,6 @@ function abertura() {
 function animacaoPadrao(depois) {
   desenharAnimacao();
   const on = id => { const e = document.getElementById(id); if (e) (e.querySelector('.bo') || e).classList.add('on'); };
-  const lg = imgURL('logo'), abl = $('#abLogo');
-  if (lg) abl.src = lg; else abl.removeAttribute('src');
   depois(650, () => $('#abertura').classList.add('claro'));
   depois(1400, () => on('anB1'));
   depois(1800, () => on('anB2'));
@@ -216,14 +261,12 @@ function animacaoPadrao(depois) {
   depois(2500, () => { $('#anBal').classList.add('on'); $('#anTi').classList.add('on'); });
   depois(2950, () => $('#anTi').classList.add('some'));
   depois(3050, () => { ['anBal', 'anB1', 'anB2', 'anB3'].forEach(id => { const e = document.getElementById(id); (e.querySelector('.bo') || e).classList.add('some'); }); });
-  depois(3450, () => { if (lg) abl.classList.add('on'); });
   depois(4500, irAzul);
 }
 
 /* ---------- 2. tela azul ---------- */
 function prepararAzul() {
-  const lg = imgURL('logo'), az = $('#azLogo');
-  if (lg) { az.src = lg; az.style.display = ''; } else { az.removeAttribute('src'); az.style.display = 'none'; }
+  $('#azLogo').style.display = 'none';
   const p = imgURL('printAzul'), ap = $('#azPrint');
   if (p) { ap.src = p; ap.classList.add('on'); } else { ap.classList.remove('on'); ap.removeAttribute('src'); }
 }
@@ -488,15 +531,39 @@ function mudouVirado(v) {
   }
 }
 function embaralhar(a) { for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; } return a; }
-function toqueMagico() {
-  if (!magia.fila) return;
-  if (magia.limpar) { sel.clear(); magia.limpar = false; }
-  const n = magia.fila.shift();
-  if (n != null) { sel.add(n); avisoMostrado = true; atualizarVolante(); }
+function visivel(n) {
+  const el = grade.querySelector('.vn[data-n="' + n + '"]');
+  if (!el) return false;
+  const a = grade.getBoundingClientRect(), b = el.getBoundingClientRect();
+  const dentro = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return dentro >= b.height * .6;
 }
+function toqueMagico() {
+  if (!magia.fila || !magia.fila.length) return;
+  const vis = magia.fila.filter(visivel);
+  if (!vis.length) return;                       // nenhum número do bilhete à vista: espera rolar
+  if (magia.limpar) { sel.clear(); magia.limpar = false; }
+  const n = vis[Math.floor(Math.random() * vis.length)];
+  magia.fila = magia.fila.filter(x => x !== n);
+  sel.add(n); avisoMostrado = true; atualizarVolante();
+}
+/* com o celular virado: toque rápido marca; arrastar rola a lista de verdade e não marca nada */
+let mt = null;
 document.addEventListener('touchstart', e => {
-  if (magia.virado && magiaPode()) { e.preventDefault(); e.stopPropagation(); toqueMagico(); }
-}, {capture: true, passive: false});
+  if (!(magia.virado && magiaPode())) return;
+  const t = e.touches[0];
+  mt = e.touches.length === 1 ? {x: t.clientX, y: t.clientY, t: Date.now(), mexeu: false} : null;
+}, {capture: true, passive: true});
+document.addEventListener('touchmove', e => {
+  if (mt && e.touches.length === 1) { const t = e.touches[0]; if (Math.hypot(t.clientX - mt.x, t.clientY - mt.y) > 10) mt.mexeu = true; }
+  else mt = null;
+}, {capture: true, passive: true});
+document.addEventListener('touchend', e => {
+  if (!(magia.virado && magiaPode()) || !mt) return;
+  const ok = !mt.mexeu && Date.now() - mt.t < 700;
+  mt = null;
+  if (ok) toqueMagico();
+}, {capture: true, passive: true});
 document.addEventListener('click', e => {
   if (magia.virado && magiaPode()) { e.preventDefault(); e.stopPropagation(); }
 }, true);
@@ -517,12 +584,12 @@ function pedirSensor() {
 document.addEventListener('touchend', pedirSensor, {once: true, capture: true});
 // teste no computador: tecla V vira/desvira, clique conta como toque
 window.addEventListener('keydown', e => { if (e.key === 'v' || e.key === 'V') mudouVirado(!magia.virado); });
-document.addEventListener('mousedown', e => { if (!('ontouchstart' in window) && magia.virado && magiaPode()) { e.preventDefault(); toqueMagico(); } }, true);
+document.addEventListener('mousedown', e => { if (!('ontouchstart' in window) && magia.virado && magiaPode()) toqueMagico(); }, true);
 
 /* ======================================================================
-   GESTOS SECRETOS: segurar 1,5 s ou deslizar dois dedos -> ajustes
+   GESTO SECRETO: segurar 1,5 s com um dedo -> ajustes
    ====================================================================== */
-let gestoUsado = false, segurar = null, ini = null, dois = null;
+let gestoUsado = false, segurar = null, ini = null;
 function abrirAjustesPorGesto() {
   clearTimeout(segurar); segurar = null;
   gestoUsado = true;
@@ -530,30 +597,21 @@ function abrirAjustesPorGesto() {
   abrirAjustes();
 }
 document.addEventListener('touchstart', e => {
+  clearTimeout(segurar); segurar = null;
   if ($('#ajustes').classList.contains('on') || magia.virado) return;
   if (e.touches.length === 1) {
     const t = e.touches[0];
     ini = [t.clientX, t.clientY];
-    clearTimeout(segurar);
     segurar = setTimeout(abrirAjustesPorGesto, 1500);
-  } else if (e.touches.length === 2) {
-    clearTimeout(segurar); segurar = null;
-    dois = [(e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2];
   }
 }, {capture: true, passive: true});
 document.addEventListener('touchmove', e => {
-  if (segurar && ini && e.touches.length === 1) {
-    const t = e.touches[0];
-    if (Math.hypot(t.clientX - ini[0], t.clientY - ini[1]) > 10) { clearTimeout(segurar); segurar = null; }
-  }
-  if (dois && e.touches.length === 2) {
-    const m = [(e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2];
-    if (Math.hypot(m[0] - dois[0], m[1] - dois[1]) > 45) { dois = null; abrirAjustesPorGesto(); }
-  }
+  if (!segurar) return;
+  const t = e.touches[0];
+  if (e.touches.length !== 1 || Math.hypot(t.clientX - ini[0], t.clientY - ini[1]) > 10) { clearTimeout(segurar); segurar = null; }
 }, {capture: true, passive: true});
-document.addEventListener('touchend', e => {
-  if (!e.touches.length) { clearTimeout(segurar); segurar = null; dois = null; }
-}, {capture: true, passive: true});
+document.addEventListener('touchend', () => { clearTimeout(segurar); segurar = null; }, {capture: true, passive: true});
+document.addEventListener('touchcancel', () => { clearTimeout(segurar); segurar = null; }, {capture: true, passive: true});
 // no computador: segurar o botão do mouse 1,5 s
 document.addEventListener('mousedown', e => {
   if ('ontouchstart' in window || $('#ajustes').classList.contains('on')) return;
@@ -582,7 +640,10 @@ function desenharAjustes() {
     el.querySelector('[data-a=tirar]').style.display = tem ? '' : 'none';
   });
   const q = guarda.ler('net_quando', null);
-  $('#ajPremios').textContent = q ? 'Última busca: ' + new Date(q.quando).toLocaleString('pt-BR') + ' — ' + q.ok + ' de ' + q.total + ' jogos vieram da internet. Os outros usam valores com cara de verdade.' : 'Ainda não buscou na internet.';
+  $('#ajPremios').textContent = !q ? 'Ainda não buscou na internet.' :
+    'Última busca: ' + new Date(q.quando).toLocaleString('pt-BR') + ' — ' +
+    (q.ok >= q.total ? 'todos os jogos vieram da internet.' :
+     q.ok + ' de ' + q.total + ' jogos vieram da internet. Os outros usam valores com cara de verdade.');
 }
 function abrirAjustes() { desenharAjustes(); $('#ajustes').classList.add('on'); barra('escuro'); }
 function fecharAjustes() {
@@ -677,8 +738,8 @@ function cobrirBarra(im) {
   return c.toDataURL('image/jpeg', .9);
 }
 function aplicarImagens() {
-  const u = imgURL('icone'), t = $('#topoIcone');
-  t.innerHTML = u ? `<img src="${u}" alt="">` : trevoSVG('#ffffff', '#9fd0f0', '#9fd0f0', '#ffffff');
+  const t = $('#topoIcone');
+  t.innerHTML = iconeTopo ? `<img src="${iconeTopo}" alt="">` : trevoSVG('#ffffff', '#9fd0f0', '#9fd0f0', '#ffffff');
   prepararAzul();
   montarCartoes();
 }
