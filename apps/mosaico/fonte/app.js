@@ -412,10 +412,17 @@ function gradeTexto(nome, cols, rows) {   // igual ao Mozaic: palavra por linha,
 function hsl(h, s, l) { const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }; return [f(0), f(8), f(4)]; }
 
 /* fotos disponíveis para o mosaico */
+/* foto quase toda branca e lisa (print, papel, parede branca): no mosaico parece um buraco, igual ao fundo do app */
+function brancaLisa(p) {
+  if (p.q) { const ls = [0, 1, 2, 3].map(k => lum([p.q[k * 3], p.q[k * 3 + 1], p.q[k * 3 + 2]])); return Math.min(...ls) > 222 && Math.max(...ls) - Math.min(...ls) < 28; }
+  return p.l > 236;
+}
 function pool() {
   const todas = [], boas = [];
   for (const [id, v] of cores) { if (tirados.has(id)) continue; const p = { id, c: v.c, q: v.q || null, l: lum(v.c) }; todas.push(p); if (v.ok) boas.push(p); }
-  return cfg.filtro && boas.length >= 300 ? boas : todas;
+  const P = cfg.filtro && boas.length >= 300 ? boas : todas;
+  const semBrancas = P.filter(p => !brancaLisa(p));   // as escuras ficam (cabelo, roupa, sombra); só as brancas lisas saem
+  return semBrancas.length >= 100 ? semBrancas : P;
 }
 /* para cada cor (8x8x8 caixinhas), as fotos de cor mais parecida */
 function indiceCores(P) {
