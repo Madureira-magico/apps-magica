@@ -483,7 +483,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             let sx = t.sf.x + (t.ss.x - t.sf.x) * u, sy = t.sf.y + (t.ss.y - t.sf.y) * u
             ajustando = true
             s.contentOffset = CGPoint(x: t.p.x * s.zoomScale - sx, y: t.p.y * s.zoomScale - sy)
-            ajustando = false            escalaAnt = s.zoomScale
+            ajustando = false
+            escalaAnt = s.zoomScale
         }
         atualizar()
         if travado && s.zoomScale > s.minimumZoomScale * 1.01 { travado = false; zoomer.isScrollEnabled = ligada && ativa }
