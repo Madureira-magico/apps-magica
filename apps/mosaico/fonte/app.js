@@ -40,6 +40,8 @@ if (!Array.isArray(cfg.slots) || cfg.slots.length !== 18) {   // 18 posições d
   let k = 17; for (let j = ant.length - 1; j >= 0 && k >= 0; j--, k--) { if (k === slotBebe()) k--; if (k >= 0) cfg.slots[k] = ant[j]; }
 }
 if (!Array.isArray(cfg.icones)) cfg.icones = [];
+if (cfg.auto == null) cfg.auto = true;
+if (cfg.espiaBebe == null) cfg.espiaBebe = true;
 cfg.filtro = true;
 const tokAbert = a => 'arq:abert/' + a.id + '.jpg';
 const abertDe = it => (typeof it === 'string' && it.startsWith('arq:abert/')) ? cfg.slots.find(a => a && tokAbert(a) === it) : null;
@@ -318,24 +320,23 @@ function palavrasNome(nome) {   // uma palavra por linha; palavra muito comprida
   while (out.length > 4) out.splice(out.length - 2, 2, out[out.length - 2] + ' ' + out[out.length - 1]);
   return out;
 }
-function colsTexto(nome) { const m = Math.max(...palavrasNome(nome).map(l => l.length)); return Math.max(+cfg.colsM || 40, Math.min(80, Math.round(m * 7.4 + 4))); }
-function gradeTexto(nome, cols, rows) {   // igual ao Mozaic: palavra por linha, numa faixa no meio, letras grossas na proporção normal
+function colsTexto(nome) { const m = Math.max(...palavrasNome(nome).map(l => l.length)); return Math.max(+cfg.colsM || 40, Math.min(80, Math.round(m * 9 + 4))); }
+function gradeTexto(nome, cols, rows) {   // igual ao Mozaic: palavra por linha, numa faixa no meio, letras grossas (fonte própria do app)
   const k = 16, c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
   const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
-  const linhas = palavrasNome(nome), F = '900 300px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
-  g.font = F; g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-  const alt = 300 * 0.72;   // altura da letra maiúscula
-  const s = Math.min(...linhas.map(l => c.width * 0.92 / g.measureText(l).width), c.height * 0.15 / alt);
-  const lh = alt * s * 1.32, total = lh * linhas.length, y0 = (c.height - total) / 2;
-  linhas.forEach((l, i) => { g.save(); g.translate(c.width / 2, y0 + i * lh + (lh + alt * s) / 2); g.scale(s, s); g.fillText(l, 0, 0); g.restore(); });
+  const linhas = palavrasNome(nome), EST = 1.35;
+  g.font = '800 300px MzLetra, -apple-system, sans-serif'; g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  const alt = Math.max(...linhas.map(l => { const m = g.measureText(l); return (m.actualBoundingBoxAscent || 218) + (m.actualBoundingBoxDescent || 0); }));
+  const s = Math.min(...linhas.map(l => c.width * 0.92 / g.measureText(l).width), c.height * 0.22 / (alt * EST));
+  const lh = alt * s * EST * 1.3, y0 = (c.height - lh * linhas.length) / 2;
+  linhas.forEach((l, i) => { g.save(); g.translate(c.width / 2, y0 + i * lh + (lh + alt * s * EST) / 2); g.scale(s, s * EST); g.fillText(l, 0, 0); g.restore(); });
   const px = g.getImageData(0, 0, c.width, c.height).data, out = [];
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
     let v = 0;
     for (let dy = 0; dy < k; dy += 2) for (let dx = 0; dx < k; dx += 2) v += px[((y * k + dy) * c.width + x * k + dx) * 4];
     v /= (k * k / 4) * 255;
-    if (v > 0.45) {   // letra: claro, com degradê de cor da esquerda (amarelo) para a direita (azul)
-      const h = 0.13 + 0.45 * (x / cols), rgb = hsl(h, 0.55, 0.82); out.push(...rgb);
-    } else out.push(52, 46, 44);   // fundo: fotos normais, mais escuras
+    if (v > 0.5) { const h = 0.13 + 0.45 * (x / cols); out.push(...hsl(h, 0.55, 0.82)); }
+    else out.push(52, 46, 44);
   }
   return out;
 }
@@ -381,7 +382,11 @@ async function prepararMosaico() {
   const rg = Math.ceil(H / t);
   let alvo = [];
   if (atual.tipo === 'rosto' && atual.arq) { try { alvo = await nat.call('grade', { nome: atual.arq, cols: n, rows: rg, enq: cfg.enq, real: 'real.jpg' }); } catch (_) { alvo = []; } }
-  if (!alvo || alvo.length < n * rg * 3) { if (atual.tipo === 'rosto') atual.tipo = 'texto'; alvo = gradeTexto(atual.nome, n, rg); }
+  if (!alvo || alvo.length < n * rg * 3) {
+    if (atual.tipo === 'rosto') atual.tipo = 'texto';
+    try { await document.fonts.load('800 100px MzLetra'); } catch (_) {}
+    alvo = gradeTexto(atual.nome, n, rg);
+  }
   if (meu !== prepararMosaico.vez) return;
   const texto = atual.tipo === 'texto';
   const L = []; for (let i = 0; i < n * rg; i++) L.push(lum([alvo[i * 3], alvo[i * 3 + 1], alvo[i * 3 + 2]]));
@@ -1166,6 +1171,14 @@ $('#bSel').addEventListener('touchcancel', () => { selSegura = false; }, { passi
 window.__mzEvento = ev => {
   if (!ev || !ev.tipo) return;
   if (ev.tipo === 'gTap') { tocouNativo(ev.i, !!ev.noMosaico, !!ev.b); return; }
+  if (ev.tipo === 'gHold') {   // segurar o bebê 2 s: vira a foto da personalidade (teste, dá para desligar no menu)
+    if (!ev.on) { nat.call('galeriaTroca', { i: -1 }).catch(() => {}); return; }
+    if (!cfg.espiaBebe || ev.i < 0 || seq[ev.i] !== '#piada' || !atual) return;
+    const fam = acharFamoso(atual.nome), arq = atual.tipo === 'rosto' ? 'real.jpg' : (fam && fam.f);
+    if (!arq) { vibrar('forte'); return; }
+    vibrar('leve'); nat.call('galeriaTroca', { i: ev.i, id: 'arq:' + arq }).catch(() => {});
+    return;
+  }
   if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) revelado = true; if (!naFace) animarReal(); return; }
   if (ev.tipo === 'gZoom') { realTrava = false; selSegura = false; animarReal(); return; }
   if (ev.tipo === 'volume') { if (telaAtual === 'fototeca' && podeReal()) { ultVol = performance.now(); animarReal(); } return; }
@@ -1249,7 +1262,7 @@ const PI = {
   hora: [0.0800, 0.0190, 0.2850, 0.0550], bat: [0.6950, 0.0190, 0.9350, 0.0550]   // hora e bateria do print
 };
 function temInicio() { return !!cfg.temPrint; }
-function carregarImg(src) { return new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; }); }
+function carregarImg(src) { return new Promise(ok => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = src; }); }
 let iniVez = 0;
 async function desenharInicio() {
   const vez = ++iniVez;
@@ -1261,36 +1274,22 @@ async function desenharInicio() {
   if (vez !== iniVez || !pr) return;
   const cw = Math.round(W * DPR), ch = Math.round(H * DPR);
   c.width = cw; c.height = ch;
-  const g = c.getContext('2d', { willReadFrequently: true });
+  const g = c.getContext('2d');
   const cobrir = (ctx, im) => { const k = Math.max(cw / im.naturalWidth, ch / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k; ctx.drawImage(im, (cw - w) / 2, (ch - h) / 2, w, h); };
   cobrir(g, pr);
-  // apaga um pedaço do print ligando, coluna por coluna, a cor de cima com a de baixo (o fundo é um degradê suave)
-  const apagar = (x0, y0, x1, y1) => {
-    x0 = Math.max(0, Math.round(x0 * cw)); x1 = Math.min(cw, Math.round(x1 * cw)); y0 = Math.max(3, Math.round(y0 * ch)); y1 = Math.min(ch - 4, Math.round(y1 * ch));
-    const w = x1 - x0, h = y1 - y0; if (w <= 0 || h <= 0) return;
-    const cima = g.getImageData(x0, y0 - 3, w, 3).data, baixo = g.getImageData(x0, y1 + 1, w, 3).data, out = g.createImageData(w, h), d = out.data;
-    for (let x = 0; x < w; x++) {
-      const a = [0, 0, 0], b = [0, 0, 0];
-      for (let r = 0; r < 3; r++) for (let c3 = 0; c3 < 3; c3++) { a[c3] += cima[(r * w + x) * 4 + c3] / 3; b[c3] += baixo[(r * w + x) * 4 + c3] / 3; }
-      for (let y = 0; y < h; y++) { const t = (y + 1) / (h + 1), k = (y * w + x) * 4; for (let c3 = 0; c3 < 3; c3++) d[k + c3] = a[c3] + (b[c3] - a[c3]) * t + (Math.random() - 0.5) * 2; d[k + 3] = 255; }
-    }
-    g.putImageData(out, x0, y0);
-  };
-  // hora e bateria do print (as de verdade aparecem por cima)
-  apagar(PI.hora[0], PI.hora[1], PI.hora[2], PI.hora[3]);
-  apagar(PI.bat[0], PI.bat[1], PI.bat[2], PI.bat[3]);
-  if (atual) {
+  // o print já vem limpo (sem hora, bateria e sem o nome do Instagram): o app só escreve por cima
+  {
     const n = PI.nome;
-    apagar(n.x0, n.y0, n.x1, n.y1);
     // nome do famoso, na fonte do iPhone, do mesmo tamanho do "Instagram"
     g.font = '500 10px -apple-system, system-ui'; const base = g.measureText('Instagram').width;
     const f = 10 * (n.larg * cw) / base;
     g.font = '500 ' + f + 'px -apple-system, system-ui';
-    let txt = atual.nome; const max = 0.205 * cw;
+    let txt = atual ? atual.nome : 'Instagram'; const max = 0.205 * cw;
     if (g.measureText(txt).width > max) { while (txt.length > 1 && g.measureText(txt + '…').width > max) txt = txt.slice(0, -1); txt = txt.trimEnd() + '…'; }
     g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     g.fillText(txt, n.cx * cw, n.topo * ch + 0.705 * f);
-    // bolinha vermelha com o 1
+    // bolinha vermelha com o 1 (só com nome recebido)
+    if (!atual) return;
     const b = PI.bolinha, r = b.d * cw / 2;
     g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(b.x * cw, b.y * ch, r, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#fff'; g.font = '500 ' + (r * 1.15) + 'px -apple-system, system-ui'; g.textBaseline = 'middle'; g.fillText('1', b.x * cw, b.y * ch + r * 0.04);
@@ -1312,6 +1311,27 @@ async function desenharInicio() {
     else mover(0, true);
     el.dataset.arrastou = '1'; setTimeout(() => { el.dataset.arrastou = ''; }, 60);
   }, { passive: true });
+})();
+/* segurar o Instagram: cartão de "notificação" com a foto e o nome da personalidade */
+(function () {
+  const el = $('#inicio'); let t = 0;
+  const perto = e => { const p = e.touches ? e.touches[0] : e; return Math.abs(p.clientX / W - PI.insta.x) < 0.09 && Math.abs(p.clientY / H - PI.insta.y) < 0.05; };
+  const fechar = () => { clearTimeout(t); t = 0; $('#cartaoIg').classList.remove('on'); };
+  el.addEventListener('touchstart', e => {
+    if (!temInicio() || !perto(e)) return;
+    t = setTimeout(() => {
+      t = 0; vibrar('media');
+      const fam = atual && acharFamoso(atual.nome), arq = atual && atual.tipo === 'rosto' ? atual.arq : (fam && fam.f);
+      $('#cigNome').textContent = atual ? atual.nome : 'Instagram';
+      $('#cigTxt').textContent = atual ? 'começou a seguir você · agora' : 'Nenhuma notificação';
+      $('#cigFoto').style.backgroundImage = arq ? 'url("' + URLS.arq(arq, cfg.ver) + '")' : '';
+      $('#cigFoto').classList.toggle('vazia', !arq);
+      const c = $('#cartaoIg'); c.style.top = Math.max(stPx() + 10, PI.insta.y * H - 0.06 * H - 230) + 'px';
+      c.classList.add('on');
+    }, 450);
+  }, { passive: true });
+  el.addEventListener('touchmove', e => { if (t && !perto(e)) { clearTimeout(t); t = 0; } }, { passive: true });
+  el.addEventListener('touchend', fechar); el.addEventListener('touchcancel', fechar);
 })();
 $('#inicio').addEventListener('click', e => {
   if ($('#inicio').dataset.arrastou) return;
@@ -1406,7 +1426,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || '';
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-  if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda;
+  $('#aEspiaBebe').checked = !!cfg.espiaBebe; if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); 
@@ -1544,6 +1564,7 @@ $('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#a
 $('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
+$('#aEspiaBebe').addEventListener('change', e => { cfg.espiaBebe = e.target.checked; salvar(); });
 $('#aAjuda').addEventListener('input', e => { cfg.ajuda = +e.target.value; $('#aAjudaV').textContent = cfg.ajuda; salvar(); enviarGaleria(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });

@@ -122,6 +122,30 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         toque = UITapGestureRecognizer(target: self, action: #selector(tocou(_:)))
         toque.delegate = self
         capa.addGestureRecognizer(toque)
+        let seg = UILongPressGestureRecognizer(target: self, action: #selector(segurou(_:)))
+        seg.minimumPressDuration = 2.0
+        seg.allowableMovement = 12
+        seg.delegate = self
+        capa.addGestureRecognizer(seg)
+    }
+    @objc private func segurou(_ g: UILongPressGestureRecognizer) {
+        if g.state == .began {
+            evento(["tipo": "gHold", "on": true, "i": indice(g.location(in: plano))])
+        } else if g.state == .ended || g.state == .cancelled || g.state == .failed {
+            evento(["tipo": "gHold", "on": false])
+        }
+    }
+    /// troca a miniatura de uma foto por outra enquanto segura (i = -1 desfaz)
+    private var troca: (i: Int, orig: String)?
+    private func trocar(_ i: Int, _ id: String) {
+        guard var d = tiles.dados else { return }
+        if let t = troca, t.i < d.seq.count { d.seq[t.i] = t.orig; tiles.dados = d; tiles.setNeedsDisplay(quadro(t.i)); troca = nil }
+        guard i >= 0, i < d.seq.count, !id.isEmpty else { return }
+        troca = (i, d.seq[i])
+        for t in [64, 256, 512] { cache.removeObject(forKey: "\(id)|\(t)" as NSString) }   // a foto do famoso muda a cada nome
+        d.seq[i] = id
+        tiles.dados = d
+        tiles.setNeedsDisplay(quadro(i))
     }
 
     // MARK: recados da página
@@ -142,6 +166,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             r(true, nil)
         case "galeriaNivel":
             irAoNivel(num("n", 3))
+            r(true, nil)
+        case "galeriaTroca":
+            trocar(Int(num("i", -1)), (m["id"] as? String) ?? "")
             r(true, nil)
         case "galeriaEstado":
             r(["zoom": visiveis, "mag": temMos && visiveis > 13.5, "k": zoomer.zoomScale], nil)
@@ -469,6 +496,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
 
     // MARK: gestos
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive t: UITouch) -> Bool { ligada && ativa }
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { g is UILongPressGestureRecognizer || o is UILongPressGestureRecognizer }
     @objc private func tocou(_ g: UITapGestureRecognizer) {
         let p = g.location(in: vista)
         let i = indice(g.location(in: plano))
