@@ -479,11 +479,11 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         centralizar()
         if trilho, let t = dadosTrilho, s.zoomScale >= 1 {
             // caminho fixo entre as fotos do começo e o rosto inteiro: desliza junto com a pinça, sem pulo
-            let u = min(1, max(0, log(s.zoomScale) / log(max(1.0001, t.smax))))
+            let u = min(1, max(0, log(s.zoomScale / escalaTrilho) / log(max(1.0001, t.smax / escalaTrilho))))
             let sx = t.sf.x + (t.ss.x - t.sf.x) * u, sy = t.sf.y + (t.ss.y - t.sf.y) * u
             ajustando = true
             s.contentOffset = CGPoint(x: t.p.x * s.zoomScale - sx, y: t.p.y * s.zoomScale - sy)
-            ajustando = false
+            ajustando = false            escalaAnt = s.zoomScale
         }
         atualizar()
         if travado && s.zoomScale > s.minimumZoomScale * 1.01 { travado = false; zoomer.isScrollEnabled = ligada && ativa }
@@ -507,24 +507,34 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         evento(["tipo": "gZoom"])
         trilho = false
         xTravado = nil
-        // pinça livre, presa nos dedos (como no Mozaic: puxa, pinça, puxa, pinça)
-        if !usarTrilho { return }
-        guard temMos else { return }
-        let smax = s.maximumZoomScale, oi = offsetInicio(smax), o = s.contentOffset
-        let noInicio = abs(s.zoomScale - smax) < smax * 0.01 && abs(o.x - oi.x) < 6 && abs(o.y - oi.y) < 6
-        guard travado || noInicio else { return }
-        let ins = zoomer.contentInset
-        let q = CGPoint(x: W / 2, y: (ins.top + H - ins.bottom) / 2)                  // meio da tela no começo
-        let p = CGPoint(x: (oi.x + q.x) / smax, y: (oi.y + q.y) / smax)               // esse ponto na imagem
-        let of = offsetRosto()
-        dadosTrilho = (p, CGPoint(x: p.x - of.x, y: p.y - of.y), q, smax)
-        trilho = true
+        // VOLTA com caminho fixo: começando do rosto inteiro, cada pinça anda um pedaço do caminho até as 18 fotos
+        // (não importa onde estão os dedos). Vale para as pinças seguintes até chegar, ou até arrastar com um dedo.
+        guard temMos, ajuda > 0 else { voltaAtiva = false; return }
+        let sc = s.zoomScale, smax3 = escalaInicio()
+        if travado || sc <= s.minimumZoomScale * 1.08 {
+            let ins = zoomer.contentInset, oi = offsetInicio(smax3), o = s.contentOffset
+            let q = CGPoint(x: W / 2, y: (ins.top + H - ins.bottom) / 2)                  // meio da tela
+            let p = CGPoint(x: (oi.x + q.x) / smax3, y: (oi.y + q.y) / smax3)             // o meio das 18 fotos na grade
+            let sf = CGPoint(x: p.x * sc - o.x, y: p.y * sc - o.y)                        // onde esse ponto está agora na tela
+            dadosTrilho = (p, sf, q, smax3)
+            escalaTrilho = sc
+            voltaAtiva = true
+        }
+        if voltaAtiva, dadosTrilho != nil { trilho = true }
     }
+    private var voltaAtiva = false
+    private var escalaTrilho: CGFloat = 1
+    private func escalaInicio() -> CGFloat { min(zoomer.maximumZoomScale, CGFloat(C) / max(1, min(CGFloat(C), n0))) }
     func scrollViewDidEndZooming(_ s: UIScrollView, with v: UIView?, atScale e: CGFloat) {
         let eraTrilho = trilho
         trilho = false
-        if eraTrilho && e >= s.maximumZoomScale * 0.99 {
-            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetInicio(s.maximumZoomScale) }
+        let smax3 = escalaInicio()
+        if eraTrilho && e >= smax3 * 0.97 {   // chegou: encaixa certinho nas 18 fotos
+            voltaAtiva = false
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+                if abs(s.zoomScale - smax3) > 0.001 { s.setZoomScale(smax3, animated: false) }
+                s.contentOffset = self.offsetInicio(smax3)
+            }
             return
         }
         guard temMos, e <= s.minimumZoomScale * 1.01 else { return }
@@ -533,7 +543,12 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetRosto() }
     }
     /// arrastar só para cima e para baixo (como no app Fotos); de lado só a pinça mexe
-    func scrollViewWillBeginDragging(_ s: UIScrollView) { tirarCapaInicio(); if !s.isZooming { xTravado = s.contentOffset.x } }
+    func scrollViewWillBeginDragging(_ s: UIScrollView) {
+        tirarCapaInicio()
+        if !s.isZooming { xTravado = s.contentOffset.x }
+        let pin = s.pinchGestureRecognizer?.state ?? .possible
+        if !s.isZooming && (pin == .possible || pin == .failed) { voltaAtiva = false }   // arrastou com o dedo: segue o dedo
+    }
     func scrollViewDidScroll(_ s: UIScrollView) {
         if let x = xTravado, !s.isZooming, !ajustando, s.contentOffset.x != x {
             ajustando = true; s.contentOffset.x = x; ajustando = false
