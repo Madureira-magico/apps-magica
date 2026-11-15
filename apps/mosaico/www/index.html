@@ -316,9 +316,8 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Vibrar quando pronto<label class="chave"><input type="checkbox" id="aVib"><span></span></label></div>
     <div class="lin">Foto real no final<label class="chave"><input type="checkbox" id="aReal"><span></span></label></div>
     <div class="lin">Ajuda na volta<input type="range" id="aAjuda" min="0" max="10" step="1"><span class="r" id="aAjudaV" style="margin-left:6px;min-width:22px"></span></div>
-    <div class="lin">Passagem para o mosaico<select id="aTroca"><option value="nova">Igual ao original</option><option value="anterior">Anterior (3.11)</option></select></div>
-    <div class="lin">Momento da troca<input type="range" id="aMomento" min="0" max="10" step="1"><span class="r" id="aMomentoV" style="margin-left:6px;min-width:22px"></span></div>
-  </div><div class="nota">Momento da troca (só no "Igual ao original"): número menor troca mais cedo, com as fotos ainda maiores; número maior troca mais tarde, com as fotos menores. Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
+    <div class="lin">Momento da cor<input type="range" id="aMomento" min="0" max="10" step="1"><span class="r" id="aMomentoV" style="margin-left:6px;min-width:22px"></span></div>
+  </div><div class="nota">Momento da cor: quando a cor começa a pintar o rosto na pinça. Número menor, o rosto aparece antes; número maior, as fotos ficam puras por mais tempo. Reforço do rosto: a força dessa cor. Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
 
   <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="caixa"><div id="aSlots"></div>
     <div class="lin"><button class="bt cinza" id="aSlotsVarias">Preencher vazios</button><button class="bt cinza" id="aSlotsLimpar" style="margin-left:auto">Limpar</button></div>
@@ -886,10 +885,11 @@ function mostrarAtual() {
   $('#ponto').classList.toggle('on', !!(cfg.aviso && atual && atual.pronto && mos));
 }
 
+let buscando = false;
 async function definirNome(txt, origem) {
   txt = String(txt || '').replace(/\s+/g, ' ').trim();
   if (txt.length < 2 || txt.length > 60) return;
-  const meu = ++preparo;
+  const meu = ++preparo; buscando = true;
   if (telaAtual === 'fototeca' || telaAtual === 'ver') bebeTravado = true;   // nome chegou com as fotos na tela (microfone, câmera, Pesquisar)
   const limpo = limparPedido(txt);
   const f = acharFamoso(txt) || acharFamoso(limpo);
@@ -946,6 +946,7 @@ async function definirNome(txt, origem) {
     await prepararMosaico();
   }
   if (meu !== preparo) return;
+  buscando = false;
   guarda.set('atual', atual);
   pontos(3, atual.tipo === 'rosto');
   mostrarAtual();
@@ -1196,7 +1197,7 @@ async function prepararMosaico() {
 prepararMosaico.vez = 0;
 
 function limparNome() {
-  preparo++; prepararMosaico.vez++; bebeTravado = false;
+  preparo++; prepararMosaico.vez++; bebeTravado = false; buscando = false;
   atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on'); $('#real').style.opacity = 0;
   if (zoom > 5) irAoNivel(5);
   mostrarAtual(); estado(''); pedirDesenho(); enviarGaleria();
@@ -1576,7 +1577,7 @@ function enviarGaleria(zerar) {
     const ap = arqPiada();
     const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
     const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, img: 'mosaico.jpg', v: String(mos.versao), real: mos.real || '', realRow: mos.realRow || 0, realRows: mos.realRows || 0 } : null;
-    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.ajuda == null ? 3 : +cfg.ajuda, troca: cfg.troca || 'nova', momento: cfg.momento == null ? 5 : +cfg.momento };
+    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.ajuda == null ? 3 : +cfg.ajuda, momento: cfg.momento == null ? 5 : +cfg.momento };
     nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
     zerarGal = false;
   }, 0);
@@ -1603,10 +1604,16 @@ $('#titulo').addEventListener('click', () => { if (emSelecao) return; if (temIni
 })();
 function espiar(on) {
   const r = $('#rotulo');
-  if (!on) { r.textContent = 'Fototeca'; r.style.color = ''; return; }
+  if (!on) { Object.assign(r.style, { color: '', fontSize: '', position: '', left: '', right: '', textAlign: '', maxWidth: '' }); r.textContent = 'Fototeca'; return; }
   if (!atual) { r.textContent = '—'; r.style.color = '#8e8e93'; return; }
+  // o nome cabe no espaço entre o ícone e a borda (a letra diminui o necessário)
+  const aba = $('#aba'), larg = aba.clientWidth, livre = Math.max(60, larg - 64 - 16);
+  const g = document.createElement('canvas').getContext('2d'); g.font = '600 17px -apple-system, system-ui';
+  const w = g.measureText(atual.nome).width, f = Math.max(11, Math.min(17, 17 * livre / Math.max(1, w)));
+  Object.assign(r.style, { fontSize: f + 'px', position: 'absolute', left: '64px', right: '16px', textAlign: 'center', maxWidth: 'none' });
   r.textContent = atual.nome;
-  r.style.color = !atual.pronto ? '#ff9f0a' : atual.tipo === 'rosto' ? '' : '#8e8e93';
+  // laranja: ainda trabalhando (montando ou procurando a foto); azul: pronto com foto; cinza: terminou sem foto
+  r.style.color = (buscando || !atual.pronto) ? '#ff9f0a' : atual.tipo === 'rosto' ? '' : '#8e8e93';
 }
 
 /* lupa: busca (o nome digitado vira o famoso) */
@@ -2216,7 +2223,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-  $('#aEspiaBebe').checked = !!cfg.espiaBebe; if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda; $('#aTroca').value = cfg.troca || 'nova'; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento; $('#aMomento').disabled = cfg.troca === 'anterior';
+  $('#aEspiaBebe').checked = !!cfg.espiaBebe; if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); 
@@ -2360,7 +2367,6 @@ $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; sal
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
 $('#aEspiaBebe').addEventListener('change', e => { cfg.espiaBebe = e.target.checked; salvar(); });
 $('#aAjuda').addEventListener('input', e => { cfg.ajuda = +e.target.value; $('#aAjudaV').textContent = cfg.ajuda; salvar(); enviarGaleria(); });
-$('#aTroca').addEventListener('change', e => { cfg.troca = e.target.value; $('#aMomento').disabled = cfg.troca === 'anterior'; salvar(); enviarGaleria(); });
 $('#aMomento').addEventListener('input', e => { cfg.momento = +e.target.value; $('#aMomentoV').textContent = cfg.momento; salvar(); enviarGaleria(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });

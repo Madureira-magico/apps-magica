@@ -316,9 +316,8 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Vibrar quando pronto<label class="chave"><input type="checkbox" id="aVib"><span></span></label></div>
     <div class="lin">Foto real no final<label class="chave"><input type="checkbox" id="aReal"><span></span></label></div>
     <div class="lin">Ajuda na volta<input type="range" id="aAjuda" min="0" max="10" step="1"><span class="r" id="aAjudaV" style="margin-left:6px;min-width:22px"></span></div>
-    <div class="lin">Passagem para o mosaico<select id="aTroca"><option value="nova">Igual ao original</option><option value="anterior">Anterior (3.11)</option></select></div>
-    <div class="lin">Momento da troca<input type="range" id="aMomento" min="0" max="10" step="1"><span class="r" id="aMomentoV" style="margin-left:6px;min-width:22px"></span></div>
-  </div><div class="nota">Momento da troca (só no "Igual ao original"): número menor troca mais cedo, com as fotos ainda maiores; número maior troca mais tarde, com as fotos menores. Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
+    <div class="lin">Momento da cor<input type="range" id="aMomento" min="0" max="10" step="1"><span class="r" id="aMomentoV" style="margin-left:6px;min-width:22px"></span></div>
+  </div><div class="nota">Momento da cor: quando a cor começa a pintar o rosto na pinça. Número menor, o rosto aparece antes; número maior, as fotos ficam puras por mais tempo. Reforço do rosto: a força dessa cor. Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
 
   <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="caixa"><div id="aSlots"></div>
     <div class="lin"><button class="bt cinza" id="aSlotsVarias">Preencher vazios</button><button class="bt cinza" id="aSlotsLimpar" style="margin-left:auto">Limpar</button></div>
