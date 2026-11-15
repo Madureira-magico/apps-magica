@@ -227,6 +227,7 @@ async function definirNome(txt, origem) {
   txt = String(txt || '').replace(/\s+/g, ' ').trim();
   if (txt.length < 2 || txt.length > 60) return;
   const meu = ++preparo;
+  if (telaAtual === 'fototeca' || telaAtual === 'ver') bebeTravado = true;   // nome chegou com as fotos na tela (microfone, câmera, Pesquisar)
   const limpo = limparPedido(txt);
   const f = acharFamoso(txt) || acharFamoso(limpo);
   const nome = f ? f.n : maiusculas(limpo);
@@ -316,8 +317,9 @@ async function completarFamoso(f) {   // sexo e tom de pele (uma vez por famoso)
   }
   if (mudou) salvarFam();
 }
+let bebeTravado = false, iniciado = false;   // o público já viu a Fototeca com este nome: o bebê não muda mais (até apagar o nome)
 function escolherBebe(f, nome) {
-  if (!cfg.auto || cfg.piada !== 'bebes') return;
+  if (!cfg.auto || cfg.piada !== 'bebes' || bebeTravado) return;
   let k = f && f.b >= 0 ? f.b : -1;
   if (k < 0) {
     const g = (f && f.g) || sexoPeloNome(nome || (f && f.n));
@@ -515,7 +517,7 @@ async function prepararMosaico() {
 prepararMosaico.vez = 0;
 
 function limparNome() {
-  preparo++; prepararMosaico.vez++;
+  preparo++; prepararMosaico.vez++; bebeTravado = false;
   atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on'); $('#real').style.opacity = 0;
   if (zoom > 5) irAoNivel(5);
   mostrarAtual(); estado(''); pedirDesenho(); enviarGaleria();
@@ -1020,11 +1022,26 @@ function grandeEmCache(it) {   // a maior versão dessa foto que já está carre
   if (!m) { const e = IMG.get(it + '|m'); if (e && e.ok) m = e.img.src; }
   return m;
 }
+/* fotos grandes já carregadas, guardadas pelo endereço da foto (se o bebê muda, o endereço muda: nada antigo aparece) */
 const preCarga = new Map();
+const pcPegar = it => preCarga.get(srcGrande(it));
+function pcGuardar(it) {
+  const u = srcGrande(it); let g = preCarga.get(u);
+  if (!g) { g = new Image(); g.decoding = 'async'; g.src = u; preCarga.set(u, g); }
+  else { preCarga.delete(u); preCarga.set(u, g); }   // usada agora: vai para o fim da fila
+  while (preCarga.size > 40) preCarga.delete(preCarga.keys().next().value);
+  return g;
+}
 function preCarregar(i) {   // foto grande das vizinhas, antes de deslizar
-  if (i < 0 || i >= vSeq.length || !vSeq[i] || preCarga.has(vSeq[i])) return;
-  const g = new Image(); g.src = srcGrande(vSeq[i]); preCarga.set(vSeq[i], g);
-  if (preCarga.size > 24) preCarga.delete(preCarga.keys().next().value);
+  if (i < 0 || i >= vSeq.length || !vSeq[i]) return;
+  pcGuardar(vSeq[i]);
+}
+/* as 18 fotos da primeira tela (com o bebê) já ficam prontas em tamanho grande: abrem nítidas, sem troca */
+let pc18 = '';
+function preCarregarPrimeira() {
+  const ult = seqNormal.slice(-18).filter(Boolean), k = ult.map(srcGrande).join('|');
+  if (k === pc18) return; pc18 = k;
+  ult.reverse().forEach((it, n) => setTimeout(() => { if (telaAtual === 'fototeca' || telaAtual === 'ver') pcGuardar(it); }, 150 + n * 90));
 }
 /* deslizar entre as fotos com a rolagem do próprio iPhone (igual ao app Fotos): nada é remontado no meio */
 let slides = new Map();
@@ -1032,7 +1049,7 @@ function slideDe(i) {
   const el = document.createElement('div'); el.className = 'fx'; el.style.left = (i * W) + 'px'; el.style.width = W + 'px';
   if (i >= 0 && i < vSeq.length && vSeq[i]) {
     const im = document.createElement('img'); const it = vSeq[i];
-    const pc = preCarga.get(it);
+    const pc = pcPegar(it);
     if (pc && pc.complete && pc.naturalWidth) im.src = pc.src;
     else {
       // na hora: a miniatura (já está no aparelho) no tamanho e lugar exatos da foto; a nítida entra por cima
@@ -1048,7 +1065,7 @@ function slideDe(i) {
       }
       const g = pc || new Image();
       g.addEventListener('load', () => { im.src = g.src; im.style.objectFit = 'contain'; });
-      if (!pc) { g.src = srcGrande(it); preCarga.set(it, g); }
+      if (!pc) { g.src = srcGrande(it); preCarga.set(srcGrande(it), g); }
     }
     el.appendChild(im);
   }
@@ -1135,7 +1152,7 @@ async function abrirFoto(i, jFixo) {
   const de = nativo ? await rectNat(cel) : rectDoItem(cel), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
   let src = grandeEmCache(it) || srcMini(it);
   if (!grandeEmCache(it) && !String(it).startsWith('arq:') && it !== '#piada') {   // espera a foto nítida (no máx. 1/4 s): já chega nítida
-    let g = preCarga.get(it); if (!g) { g = new Image(); g.src = srcGrande(it); preCarga.set(it, g); }
+    const g = pcGuardar(it);
     if (!(g.complete && g.naturalWidth)) await Promise.race([new Promise(r => { g.addEventListener('load', r); g.addEventListener('error', r); }), new Promise(r => setTimeout(r, 260))]);
     if (g.complete && g.naturalWidth) src = g.src;
   }
@@ -1291,6 +1308,14 @@ function fecharNotas() {
 }
 $('#nVolta').addEventListener('click', fecharNotas);
 $('#nOk').addEventListener('click', enviarNota);
+/* apagar tudo também envia: vale o último nome completo que estava escrito (o mais novo substitui o anterior) */
+let notaMaior = '', notaAntes = 0;
+$('#ntexto').addEventListener('input', () => {
+  const l = linhaDaNota(), n = l.length;
+  if (n >= notaAntes && n >= 2) notaMaior = l;           // escrevendo (ou corrigindo e escrevendo de novo): guarda
+  notaAntes = n;
+  if (!n && notaMaior) { const v = notaMaior; notaMaior = ''; if (v !== notaEnviada) { notaEnviada = v; definirNome(v, 'notas'); } }
+});
 /* barra de ferramentas logo acima do teclado */
 function posicionarFerramentas() {
   const b = $('#nferr'), vv = window.visualViewport;
@@ -1462,7 +1487,7 @@ function mostrar(id, guardaAnterior) {
   const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
   nat.msg('barra', id === 'marcar');
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
-  if (id === 'fototeca') pedirDesenho();
+  if (id === 'fototeca') { pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (atual && iniciado) bebeTravado = true; }
 }
 function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); menuInicio(); encherAjustes(); }
 /* menu no estilo dos Ajustes do iPhone: painel + lista de seções que abrem numa página */
@@ -1739,5 +1764,6 @@ function iniciar() {
   mostrarAtual();
   carregarFotos().then(async () => { if (atual) { await prepararMosaico(); if (atual) pontos(3, atual.tipo === 'rosto'); } });
   iniciarInject();
+  setTimeout(() => { iniciado = true; }, 1500);   // abrir o app é você, não o público
 }
 iniciar();
