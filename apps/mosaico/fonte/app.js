@@ -1564,7 +1564,7 @@ function mostrar(id, guardaAnterior) {
   const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
   nat.msg('barra', id === 'marcar');
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
-  if (id === 'fototeca') { pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (iniciado) bebeTravado = true; }   // o público viu a Fototeca: o bebê não muda mais nesta apresentação
+  if (id === 'fototeca') { pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (iniciado && atual) bebeTravado = true; }   // o público viu a Fototeca COM o artista: o bebê não muda mais (sem artista não trava)
 }
 function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); menuInicio(); encherAjustes(); }
 /* menu no estilo dos Ajustes do iPhone: painel + lista de seções que abrem numa página */
