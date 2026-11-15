@@ -39,6 +39,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var mosImg = "", mosV = ""
     private var temMos: Bool { mosCols > 0 && magImg.image != nil }
     private var reforco: CGFloat = 0.4
+    private var trocaNova = true          // passagem igual ao original: fotos com as cores de verdade até ficarem pequenininhas
+    private var momento: CGFloat = 5       // 0 = troca mais cedo, 10 = mais tarde
     private var corModo = "cor"
     private var escuro = true
     private var n0: CGFloat = 3
@@ -238,6 +240,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let selAntes = selecao ? selecionados : []
         if let c = m["cfg"] as? [String: Any] {
             reforco = CGFloat((c["reforco"] as? NSNumber)?.doubleValue ?? 0.4)
+            trocaNova = ((c["troca"] as? String) ?? "nova") != "anterior"
+            momento = CGFloat((c["momento"] as? NSNumber)?.doubleValue ?? 5)
             corModo = (c["cor"] as? String) ?? "cor"
             escuro = (c["escuro"] as? Bool) ?? true
             n0 = CGFloat((c["n0"] as? NSNumber)?.doubleValue ?? 3)
@@ -454,13 +458,25 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func atualizar() {
         let v = visiveis, k = zoomer.zoomScale
         let cc = CGFloat(C)
-        let b: CGFloat = temMos ? suave(0.22 * cc, 0.38 * cc, v) : 0   // dissolve da Fototeca para o mosaico
+        var b: CGFloat = 0, ramp: CGFloat = 0, segura: CGFloat = 1
+        if temMos && trocaNova {
+            // igual ao original: as fotos ficam com as cores de verdade enquanto dá para ver cada uma;
+            // pequenininhas, viram as fotinhas do mosaico (rápido) e só depois a cor pinta o rosto.
+            // Na volta é o contrário: a cor some primeiro, depois as fotinhas viram fotos normais.
+            let ini = min(0.78, 0.30 + 0.04 * max(0, min(10, momento))) * cc
+            let fim = min(0.84 * cc, ini + 0.07 * cc)
+            b = suave(ini, fim, v)
+            ramp = suave(fim, max(fim + 0.05 * cc, 0.9 * cc), v) * b
+            segura = suave(fim, min(0.95 * cc, fim + 0.15 * cc), v)   // o rosto pronto (já pintado) só entra depois das fotinhas
+        } else if temMos {
+            b = suave(0.22 * cc, 0.38 * cc, v)   // dissolve da Fototeca para o mosaico (como na 3.11)
+            ramp = suave(0.22 * cc, 0.6 * cc, v) * b
+        }
         bAtual = b
         tilesB.isHidden = b <= 0.001
         tiles.isHidden = b >= 0.999
         tilesB.alpha = b
-        let ramp = temMos ? suave(0.22 * cc, 0.6 * cc, v) * b : 0
-        let mag: CGFloat = temMos ? min(1, max(0, (2.0 - k) / 0.6)) : 0
+        let mag: CGFloat = temMos ? min(1, max(0, (2.0 - k) / 0.6)) * segura : 0
         CATransaction.begin(); CATransaction.setDisableActions(true)
         magImg.alpha = mag
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
