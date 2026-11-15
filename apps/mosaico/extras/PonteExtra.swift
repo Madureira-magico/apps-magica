@@ -147,8 +147,11 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             telaCobrir(); responder(true, nil)
         case "telaAbrir":    // o app novo cresce do ícone até a tela cheia, por cima da tela de início
             telaAbrir(CGFloat(num("x", 0)), CGFloat(num("y", 0)), CGFloat(num("s", 60)), responder)
-        case "telaFechar":   // o app encolhe até o ícone, com a tela de início por trás
+        case "telaFechar":   // congela o app na tela (a página troca para a tela de início por baixo)
             telaFechar(CGFloat(num("x", 0)), CGFloat(num("y", 0)), CGFloat(num("s", 60)), responder)
+        case "telaFecharVai":   // e agora o app encolhe até o ícone, como no iOS 26
+            telaFecharVai(CGFloat(num("x", 0)), CGFloat(num("y", 0)), CGFloat(num("s", 60)))
+            responder(true, nil)
         case "pegar":   // texto de um endereço, sem bloqueio de outro site (Inject direto)
             guard let url = URL(string: txt("url")) else { return responder(nil, "endereço inválido") }
             var pedido = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: max(2, num("tempo", 6)))
@@ -246,27 +249,73 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             self?.capaTela?.removeFromSuperview(); self?.capaTela = nil
         }
     }
+    private var velhoTela: UIView?
     private func telaFechar(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat, _ r: @escaping Resposta) {
+        velhoTela?.removeFromSuperview(); velhoTela = nil
         // a página (Notas) é desenhada fora do app: a foto precisa ser tirada "depois de atualizar", senão sai vazia
         guard let w = web, let jan = janela(), let velho = w.snapshotView(afterScreenUpdates: true) else { return r(true, nil) }
-        let B = w.convert(w.bounds, to: jan)
-        velho.frame = B
+        velho.frame = w.convert(w.bounds, to: jan)
         velho.layer.masksToBounds = true
+        velho.layer.cornerCurve = .continuous
         jan.addSubview(velho)
-        r(true, nil)   // a página já pode trocar para a tela de início por baixo
-        let k = max(0.05, s / B.width), raioFim = 0.2237 * s / k
-        let fim = CGAffineTransform(translationX: x - B.midX, y: y - B.midY).scaledBy(x: k, y: k)
-        let dur = 0.42
-        // encolhe sem quicar e some exatamente ao chegar no ícone (sem o "tiquezinho" no final)
-        UIView.animateKeyframes(withDuration: dur, delay: 0.02, options: [.calculationModeCubic]) {
-            UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 1) { velho.transform = fim }
-            UIView.addKeyframe(withRelativeStartTime: 0.55, relativeDuration: 0.45) { velho.alpha = 0 }
-        } completion: { _ in velho.removeFromSuperview() }
+        velhoTela = velho
+        r(true, nil)
+        // segurança: se o "vai" não chegar, tira a foto congelada
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak velho] in
+            if let v = velho, v === self?.velhoTela, v.layer.animationKeys() == nil { v.removeFromSuperview(); self?.velhoTela = nil }
+        }
+    }
+    /// Fechamento como no iOS 26 (medido quadro a quadro num iPhone):
+    /// o app encolhe rápido até o ícone; ali vira o próprio ícone, maior e esticado, que "chacoalha" até o tamanho normal;
+    /// a tela de início começa desfocada e um pouco ampliada, e volta ao normal.
+    private func telaFecharVai(_ x: CGFloat, _ y: CGFloat, _ s: CGFloat) {
+        guard let w = web, let jan = janela(), let velho = velhoTela else { return }
+        velhoTela = nil
+        let B = w.convert(w.bounds, to: jan)
+        // tela de início (já trocada por baixo), desfocada
+        let fundo = w.snapshotView(afterScreenUpdates: true)
+        let desfoque = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterial))
+        // o ícone de verdade, recortado da tela de início
+        let rIcone = CGRect(x: x - s / 2, y: y - s / 2, width: s, height: s)
+        let icone = w.resizableSnapshotView(from: w.convert(rIcone, from: jan), afterScreenUpdates: false, withCapInsets: .zero)
+        if let f = fundo {
+            f.frame = B
+            jan.insertSubview(f, belowSubview: velho)
+            desfoque.frame = B
+            jan.insertSubview(desfoque, belowSubview: velho)
+            f.transform = CGAffineTransform(scaleX: 1.07, y: 1.07)
+        }
+        if let ic = icone {
+            ic.frame = rIcone
+            ic.layer.cornerRadius = 0.2237 * s; ic.layer.cornerCurve = .continuous; ic.layer.masksToBounds = true
+            ic.alpha = 0
+            ic.transform = CGAffineTransform(translationX: 0, y: s * 0.18).scaledBy(x: 1.3, y: 1.55)
+            jan.insertSubview(ic, belowSubview: velho)
+        }
+        // 1) o app encolhe (rápido no começo, firme no fim), arredondando os cantos
+        let k = max(0.05, s / B.width) * 1.25, raioFim = 0.2237 * s * 1.25 / k
+        let fim = CGAffineTransform(translationX: x - B.midX, y: y - B.midY + s * 0.18).scaledBy(x: k, y: k * 1.2)
+        let dur = 0.32
+        UIView.animate(withDuration: dur, delay: 0, options: [.curveEaseIn]) { velho.transform = fim }
+        UIView.animate(withDuration: 0.12, delay: dur - 0.1, options: [.curveLinear]) { velho.alpha = 0 }
         let raio = CABasicAnimation(keyPath: "cornerRadius")
-        raio.fromValue = 0; raio.toValue = raioFim; raio.duration = dur * 0.8
-        raio.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        raio.fromValue = 44; raio.toValue = raioFim; raio.duration = dur
+        raio.timingFunction = CAMediaTimingFunction(name: .easeIn)
         velho.layer.cornerRadius = raioFim
         velho.layer.add(raio, forKey: "raio")
+        // 2) vira o ícone, grande e esticado, que chacoalha até o tamanho normal
+        if let ic = icone {
+            UIView.animate(withDuration: 0.1, delay: dur - 0.1, options: [.curveLinear]) { ic.alpha = 1 }
+            UIView.animate(withDuration: 0.5, delay: dur - 0.04, usingSpringWithDamping: 0.52, initialSpringVelocity: 0.6, options: []) { ic.transform = .identity }
+        }
+        // 3) a tela de início perde o desfoque e volta ao tamanho normal
+        UIView.animate(withDuration: 0.42, delay: dur - 0.06, options: [.curveEaseOut]) {
+            fundo?.transform = .identity
+            desfoque.alpha = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + dur + 0.55) {
+            velho.removeFromSuperview(); icone?.removeFromSuperview(); desfoque.removeFromSuperview(); fundo?.removeFromSuperview()
+        }
     }
 
     // MARK: permissão e lista de fotos

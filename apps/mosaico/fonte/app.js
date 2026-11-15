@@ -1367,6 +1367,7 @@ function enviarNota() {   // ✓ amarelo: esconde o teclado e manda o nome
   if (l && l !== notaEnviada) { notaEnviada = l; definirNome(l, 'notas'); }
 }
 function fecharNotas() {
+  if (temInicio() && (!telaAnterior || telaAnterior === 'inicio')) { voltarInicio(); return; }   // a setinha também encolhe até o ícone
   enviarNota();
   mostrar(telaAnterior || (cfg.abrir === 'inicio' && temInicio() ? 'inicio' : 'fototeca'));
 }
@@ -1527,9 +1528,12 @@ async function voltarInicio() {
   if (nat.tem && (qual === 'notas' || qual === 'fototeca')) {   // igual ao iPhone: o app inteiro encolhe até o ícone, com a tela de início por trás
     if (animando) return; animando = true;
     try {
-      await nat.call('telaFechar', iconeNaTela(p)).catch(() => {});
-      if (nativo && qual === 'fototeca') nat.call('galeria', { on: false }).catch(() => {});
+      const ic = iconeNaTela(p);
+      await nat.call('telaFechar', ic).catch(() => {});
+      if (nativo && qual === 'fototeca') await nat.call('galeria', { on: false }).catch(() => {});
       mostrar('inicio'); saiuDasFotos();
+      await doisQuadros();
+      await nat.call('telaFecharVai', ic).catch(() => {});
     } catch (_) { mostrar('inicio'); } finally { animando = false; }
     return;
   }
