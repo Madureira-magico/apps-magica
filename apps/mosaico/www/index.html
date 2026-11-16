@@ -904,10 +904,12 @@ async function definirNome(txt, origem) {
   txt = String(txt || '').replace(/\s+/g, ' ').trim();
   if (txt.length < 2 || txt.length > 60) return;
   const meu = ++preparo; buscando = true;
-  if (telaAtual === 'fototeca' || telaAtual === 'ver') bebeTravado = true;   // nome chegou com as fotos na tela (microfone, câmera, Pesquisar)
+  const naTela = telaAtual === 'fototeca' || telaAtual === 'ver';
   const limpo = limparPedido(txt);
   const f = acharFamoso(txt) || acharFamoso(limpo);
   const nome = f ? f.n : maiusculas(limpo);
+  if (naTela) bebeTravado = true;   // nome chegou com as fotos na tela (microfone, câmera, Pesquisar, Inject): o bebê não muda
+  else if (jaRevelou && !(atual && semAcento(atual.nome) === semAcento(nome))) { bebeTravado = false; jaRevelou = false; }   // o mosaico anterior já foi revelado e chegou um nome novo: próxima mesa, o bebê pode mudar
   escolherBebe(f, nome);
   atual = { nome, tipo: 'texto', pronto: false, origem };
   pontos(1, false);
@@ -998,7 +1000,7 @@ async function completarFamoso(f) {   // sexo e tom de pele (uma vez por famoso)
   }
   if (mudou) salvarFam();
 }
-let bebeTravado = false, iniciado = false;   // o público já viu a Fototeca com este nome: o bebê não muda mais (até apagar o nome)
+let bebeTravado = false, iniciado = false, jaRevelou = false;   // jaRevelou: o zoom chegou no rosto (ou na palavra) com o artista atual   // o público já viu a Fototeca com este nome: o bebê não muda mais (até apagar o nome)
 function escolherBebe(f, nome) {
   if (!cfg.auto || cfg.piada !== 'bebes' || bebeTravado) return;
   let k = f && f.b >= 0 ? f.b : -1;
@@ -1267,7 +1269,7 @@ async function prepararMosaico() {
 prepararMosaico.vez = 0;
 
 function limparNome() {
-  preparo++; prepararMosaico.vez++; bebeTravado = false; buscando = false;
+  preparo++; prepararMosaico.vez++; bebeTravado = false; jaRevelou = false; buscando = false;
   atual = null; mos = null; guarda.set('atual', null); pontos(0); seq = seqNormal; $('#real').classList.remove('on'); $('#real').style.opacity = 0;
   if (zoom > 5) irAoNivel(5);
   mostrarAtual(); estado(''); pedirDesenho(); enviarGaleria();
@@ -2040,7 +2042,7 @@ window.__mzEvento = ev => {
     vibrar('leve'); nat.call('galeriaTroca', { i: ev.i, id: 'arq:' + arq }).catch(() => {});
     return;
   }
-  if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) revelado = true; if (!naFace) animarReal(); return; }
+  if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) { revelado = true; jaRevelou = true; } if (!naFace) animarReal(); return; }
   if (ev.tipo === 'gZoom') { realTrava = false; selSegura = false; animarReal(); return; }
   if (ev.tipo === 'volume') { if (telaAtual === 'fototeca' && podeReal()) { ultVol = performance.now(); animarReal(); } return; }
   if (ev.tipo === 'texto' && camLigada) {
@@ -2567,7 +2569,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { saiuDasFotos(); saiuEm = Date.now(); return; }
   if (saiuEm && Date.now() - saiuEm > 3 * 60 * 1000) {   // ficou fora mais de 3 minutos: começa do zero
     if (atual) limparNome();
-    bebeTravado = false; injZerar = true;
+    bebeTravado = false; jaRevelou = false; injZerar = true;
     if (telaAtual === 'fototeca' && nativo) nat.call('galeriaInicio').catch(() => {});
   }
   saiuEm = 0;
