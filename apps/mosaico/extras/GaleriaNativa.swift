@@ -675,6 +675,15 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             return
         }
         zoomer.isScrollEnabled = ligada && ativa
+        if !temMos {   // sem artista a grade não tem zoom: volta para as 3 colunas certinhas
+            let o = zoomer.contentOffset, alvo = min(mx, max(mn, CGFloat(C) / max(1, min(CGFloat(C), n0))))
+            if abs(e - alvo) > 0.001 {
+                let cs = CGSize(width: plano.bounds.width * alvo, height: plano.bounds.height * alvo), ins = zoomer.contentInset
+                let y = min(max((o.y + H / 2) / e * alvo - H / 2, -ins.top), max(-ins.top, cs.height - H + ins.bottom))
+                animarPara(alvo, CGPoint(x: 0, y: y), 0.2)
+            }
+            return
+        }
         if ajuda > 0, temMos, e >= mx * 0.75 {   // quase nas fotos grandes: encaixa as 3 colunas da faixa certinho
             let o = zoomer.contentOffset
             let cy = (o.y + H / 2) / e
