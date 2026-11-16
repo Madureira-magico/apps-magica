@@ -169,6 +169,15 @@ body:not(.claro) .nok{color:#000}
 #ntexto::first-line{font-size:28px;font-weight:700;line-height:1.25}
 #nferr{position:fixed;left:12px;right:12px;height:50px;border-radius:25px;display:none;align-items:center;justify-content:space-around;color:var(--fg);z-index:7}
 #nferr.on{display:none}
+#famVer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:16px}
+#famVer.on{display:flex}
+#famVer .fvCx{width:100%;max-width:420px;background:var(--cel);border-radius:18px;padding:14px;color:var(--fg)}
+#famVer .fvTopo{display:flex;align-items:center;justify-content:space-between;font-size:18px;margin-bottom:10px}
+#fvFecha{font-size:20px;padding:4px 8px;color:var(--fg2)}
+#fvImg{width:100%;aspect-ratio:3/4;border-radius:12px;background:#222 center/contain no-repeat}
+#fvImg.vazia::after{content:'sem foto';display:flex;height:100%;align-items:center;justify-content:center;color:#888}
+#fvMsg{min-height:20px;margin:8px 0;color:var(--fg2);font-size:14px;text-align:center}
+#famVer .fvBts{display:flex;flex-direction:column;gap:8px}#famVer .fvBts .bt{padding:12px}
 .desf{display:none;align-items:center}#notas.temDesf .desf{display:flex}
 #notas .nok{transition:opacity .2s,transform .2s}#notas:not(.digitando) .nok{opacity:0;transform:scale(.6);pointer-events:none}
 #nbaixo{position:absolute;left:16px;right:16px;bottom:max(calc(var(--sb) - 8px),10px);display:flex;justify-content:space-between;align-items:center;transition:opacity .2s;z-index:2}
@@ -275,6 +284,8 @@ body:not(.claro) .nok{color:#000}
   </div>
 </div>
 
+<div id="famVer"><div class="fvCx"><div class="fvTopo"><b id="fvNome"></b><span id="fvFecha">✕</span></div><div id="fvImg"></div><div id="fvMsg"></div>
+  <div class="fvBts"><button class="bt verm" id="fvApagar">Excluir foto</button><button class="bt" id="fvBuscar">Buscar na internet</button><button class="bt cinza" id="fvGaleria">Escolher da galeria</button></div></div></div>
 <div class="tela" id="notas">
   <div class="ncab">
     <div class="circ vid" id="nVolta"><svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg></div>

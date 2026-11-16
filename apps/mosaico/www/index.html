@@ -169,6 +169,15 @@ body:not(.claro) .nok{color:#000}
 #ntexto::first-line{font-size:28px;font-weight:700;line-height:1.25}
 #nferr{position:fixed;left:12px;right:12px;height:50px;border-radius:25px;display:none;align-items:center;justify-content:space-around;color:var(--fg);z-index:7}
 #nferr.on{display:none}
+#famVer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:16px}
+#famVer.on{display:flex}
+#famVer .fvCx{width:100%;max-width:420px;background:var(--cel);border-radius:18px;padding:14px;color:var(--fg)}
+#famVer .fvTopo{display:flex;align-items:center;justify-content:space-between;font-size:18px;margin-bottom:10px}
+#fvFecha{font-size:20px;padding:4px 8px;color:var(--fg2)}
+#fvImg{width:100%;aspect-ratio:3/4;border-radius:12px;background:#222 center/contain no-repeat}
+#fvImg.vazia::after{content:'sem foto';display:flex;height:100%;align-items:center;justify-content:center;color:#888}
+#fvMsg{min-height:20px;margin:8px 0;color:var(--fg2);font-size:14px;text-align:center}
+#famVer .fvBts{display:flex;flex-direction:column;gap:8px}#famVer .fvBts .bt{padding:12px}
 .desf{display:none;align-items:center}#notas.temDesf .desf{display:flex}
 #notas .nok{transition:opacity .2s,transform .2s}#notas:not(.digitando) .nok{opacity:0;transform:scale(.6);pointer-events:none}
 #nbaixo{position:absolute;left:16px;right:16px;bottom:max(calc(var(--sb) - 8px),10px);display:flex;justify-content:space-between;align-items:center;transition:opacity .2s;z-index:2}
@@ -275,6 +284,8 @@ body:not(.claro) .nok{color:#000}
   </div>
 </div>
 
+<div id="famVer"><div class="fvCx"><div class="fvTopo"><b id="fvNome"></b><span id="fvFecha">✕</span></div><div id="fvImg"></div><div id="fvMsg"></div>
+  <div class="fvBts"><button class="bt verm" id="fvApagar">Excluir foto</button><button class="bt" id="fvBuscar">Buscar na internet</button><button class="bt cinza" id="fvGaleria">Escolher da galeria</button></div></div></div>
 <div class="tela" id="notas">
   <div class="ncab">
     <div class="circ vid" id="nVolta"><svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg></div>
@@ -1053,7 +1064,33 @@ function tituloBate(titulo, pedido) {
   const pt = t.split(' '), pq = q.split(' ').filter(x => x.length > 1);
   return pq.length > 0 && pq.every(x => pt.some(y => y === x || (x.length >= 5 && distancia(x, y) <= 1)));
 }
-async function baixarFamoso(f, novo, estrito) {
+/* outras fotos da mesma página da Wikipédia (para escolher a mais de frente) */
+const FORA_FOTO = /logo|signature|assinatura|flag|bandeira|map|mapa|icon|ícone|award|prêmio|premio|poster|cartaz|album|álbum|capa|cover|coat|brasão|brasao|svg|stamp|selo|grave|tumulo|túmulo|house|casa|star_|estrela/i;
+async function imagensPagina(lang, titulo) {
+  if (!titulo) return [];
+  const u = 'https://' + lang + '.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&titles=' + encodeURIComponent(titulo)
+    + '&generator=images&gimlimit=40&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1400';
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 6000);
+  try {
+    const d = await (await fetch(u, { signal: ac.signal, cache: 'no-store' })).json();
+    const pags = d && d.query && d.query.pages ? Object.values(d.query.pages) : [];
+    return pags.map(p => ({ t: p.title || '', i: (p.imageinfo || [])[0] })).filter(x => x.i && /jpe?g/i.test(x.i.mime || '') && (x.i.width || 0) >= 400 && (x.i.height || 0) >= 400 && !FORA_FOTO.test(x.t))
+      .map(x => x.i.thumburl || x.i.url);
+  } catch (_) { return []; } finally { clearTimeout(t); }
+}
+/* guarda a melhor foto (de frente, rosto grande, luz boa) entre a principal e as outras da página; "pular" = fotos que já foram usadas */
+async function guardarMelhorFoto(f, principal, lang, titulo, nome, pular) {
+  const fora = new Set(pular || []);
+  const extras = await imagensPagina(lang, titulo);
+  const urls = [principal, ...extras].filter((x, i, a) => x && a.indexOf(x) === i && !fora.has(x)).slice(0, 8);
+  if (!urls.length) return null;
+  try {
+    const r = await nat.call('escolherFoto', { urls, nome });
+    if (r && r.url) return { arq: nome, rosto: !!r.rosto, pele: r.pele, url: r.url, nota: r.nota };
+  } catch (_) {}
+  return null;
+}
+async function baixarFamoso(f, novo, estrito, pular) {
   const tentativas = [];
   if (f.w) tentativas.push(['pt', f.w, '']);
   tentativas.push(['pt', '', f.n], ['en', f.w && !/\(/.test(f.w) ? f.w : '', f.n]);
@@ -1065,6 +1102,13 @@ async function baixarFamoso(f, novo, estrito) {
     if (estrito && busca && !tituloBate(infoWiki.t, busca)) continue;
     if (infoWiki.q) f.q = infoWiki.q;
     const nome = 'famosos/' + slug(f.n) + '.jpg';
+    const melhor = await guardarMelhorFoto(f, url, lang, infoWiki.t, nome, pular);   // a mais de frente entre as fotos da página
+    if (melhor) {
+      feito = { arq: nome, rosto: melhor.rosto }; if (Array.isArray(melhor.pele)) f.p = melhor.pele;
+      f.usadas = (Array.isArray(f.usadas) ? f.usadas : []).concat(melhor.url).slice(-30);
+      if (feito.rosto) break; else continue;
+    }
+    if (pular && pular.includes(url)) continue;
     try {
       const r = await nat.call('baixarRosto', { url, nome });
       feito = { arq: nome, rosto: !!(r && r.rosto) };
@@ -2509,10 +2553,7 @@ $('#listaFam').addEventListener('click', async e => {
   if (a === 'bebe') { const k = +e.target.dataset.k; f.b = f.b === k ? -1 : k; salvarFam(); desenharListaFam(); }
   else if (a === 'usar') { definirNome(f.n, 'ajustes'); toast('Preparando ' + f.n); }
   else if (a === 'tirar') { if (confirm('Tirar ' + f.n + ' da lista?')) { if (f.f) nat.call('apagar', { nome: f.f }).catch(() => {}); famosos.splice(+l.dataset.i, 1); salvarFam(); desenharListaFam(); } }
-  else if (a === 'foto') {
-    const nome = 'famosos/' + slug(f.n) + '.jpg';
-    try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; cfg.ver++; salvar(); salvarFam(); desenharListaFam(); if (atual && atual.nome === f.n) definirNome(f.n, 'ajustes'); } } catch (_) {}
-  }
+  else if (a === 'foto') abrirFotoFam(f);
 });
 /* cópia da lista: famosos (fotos e bebê), primeira tela da Fototeca e fotos dos bebês */
 const CHAVES_COPIA = ['slots', 'slots2', 'bebes', 'bebe', 'auto', 'piada', 'fixas', 'fixa'];
@@ -2553,6 +2594,40 @@ $('#aApagarFam').addEventListener('click', () => {
   for (const f of famosos) if (f.f) nat.call('apagar', { nome: f.f }).catch(() => {});
   famosos = []; salvarFam(); if (typeof palavrasPi !== 'undefined') palavrasPi = null;
   desenharListaFam(); $('#aCopiaEst').textContent = 'lista apagada';
+});
+/* tocar na miniatura: a foto grande para conferir, com Excluir foto, Buscar na internet e Escolher da galeria */
+let famVer = null;
+function mostrarFotoFam(msg) {
+  const f = famVer; if (!f) return;
+  $('#fvNome').textContent = f.n;
+  $('#fvImg').style.backgroundImage = f.f ? 'url("' + URLS.arq(f.f, cfg.ver) + '")' : 'none';
+  $('#fvImg').classList.toggle('vazia', !f.f);
+  $('#fvMsg').textContent = msg || (f.f && f.r === false ? 'sem rosto achado nesta foto' : '');
+}
+function abrirFotoFam(f) { famVer = f; $('#famVer').classList.add('on'); mostrarFotoFam(); }
+function fecharFotoFam() { $('#famVer').classList.remove('on'); famVer = null; desenharListaFam(); }
+function fotoFamMudou(f) { cfg.ver++; salvar(); salvarFam(); mostrarFotoFam(); if (atual && atual.nome === f.n) definirNome(f.n, 'ajustes'); }
+$('#famVer').addEventListener('click', e => { if (e.target.id === 'famVer' || e.target.closest('#fvFecha')) fecharFotoFam(); });
+$('#fvApagar').addEventListener('click', () => {
+  const f = famVer; if (!f || !f.f) return;
+  if (!confirm('Excluir a foto de ' + f.n + '? (o nome continua na lista)')) return;
+  nat.call('apagar', { nome: f.f }).catch(() => {}); f.f = ''; f.r = null; fotoFamMudou(f);
+});
+let buscandoFam = false;
+$('#fvBuscar').addEventListener('click', async () => {
+  const f = famVer; if (!f || buscandoFam) return;
+  buscandoFam = true; mostrarFotoFam('procurando outra foto…');
+  const tinha = f.f, tinhaR = f.r, pular = Array.isArray(f.usadas) ? f.usadas.slice() : [];
+  const r = await baixarFamoso(f, false, false, pular);
+  buscandoFam = false;
+  if (famVer !== f) return;
+  if (r && r.f) fotoFamMudou(f);
+  else { if (Array.isArray(f.usadas) && f.usadas.length) f.usadas = []; if (tinha) { f.f = tinha; f.r = tinhaR; } salvarFam(); mostrarFotoFam('não achei outra foto (tocando de novo, recomeça da primeira)'); }
+});
+$('#fvGaleria').addEventListener('click', async () => {
+  const f = famVer; if (!f) return;
+  const nome = 'famosos/' + slug(f.n) + '.jpg';
+  try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; fotoFamMudou(f); } } catch (_) {}
 });
 let baixandoTodos = false;
 $('#aBaixar').addEventListener('click', async () => {

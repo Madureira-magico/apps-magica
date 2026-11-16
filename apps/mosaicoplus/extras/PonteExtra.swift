@@ -165,6 +165,8 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             fila.async { responder(self.info(id), nil) }
         case "baixarRosto":
             baixarRosto(txt("url"), nome: txt("nome"), responder)
+        case "escolherFoto":   // várias fotos candidatas: guarda a mais de frente
+            escolherFoto((m["urls"] as? [String]) ?? [], nome: txt("nome"), responder)
         case "telaCobrir":   // congela o que está na tela (a tela de início) por cima de tudo, para trocar por baixo
             telaCobrir(); responder(true, nil)
         case "telaAbrir":    // o app novo cresce do ícone até a tela cheia, por cima da tela de início
@@ -1185,5 +1187,65 @@ final class BarraNotasView: UIView {
             iv.sizeToFit()
             iv.center = CGPoint(x: pilula.bounds.width * fx, y: pilula.bounds.height * fy)
         }
+    }
+}
+
+// MARK: escolher a melhor foto do famoso (de frente, rosto grande, luz boa)
+extension PonteExtra {
+    /// baixa as fotos candidatas, dá nota a cada uma e guarda a melhor em "nome"
+    func escolherFoto(_ enderecos: [String], nome: String, _ r: @escaping Resposta) {
+        let lista = Array(enderecos.prefix(10))
+        guard !lista.isEmpty, !nome.isEmpty else { return r(nil, "sem fotos") }
+        let grupo = DispatchGroup(), trava = NSLock()
+        var notas: [(Double, Int, UIImage)] = []
+        for (i, e) in lista.enumerated() {
+            guard let url = URL(string: e) else { continue }
+            grupo.enter()
+            var pedido = URLRequest(url: url, timeoutInterval: 12)
+            pedido.setValue("MosaicoApp/1.1 (iPhone; uso pessoal)", forHTTPHeaderField: "User-Agent")
+            URLSession.shared.dataTask(with: pedido) { dados, _, _ in
+                defer { grupo.leave() }
+                guard let d = dados, let im = UIImage(data: d) else { return }
+                let pronta = self.normalizar(im, maior: 1600)
+                let n = self.notaRosto(pronta)
+                trava.lock(); notas.append((n, i, pronta)); trava.unlock()
+            }.resume()
+        }
+        grupo.notify(queue: fila) {
+            let todas = notas.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1 < $1.1 }
+            guard let melhor = todas.first else { return r(nil, "não baixou") }
+            guard let jpg = melhor.2.jpegData(compressionQuality: 0.9), self.gravar(jpg, self.arq(nome)) else { return r(nil, "não gravou") }
+            var d: [String: Any] = ["rosto": melhor.0 > 0, "nota": melhor.0, "url": lista[melhor.1],
+                                    "notas": todas.map { ["url": lista[$0.1], "nota": $0.0] as [String: Any] }]
+            if melhor.0 > 0, let cg = melhor.2.cgImage, let p = self.corDaPele(cg) { d["pele"] = p }
+            r(d, nil)
+        }
+    }
+    /// 0 = sem rosto; perto de 1 = rosto de frente, grande, com luz boa
+    func notaRosto(_ im: UIImage) -> Double {
+        guard let cg = im.cgImage else { return 0 }
+        let pedido = VNDetectFaceRectanglesRequest()
+        pedido.revision = VNDetectFaceRectanglesRequestRevision3
+        try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([pedido])
+        let rostos = (pedido.results ?? []).sorted { $0.boundingBox.width * $0.boundingBox.height > $1.boundingBox.width * $1.boundingBox.height }
+        guard let f = rostos.first else { return 0 }
+        let b = f.boundingBox, W = Double(cg.width), H = Double(cg.height)
+        let area = Double(b.width * b.height)
+        let tamanho = min(1, area / 0.10)
+        func ang(_ x: NSNumber?) -> Double { abs(x?.doubleValue ?? 0) }
+        let frente = max(0, 1 - ang(f.yaw) / 0.8) * max(0, 1 - ang(f.roll) / 0.7) * max(0, 1 - ang(f.pitch) / 0.7)
+        let resol = Double(b.width) * W >= 200 ? 1.0 : 0.3
+        var outros = 1.0
+        if rostos.count > 1 { let a2 = Double(rostos[1].boundingBox.width * rostos[1].boundingBox.height); if a2 > area * 0.35 { outros = 0.55 } }
+        var luz = 0.7
+        let caixa = CGRect(x: Double(b.minX) * W, y: (1 - Double(b.maxY)) * H, width: Double(b.width) * W, height: Double(b.height) * H).integral
+        if caixa.width > 4, caixa.height > 4, let c = cg.cropping(to: caixa) {
+            let p = pixels(c, 4, 4); var s = 0.0
+            for i in 0..<16 { s += 0.299 * Double(p[i * 4]) + 0.587 * Double(p[i * 4 + 1]) + 0.114 * Double(p[i * 4 + 2]) }
+            let m = s / 16; luz = m < 60 ? 0.4 : (m > 215 ? 0.6 : 1)
+        }
+        let emPe = H >= W * 1.1 ? 1.0 : 0.9
+        let menor = min(W, H), tamFoto = menor >= 800 ? 1.0 : (menor >= 500 ? 0.9 : 0.75)
+        return (0.4 * frente + 0.35 * tamanho + 0.15 * luz + 0.1) * resol * outros * emPe * tamFoto
     }
 }
