@@ -199,7 +199,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private func mostrarCapaInicio() {
         guard let d = tiles.dados, d.t0 > 0, vista.bounds.width > 0 else { return }
         let z = zoomer.zoomScale, off = zoomer.contentOffset, B = vista.bounds
-        let g = d.t0 * 0.07, lado = d.t0 - g
+        let px = z * UIScreen.main.scale
+        let g: CGFloat = d.t0 * px >= 60 ? 2 / px : 0, lado = d.t0 - g
         let visivel = CGRect(x: off.x / z, y: off.y / z, width: B.width / z, height: B.height / z)
         let c0 = max(0, Int(floor(visivel.minX / d.t0))), c1 = min(d.cols - 1, Int(floor(visivel.maxX / d.t0)))
         let r0 = max(0, Int(floor(visivel.minY / d.t0))), r1 = min(d.linhas - 1, Int(floor(visivel.maxY / d.t0)))
@@ -724,7 +725,8 @@ final class TilesMosaico: UIView {
         ctx.setFillColor(corFundo)
         ctx.fill(rect)
         let escala = max(1, abs(ctx.ctm.a))
-        let g = d.t0 * 0.07, lado = d.t0 - g
+        // como no Fotos do iPhone: fotos grandes com uma linha fininha (2 pixels); pequenas (mosaico), coladas
+        let g: CGFloat = d.t0 * escala >= 60 ? 2 / escala : 0, lado = d.t0 - g
         let c0 = max(0, Int(floor(rect.minX / d.t0))), c1 = min(d.cols - 1, Int(floor(rect.maxX / d.t0)))
         let r0 = max(0, Int(floor(rect.minY / d.t0))), r1 = min(d.linhas - 1, Int(floor(rect.maxY / d.t0)))
         guard c0 <= c1, r0 <= r1 else { return }
