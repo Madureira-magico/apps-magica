@@ -1374,7 +1374,7 @@ window.__mzEvento = ev => {
     vibrar('leve'); nat.call('galeriaTroca', { i: ev.i, id: 'arq:' + arq }).catch(() => {});
     return;
   }
-  if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) { revelado = true; jaRevelou = true; } if (!naFace) animarReal(); return; }
+  if (ev.tipo === 'gFace') { naFace = !!ev.on; if (naFace && comMosaico()) { revelado = true; jaRevelou = true; if (nativo && !vozLigada) nat.call('volumeAtivar').catch(() => {}); } if (!naFace) animarReal(); return; }
   if (ev.tipo === 'gZoom') { realTrava = false; selSegura = false; animarReal(); return; }
   if (ev.tipo === 'volume') { if (telaAtual === 'fototeca' && podeReal()) { ultVol = performance.now(); animarReal(); } return; }
   if (ev.tipo === 'texto' && camLigada) {
@@ -1610,7 +1610,7 @@ function mostrar(id, guardaAnterior) {
   const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
   nat.msg('barra', id === 'marcar');
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
-  if (id === 'fototeca') { pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (iniciado && atual) bebeTravado = true; }   // o público viu a Fototeca COM o artista: o bebê não muda mais (sem artista não trava)
+  if (id === 'fototeca') { if (nativo && !vozLigada) nat.call('volumeAtivar').catch(() => {}); pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (iniciado && atual) bebeTravado = true; }   // o público viu a Fototeca COM o artista: o bebê não muda mais (sem artista não trava)
 }
 function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); menuInicio(); encherAjustes(); }
 /* menu no estilo dos Ajustes do iPhone: painel + lista de seções que abrem numa página */

@@ -204,6 +204,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             responder(true, nil)
         case "vozLigar":
             vozLigar(num("segundos", 7), responder)
+        case "volumeAtivar":   // abriu o Fotos / chegou no rosto: confere a escuta do volume e deixa o volume no meio
+            if motor == nil { volume.reativar(depois: 0) }
+            r(true, nil)
         case "vozDesligar":
             pararVoz(avisar: false)
             responder(true, nil)
@@ -876,7 +879,8 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         pedidoVoz = nil
         tarefaVoz = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        volume.ativar()
+        // volta o som ao modo normal com calma (o iPhone recusa se for na mesma hora) para o botão de volume voltar a ser percebido
+        volume.reativar(depois: 0.45)
         if avisar { evento(["tipo": "vozFim"]) }
     }
 
@@ -980,10 +984,27 @@ final class VolumeEspiao: NSObject {
         try? s.setActive(true)
         centralizar()
     }
+    /// depois do microfone (ou ao abrir o Fotos): som no modo normal, escuta ativa e volume no meio — tenta de novo se o iPhone recusar
+    func reativar(depois: Double, tentativa: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + depois) { [weak self] in
+            guard let self = self else { return }
+            let s = AVAudioSession.sharedInstance()
+            var ok = true
+            if s.category != .ambient { do { try s.setCategory(.ambient, mode: .default, options: [.mixWithOthers]) } catch { ok = false } }
+            do { try s.setActive(true) } catch { ok = false }
+            if !ok && tentativa < 5 { self.reativar(depois: 0.3, tentativa: tentativa + 1); return }
+            self.centralizar(forcar: true)
+        }
+    }
     /// deixa o volume no meio para o botão continuar avisando (no máximo ele para de mudar)
-    private func centralizar() {
+    private func centralizar(forcar: Bool = false, tentativa: Int = 0) {
         let v = AVAudioSession.sharedInstance().outputVolume
-        guard v > 0.85 || v < 0.1, let sl = vv.subviews.compactMap({ $0 as? UISlider }).first else { return }
+        guard v > (forcar ? 0.8 : 0.85) || v < (forcar ? 0.15 : 0.1) else { return }
+        // pelo controle invisível (assim a barra de volume do iPhone não aparece); se ainda não está pronto, tenta de novo
+        guard vv.window != nil, let sl = vv.subviews.compactMap({ $0 as? UISlider }).first else {
+            if tentativa < 6 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.centralizar(forcar: forcar, tentativa: tentativa + 1) } }
+            return
+        }
         ajustando = true
         sl.value = 0.5
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.ajustando = false }
