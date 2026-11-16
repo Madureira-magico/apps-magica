@@ -2076,7 +2076,7 @@ window.__mzEvento = ev => {
 let notaEnviada = '';
 const fmtNota = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 function abrirNotas() {
-  const t = $('#ntexto'); t.textContent = ''; notaEnviada = '';
+  const t = $('#ntexto'); t.textContent = ''; notaEnviada = ''; notaMaior = ''; notaAntes = 0;
   const d = new Date(); $('#nData').textContent = fmtNota.format(d) + ' às ' + fmtHora.format(d);
   mostrar('notas', true);
   setTimeout(() => t.focus(), 250);
@@ -2097,7 +2097,9 @@ $('#nOk').addEventListener('click', enviarNota);
 let notaMaior = '', notaAntes = 0;
 $('#ntexto').addEventListener('input', () => {
   const l = linhaDaNota(), n = l.length;
-  if (n >= notaAntes && n >= 2) notaMaior = l;           // escrevendo (ou corrigindo e escrevendo de novo): guarda
+  // apagando do fim (o texto é só o começo do nome guardado, mesmo sem o espaço): não troca; entrou letra nova: guarda
+  const apagando = notaMaior && semAcento(notaMaior).startsWith(semAcento(l)) && n <= notaAntes;
+  if (n >= 2 && !apagando) notaMaior = l;
   notaAntes = n;
   if (!n && notaMaior) { const v = notaMaior; notaMaior = ''; if (v !== notaEnviada) { notaEnviada = v; definirNome(v, 'notas'); } }
 });

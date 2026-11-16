@@ -43,8 +43,8 @@ svg{display:block}
 #iniDockIc{top:85.404%;height:14.596%}
 #cvIni{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #cvDock{position:absolute;left:0;width:100%;top:85.404%;height:14.596%;pointer-events:none}
-#ilha{position:fixed;left:50%;top:11px;transform:translateX(-50%);background:#000;display:none;z-index:9999;overflow:hidden;pointer-events:none;align-items:center;justify-content:center}
-#ilha.on{display:flex}#ilhaCv{opacity:0;transition:opacity .18s}#ilha.grande #ilhaCv{opacity:1;transition:opacity .25s .12s}
+#ilha{position:fixed;left:50%;top:11px;transform:translateX(-50%);background:#000;display:none;z-index:9999;overflow:hidden;pointer-events:none;align-items:flex-end;justify-content:center}
+#ilha.on{display:flex}#ilhaCv{flex:none;opacity:0;transition:opacity .18s}#ilha.grande #ilhaCv{opacity:1;transition:opacity .25s .12s}
 #aPiCv{display:block;width:100%;height:170px;background:#000;border-radius:10px}
 .ic{position:absolute;transition:transform .12s,filter .12s}
 .ic img{display:block;width:100%;height:100%;border-radius:22.5%;object-fit:cover}
@@ -2095,7 +2095,7 @@ window.__mzEvento = ev => {
 let notaEnviada = '';
 const fmtNota = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 function abrirNotas() {
-  const t = $('#ntexto'); t.textContent = ''; notaEnviada = '';
+  const t = $('#ntexto'); t.textContent = ''; notaEnviada = ''; notaMaior = ''; notaAntes = 0;
   const d = new Date(); $('#nData').textContent = fmtNota.format(d) + ' às ' + fmtHora.format(d);
   mostrar('notas', true);
   setTimeout(() => t.focus(), 250);
@@ -2116,7 +2116,9 @@ $('#nOk').addEventListener('click', enviarNota);
 let notaMaior = '', notaAntes = 0;
 $('#ntexto').addEventListener('input', () => {
   const l = linhaDaNota(), n = l.length;
-  if (n >= notaAntes && n >= 2) notaMaior = l;           // escrevendo (ou corrigindo e escrevendo de novo): guarda
+  // apagando do fim (o texto é só o começo do nome guardado, mesmo sem o espaço): não troca; entrou letra nova: guarda
+  const apagando = notaMaior && semAcento(notaMaior).startsWith(semAcento(l)) && n <= notaAntes;
+  if (n >= 2 && !apagando) notaMaior = l;
   notaAntes = n;
   if (!n && notaMaior) { const v = notaMaior; notaMaior = ''; if (v !== notaEnviada) { notaEnviada = v; definirNome(v, 'notas'); } }
 });
@@ -2801,8 +2803,20 @@ function palavrasLeitor() {
   if (!palavrasPi) { const s = new Set(); famosos.forEach(f => { s.add(f.n); f.n.split(' ').forEach(p => p.length >= 3 && s.add(p)); }); palavrasPi = [...s]; }
   return palavrasPi;
 }
-function famosoDoTexto(t) { return acharFamoso(t) || acharFamoso(limparPedido(t)) || acharFamosoEm(t); }
-/* lê a escrita: tenta reto, depois inclinado, depois de cabeça para baixo / de lado; para no primeiro famoso */
+/* o famoso tem que bater com o TEXTO TODO escrito (todas as linhas juntas), não com uma palavra solta ("ELIS REGINA" não vira Elvis) */
+function famosoDoTexto(t) {
+  const f = acharFamoso(t) || acharFamoso(limparPedido(t)); if (f) return f;
+  const g = acharFamosoEm(t); if (!g) return null;
+  const letras = semAcento(t).replace(/ /g, '').length, nome = Math.max(...nomesDe(g).map(x => x.replace(/ /g, '').length));
+  return nome >= 0.7 * letras ? g : null;
+}
+function textosDaLeitura(linhas) {   // junta as linhas em todas as combinações de palpites; os palpites mais seguros primeiro
+  linhas = (linhas || []).slice(0, 5).map((l, k, a) => l.slice(0, a.length > 3 ? 2 : 3));
+  let combos = [{ t: [], r: 0 }];
+  for (const l of linhas) { const n = []; for (const c of combos) l.forEach((x, k) => n.push({ t: c.t.concat(x), r: c.r + k })); combos = n.slice(0, 250); }
+  return combos.filter(c => c.t.length).map(c => ({ texto: c.t.join(' ').replace(/\s+/g, ' ').trim(), r: c.r }));
+}
+/* lê a escrita: tenta reto, depois inclinado, depois de cabeça para baixo / de lado */
 async function lerPostit(mostrar) {
   const lista = piTracos().filter(t => t.length);
   if (!lista.length) return { nome: null, cands: [] };
@@ -2810,11 +2824,12 @@ async function lerPostit(mostrar) {
   for (const angs of etapas) {
     let r = [];
     try { r = await nat.call('lerImagens', { imgs: angs.map(a => imagemTracos(lista, a)), palavras: palavrasLeitor() }); } catch (_) { r = []; }
-    for (let i = 0; i < angs.length; i++) for (const t of (r[i] || [])) {
-      todos.push(t); if (mostrar) mostrar(todos);
-      const f = famosoDoTexto(t);
-      if (f) return { nome: f.n, cands: todos, ang: angs[i] };
-    }
+    const op = [];
+    angs.forEach((ang, i) => (r[i] || []).forEach((linhas, passo) => textosDaLeitura(linhas).forEach(c => op.push({ texto: c.texto, ang, nota: c.r + passo * 0.5 + i * 0.3 }))));
+    op.sort((a, b) => a.nota - b.nota);
+    for (const o of op) if (!todos.includes(o.texto)) todos.push(o.texto);
+    if (mostrar) mostrar(todos);
+    for (const o of op) { const f = famosoDoTexto(o.texto); if (f) return { nome: f.n, cands: todos, ang: o.ang, lido: o.texto }; }
   }
   return { nome: null, cands: todos };
 }
@@ -2833,20 +2848,34 @@ function postitVoltou() { if (!pit.ligado) piAuto(); else piAbrir(); }
 
 /* janela no topo, igual à ilha dinâmica crescendo, com a escrita */
 let ilhaAberta = false, ilhaT = 0;
+/* janela no topo: a letra fica sempre do mesmo tamanho e a janela cresce só o necessário; a escrita começa abaixo da hora e da bateria */
+const ILHA = { letra: 48, topo: 50, pe: 16, folga: 8 };
+function medidaIlha() {
+  const w = Math.min(W - 18, 400), cw = w - 40, lista = piTracos().filter(t => t.length), pts = lista.flat();
+  if (!pts.length) return { w, cw, ch: 60 };
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  pts.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+  const alts = lista.map(t => { let a = Infinity, b = -Infinity; t.forEach(p => { a = Math.min(a, p.y); b = Math.max(b, p.y); }); return b - a; }).sort((a, b) => a - b);
+  const grandes = alts.filter(h => h > alts[alts.length - 1] * 0.15), ref = grandes.length ? grandes[Math.floor(grandes.length * 0.75)] : (y1 - y0);
+  let k = ILHA.letra / Math.max(1, ref);                       // tamanho da letra fixo
+  if ((x1 - x0) * k > cw) k = cw / Math.max(1, x1 - x0);       // nome muito comprido: diminui só o necessário
+  const maxH = H * 0.42; if ((y1 - y0) * k > maxH) k = maxH / Math.max(1, y1 - y0);
+  return { w, cw, ch: Math.max(40, (y1 - y0) * k + 2 * ILHA.folga) };
+}
 function desenharIlha() {
-  const cv = $('#ilhaCv'), r = cv.getBoundingClientRect(); if (!r.width) return;
-  cv.width = Math.round(r.width * DPR); cv.height = Math.round(r.height * DPR);
-  desenharTracos(cv.getContext('2d'), piTracos(), cv.width, cv.height, 0, '#fff', null, 14 * DPR);
+  const cv = $('#ilhaCv'), w = parseFloat(cv.style.width), h = parseFloat(cv.style.height); if (!w || !h) return;
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  desenharTracos(cv.getContext('2d'), piTracos(), cv.width, cv.height, 0, '#fff', null, ILHA.folga * DPR);
 }
 function abrirIlha() {
   if (ilhaAberta) return; ilhaAberta = true; clearTimeout(ilhaT);
-  const il = $('#ilha'), w = Math.min(W - 18, 400), h = Math.round(Math.min(w * 0.5, H * 0.3));
+  const m = medidaIlha(), il = $('#ilha'), h = Math.round(ILHA.topo + m.ch + ILHA.pe);
   il.style.transition = 'none'; il.className = 'on';
   Object.assign(il.style, { width: '124px', height: '36px', borderRadius: '18px' });
-  $('#ilhaCv').style.width = (w - 28) + 'px'; $('#ilhaCv').style.height = (h - 28) + 'px'; desenharIlha();
+  Object.assign($('#ilhaCv').style, { width: m.cw + 'px', height: m.ch + 'px', marginBottom: ILHA.pe + 'px' }); desenharIlha();
   il.getBoundingClientRect();
   il.style.transition = 'width .42s cubic-bezier(.2,1.25,.35,1), height .42s cubic-bezier(.2,1.25,.35,1), border-radius .42s';
-  Object.assign(il.style, { width: w + 'px', height: h + 'px', borderRadius: '42px' });
+  Object.assign(il.style, { width: m.w + 'px', height: h + 'px', borderRadius: '42px' });
   il.classList.add('grande');
 }
 function fecharIlha() {
@@ -2904,7 +2933,7 @@ $('#aPiLer').addEventListener('click', async () => {
   if (!piTracos().length) { $('#aPiRes').textContent = 'nada escrito'; return; }
   $('#aPiRes').textContent = 'lendo…'; const t0 = performance.now();
   const r = await lerPostit(c => { $('#aPiCands').textContent = c.join(' · '); });
-  $('#aPiRes').textContent = (r.nome ? r.nome + ' ✓' + (r.ang ? ' (inclinação ' + r.ang + '°)' : '') : 'não leu (mostraria "Atualizando…")') + ' · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
+  $('#aPiRes').textContent = (r.nome ? r.nome + ' ✓ (leu "' + r.lido + '"' + (r.ang ? ', inclinação ' + r.ang + '°' : '') + ')' : 'não leu (mostraria "Atualizando…")') + ' · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
   $('#aPiCands').textContent = r.cands.join(' · ') || '(nenhum texto)';
 });
 

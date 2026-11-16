@@ -833,12 +833,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     }
 
     // MARK: Post-It (escrita desenhada pela página → texto)
-    private func lerImagens(_ imgs: [String], _ palavras: [String]) -> [[String]] {
-        var saida: [[String]] = []
+    /// para cada imagem e cada leitura (sem e com correção): as linhas, de cima para baixo, cada uma com até 3 palpites
+    private func lerImagens(_ imgs: [String], _ palavras: [String]) -> [[[[String]]]] {
+        var saida: [[[[String]]]] = []
         for s in imgs {
             let b64 = s.components(separatedBy: ",").last ?? s
             guard let d = Data(base64Encoded: b64), let im = UIImage(data: d), let cg = im.cgImage else { saida.append([]); continue }
-            var achou: [String] = []
+            var leituras: [[[String]]] = []
             for corrigir in [false, true] {   // sem correção (letra por letra) e com correção puxando para os nomes da lista
                 let pedido = VNRecognizeTextRequest()
                 pedido.recognitionLevel = .accurate
@@ -849,18 +850,16 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
                     if !quero.isEmpty { pedido.recognitionLanguages = quero }
                 }
                 try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([pedido])
-                let obs = (pedido.results ?? []).sorted { $0.boundingBox.midY > $1.boundingBox.midY }   // de cima para baixo
-                // cada linha sozinha e todas juntas (nome e sobrenome em duas linhas)
-                var junto: [String] = []
-                for o in obs {
-                    let cands = o.topCandidates(3).map { $0.string }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-                    achou.append(contentsOf: cands)
-                    if let p = cands.first { junto.append(p) }
+                // de cima para baixo; na mesma altura, da esquerda para a direita
+                let obs = (pedido.results ?? []).sorted { a, b in
+                    let ba = a.boundingBox, bb = b.boundingBox
+                    if abs(ba.midY - bb.midY) < 0.5 * min(ba.height, bb.height) { return ba.minX < bb.minX }
+                    return ba.midY > bb.midY
                 }
-                if junto.count > 1 { achou.append(junto.joined(separator: " ")) }
+                let linhas: [[String]] = obs.map { o in o.topCandidates(3).map { $0.string }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty } }.filter { !$0.isEmpty }
+                leituras.append(linhas)
             }
-            var vistos = Set<String>()
-            saida.append(achou.filter { vistos.insert($0).inserted })
+            saida.append(leituras)
         }
         return saida
     }
