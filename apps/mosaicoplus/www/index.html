@@ -2166,7 +2166,7 @@ function fecharNotas() {
   mostrar(telaAnterior || (cfg.abrir === 'inicio' && temInicio() ? 'inicio' : 'fototeca'));
 }
 $('#nVolta').addEventListener('click', fecharNotas);
-$('#nOk').addEventListener('click', enviarNota);
+$('#nOk').addEventListener('click', () => { $('#notas').classList.remove('digitando'); enviarNota(); });   // igual ao Notas: no toque o ✓ some, manda e o teclado desce
 /* apagar tudo também envia: vale o último nome completo que estava escrito (o mais novo substitui o anterior) */
 let notaMaior = '', notaAntes = 0;
 $('#ntexto').addEventListener('input', () => {
@@ -2191,7 +2191,8 @@ function prenderPagina() { if (telaAtual === 'notas' && (window.scrollY || docum
 window.addEventListener('scroll', prenderPagina, { passive: true });
 if (window.visualViewport) { visualViewport.addEventListener('resize', () => { prenderPagina(); setTimeout(prenderPagina, 60); setTimeout(prenderPagina, 300); }); visualViewport.addEventListener('scroll', prenderPagina); }
 $('#ntexto').addEventListener('focus', () => $('#notas').classList.add('digitando'));     // ✓ aparece, barrinha de baixo some
-$('#ntexto').addEventListener('blur', () => $('#notas').classList.remove('digitando'));   // ✓ some, barrinha de baixo aparece
+$('#ntexto').addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('#ntexto')) $('#notas').classList.remove('digitando'); }, 250));   // ✓ some, barrinha de baixo aparece (depois do toque no ✓ valer)
+for (const ev of ['pointerdown', 'mousedown']) $('#nOk').addEventListener(ev, e => e.preventDefault());   // tocar no ✓ não tira o foco antes do toque valer
 /* desfazer (↶): apaga a escrita e manda o nome (igual a apagar tudo) */
 $('#nDesf').addEventListener('pointerdown', e => e.preventDefault());   // não tira o teclado
 $('#nDesf').addEventListener('click', () => {
