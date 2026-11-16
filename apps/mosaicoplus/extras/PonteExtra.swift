@@ -7,6 +7,7 @@ import CoreImage
 import AVFoundation
 import Speech
 import MediaPlayer
+import UniformTypeIdentifiers
 
 /// Parte do iPhone só do app Mosaico.
 /// Recados da página (window.webkit.messageHandlers.mz.postMessage({cmd: ...}) devolve uma resposta):
@@ -24,7 +25,10 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
 
     private weak var web: WKWebView?
     private weak var tela: UIViewController?
-    private let fila = DispatchQueue(label: "mosaico.trabalho", qos: .userInitiated)
+    let fila = DispatchQueue(label: "mosaico.trabalho", qos: .userInitiated)
+    var escolhaArquivo: EscolhaArquivo?
+    var telaPublica: UIViewController? { tela }
+    func arqPublico(_ n: String) -> URL { arq(n) }
     private let filaImg = DispatchQueue(label: "mosaico.imagens", qos: .userInitiated, attributes: .concurrent)
     private let gerente = PHImageManager.default()
     private var parados = Set<ObjectIdentifier>()
@@ -210,6 +214,10 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         case "vozDesligar":
             pararVoz(avisar: false)
             responder(true, nil)
+        case "exportar":   // cópia da lista de famosos, Fototeca e bebês
+            exportarCopia(dados: txt("dados"), pastas: (m["pastas"] as? [String]) ?? [], nome: txt("nome"), responder)
+        case "importar":
+            importarCopia(responder)
         case "lerImagens":   // Post-It: lê a escrita (desenhada pela página em várias inclinações) com o mesmo leitor da câmera
             let imgs = (m["imgs"] as? [String]) ?? []
             let palavras = (m["palavras"] as? [String]) ?? []
@@ -1045,5 +1053,67 @@ final class VolumeEspiao: NSObject {
         ajustando = true
         sl.value = 0.5
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.ajustando = false }
+    }
+}
+
+// MARK: cópia da lista (exportar / importar)
+final class EscolhaArquivo: NSObject, UIDocumentPickerDelegate {
+    var fim: (URL?) -> Void = { _ in }
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { fim(urls.first); fim = { _ in } }
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { fim(nil); fim = { _ in } }
+}
+
+extension PonteExtra {
+    /// junta os dados da página e todos os arquivos das pastas pedidas num arquivo só e abre o "Compartilhar" do iPhone
+    func exportarCopia(dados: String, pastas: [String], nome: String, _ r: @escaping Resposta) {
+        fila.async {
+            var arquivos: [String: String] = [:]
+            let fm = FileManager.default
+            for p in pastas {
+                let pasta = self.arqPublico(p)
+                for n in (try? fm.contentsOfDirectory(atPath: pasta.path)) ?? [] where !n.hasPrefix(".") {
+                    if let d = try? Data(contentsOf: pasta.appendingPathComponent(n)) { arquivos[p + "/" + n] = d.base64EncodedString() }
+                }
+            }
+            let tudo: [String: Any] = ["tipo": "mosaico-lista", "v": 1, "dados": dados, "arquivos": arquivos]
+            let destino = fm.temporaryDirectory.appendingPathComponent(nome.isEmpty ? "lista.json" : nome)
+            guard let j = try? JSONSerialization.data(withJSONObject: tudo), (try? j.write(to: destino, options: .atomic)) != nil else { return r(nil, "não consegui criar o arquivo") }
+            DispatchQueue.main.async {
+                guard let t = self.telaPublica else { return r(nil, "sem tela") }
+                let av = UIActivityViewController(activityItems: [destino], applicationActivities: nil)
+                av.popoverPresentationController?.sourceView = t.view
+                av.popoverPresentationController?.sourceRect = CGRect(x: t.view.bounds.midX, y: t.view.bounds.midY, width: 1, height: 1)
+                av.completionWithItemsHandler = { _, ok, _, _ in r(["ok": ok, "fotos": arquivos.count], nil) }
+                t.present(av, animated: true)
+            }
+        }
+    }
+    /// abre o app Arquivos; grava as fotos de volta e devolve os dados para a página
+    func importarCopia(_ r: @escaping Resposta) {
+        DispatchQueue.main.async {
+            guard let t = self.telaPublica else { return r(nil, "sem tela") }
+            let p = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .data, .item], asCopy: true)
+            let d = EscolhaArquivo()
+            self.escolhaArquivo = d
+            d.fim = { url in
+                self.escolhaArquivo = nil
+                guard let url = url else { return r(NSNull(), nil) }
+                self.fila.async {
+                    guard let dados = try? Data(contentsOf: url),
+                          let o = try? JSONSerialization.jsonObject(with: dados) as? [String: Any],
+                          o["tipo"] as? String == "mosaico-lista", let txt = o["dados"] as? String else { return r(nil, "arquivo não é uma lista do Mosaico") }
+                    var n = 0
+                    for (cam, b64) in (o["arquivos"] as? [String: String]) ?? [:] {
+                        guard let d = Data(base64Encoded: b64) else { continue }
+                        let u = self.arqPublico(cam)
+                        try? FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+                        if (try? d.write(to: u, options: .atomic)) != nil { n += 1 }
+                    }
+                    r(["dados": txt, "fotos": n], nil)
+                }
+            }
+            p.delegate = d
+            t.present(p, animated: true)
+        }
     }
 }

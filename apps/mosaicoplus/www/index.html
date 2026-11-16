@@ -357,7 +357,10 @@ body:not(.claro) .nok{color:#000}
     <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
   </div>
   <div class="caixa" id="listaFam" style="margin-top:10px"></div>
-  <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div></div>
+  <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div>
+  <div class="caixa" style="margin-top:14px">
+    <div class="lin"><button class="bt" id="aExportar">Exportar</button><button class="bt cinza" id="aImportar">Importar</button><span class="r" id="aCopiaEst"></span></div>
+  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mosaico e no Mozaic Plus.</div></div>
 
   <div class="sec" data-ic="◉" data-cor="#8e8e93"><h3>Fotos da galeria</h3><div class="caixa">
     <div class="lin">Usar<select id="aOrigem"><option value="">Todas as fotos</option></select></div>
@@ -2465,6 +2468,38 @@ $('#listaFam').addEventListener('click', async e => {
     try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; cfg.ver++; salvar(); salvarFam(); desenharListaFam(); if (atual && atual.nome === f.n) definirNome(f.n, 'ajustes'); } } catch (_) {}
   }
 });
+/* cópia da lista: famosos (fotos e bebê), primeira tela da Fototeca e fotos dos bebês */
+const CHAVES_COPIA = ['slots', 'slots2', 'bebes', 'bebe', 'auto', 'piada', 'fixas', 'fixa'];
+$('#aExportar').addEventListener('click', async () => {
+  const e = $('#aCopiaEst'); e.textContent = 'preparando…';
+  const d = { famosos }; CHAVES_COPIA.forEach(k => { d[k] = cfg[k]; });
+  const hoje = new Date(), dd = n => String(n).padStart(2, '0');
+  try {
+    const r = await nat.call('exportar', { dados: JSON.stringify(d), pastas: ['famosos', 'abert', 'bebes', 'piada'], nome: 'Lista-Mozaic-Plus-' + hoje.getFullYear() + '-' + dd(hoje.getMonth() + 1) + '-' + dd(hoje.getDate()) + '.json' });
+    e.textContent = r && r.ok ? 'guardado ✓ (' + famosos.length + ' famosos, ' + r.fotos + ' fotos)' : '';
+  } catch (err) { e.textContent = 'não deu: ' + (err && err.message || err); }
+});
+$('#aImportar').addEventListener('click', async () => {
+  if (!confirm('Importar uma lista? Os famosos do arquivo entram na lista, e as fotos da Fototeca e dos bebês são trocadas pelas do arquivo.')) return;
+  const e = $('#aCopiaEst'); e.textContent = 'abrindo…';
+  try {
+    const r = await nat.call('importar');
+    if (!r || !r.dados) { e.textContent = ''; return; }
+    const d = JSON.parse(r.dados);
+    let novos = 0;
+    for (const g of (Array.isArray(d.famosos) ? d.famosos : [])) {
+      if (!g || !g.n) continue;
+      const i = famosos.findIndex(f => semAcento(f.n) === semAcento(g.n));
+      if (i >= 0) famosos[i] = g; else { famosos.push(g); novos++; }
+    }
+    CHAVES_COPIA.forEach(k => { if (d[k] !== undefined) cfg[k] = d[k]; });
+    if (!Array.isArray(cfg.slots) || cfg.slots.length !== 18) cfg.slots = new Array(18).fill(null);
+    if (!Array.isArray(cfg.slots2) || cfg.slots2.length !== 18) cfg.slots2 = new Array(18).fill(null);
+    cfg.ver++; salvar(); salvarFam(); if (typeof palavrasPi !== 'undefined') palavrasPi = null;
+    desenharSlots(); desenharPiada(); desenharListaFam(); montarSeq(); if (atual) prepararMosaico();
+    e.textContent = 'importado ✓ (' + (d.famosos || []).length + ' famosos, ' + novos + ' novos, ' + r.fotos + ' fotos)';
+  } catch (err) { e.textContent = 'não deu: ' + (err && err.message || err); }
+});
 let baixandoTodos = false;
 $('#aBaixar').addEventListener('click', async () => {
   if (baixandoTodos) { baixandoTodos = false; return; }
@@ -2613,7 +2648,7 @@ const PI_SVC = '58570001-b5a3-f393-e0a9-e50e24dcca9e', PI_WRITE = '58570002-b5a3
 if (cfg.pi == null) cfg.pi = true;
 const pit = {
   dev: null, wr: null, nc: null, ligado: false, bat: null, tipo: guarda.get('padType', 0x1B),
-  tracos: [], cur: null, lido: false, ultT: 0, ultRaw: '', lendo: false, abrirTent: 0, ops: {}, batTimer: 0, tentando: false, token: 0
+  tracos: [], cur: null, lido: false, novo: null, ultT: 0, ultRaw: '', lendo: false, abrirTent: 0, ops: {}, batTimer: 0, tentando: false, token: 0
 };
 function sha1pi(bytes) {
   const rotl = (x, n) => (x << n) | (x >>> (32 - n));
@@ -2718,7 +2753,13 @@ function piNotif(ev) {
   if (pit.cur && agora - pit.ultT > 350) piFimTraco();
   for (let i = 0; i < n; i++) {
     const o = 11 + i * 5, down = b[o] !== 0, x = (b[o + 1] << 8) | b[o + 2], y = (b[o + 3] << 8) | b[o + 4];
-    if (down && pit.lido) { pit.lido = false; pit.tracos = []; pit.cur = null; if (PIT.falhou) { PIT.falhou = false; desenharInicio(); } }   // já apertou o volume: a escrita nova começa do zero
+    if (pit.lido) {   // já apertou o volume: a escrita antiga fica guardada até começar uma escrita NOVA de verdade (caneta andando)
+      if (!down) { pit.novo = null; continue; }   // sinal solto: não apaga nada
+      (pit.novo = pit.novo || []).push({ x, y });
+      const p0 = pit.novo[0], longe = pit.novo.some(q => Math.hypot(q.x - p0.x, q.y - p0.y) > 400);
+      if (pit.novo.length >= 4 && longe) { pit.lido = false; pit.tracos = []; pit.cur = pit.novo; pit.novo = null; pit.ultT = agora; if (PIT.falhou) { PIT.falhou = false; desenharInicio(); } }
+      continue;
+    }
     if (down) { if (!pit.cur) pit.cur = []; pit.cur.push({ x, y }); pit.ultT = agora; }
     else if (pit.cur) piFimTraco();
   }
@@ -2779,7 +2820,7 @@ async function lerPostit(mostrar) {
 }
 async function postitVolume() {   // volume + na tela de início
   if (pit.lendo || !piTracos().some(t => t.length)) return;   // nada escrito: não faz nada
-  pit.lendo = true; piFimTraco(); pit.lido = true;
+  pit.lendo = true; piFimTraco(); pit.lido = true; pit.novo = null;
   try {
     const r = await lerPostit();
     if (r.nome) { PIT.falhou = false; if (atual && semAcento(atual.nome) === semAcento(r.nome) && atual.pronto) desenharInicio(); else definirNome(r.nome, 'postit'); }

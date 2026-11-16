@@ -1775,6 +1775,38 @@ $('#listaFam').addEventListener('click', async e => {
     try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; cfg.ver++; salvar(); salvarFam(); desenharListaFam(); if (atual && atual.nome === f.n) definirNome(f.n, 'ajustes'); } } catch (_) {}
   }
 });
+/* cópia da lista: famosos (fotos e bebê), primeira tela da Fototeca e fotos dos bebês */
+const CHAVES_COPIA = ['slots', 'slots2', 'bebes', 'bebe', 'auto', 'piada', 'fixas', 'fixa'];
+$('#aExportar').addEventListener('click', async () => {
+  const e = $('#aCopiaEst'); e.textContent = 'preparando…';
+  const d = { famosos }; CHAVES_COPIA.forEach(k => { d[k] = cfg[k]; });
+  const hoje = new Date(), dd = n => String(n).padStart(2, '0');
+  try {
+    const r = await nat.call('exportar', { dados: JSON.stringify(d), pastas: ['famosos', 'abert', 'bebes', 'piada'], nome: 'Lista-Mosaico-' + hoje.getFullYear() + '-' + dd(hoje.getMonth() + 1) + '-' + dd(hoje.getDate()) + '.json' });
+    e.textContent = r && r.ok ? 'guardado ✓ (' + famosos.length + ' famosos, ' + r.fotos + ' fotos)' : '';
+  } catch (err) { e.textContent = 'não deu: ' + (err && err.message || err); }
+});
+$('#aImportar').addEventListener('click', async () => {
+  if (!confirm('Importar uma lista? Os famosos do arquivo entram na lista, e as fotos da Fototeca e dos bebês são trocadas pelas do arquivo.')) return;
+  const e = $('#aCopiaEst'); e.textContent = 'abrindo…';
+  try {
+    const r = await nat.call('importar');
+    if (!r || !r.dados) { e.textContent = ''; return; }
+    const d = JSON.parse(r.dados);
+    let novos = 0;
+    for (const g of (Array.isArray(d.famosos) ? d.famosos : [])) {
+      if (!g || !g.n) continue;
+      const i = famosos.findIndex(f => semAcento(f.n) === semAcento(g.n));
+      if (i >= 0) famosos[i] = g; else { famosos.push(g); novos++; }
+    }
+    CHAVES_COPIA.forEach(k => { if (d[k] !== undefined) cfg[k] = d[k]; });
+    if (!Array.isArray(cfg.slots) || cfg.slots.length !== 18) cfg.slots = new Array(18).fill(null);
+    if (!Array.isArray(cfg.slots2) || cfg.slots2.length !== 18) cfg.slots2 = new Array(18).fill(null);
+    cfg.ver++; salvar(); salvarFam(); if (typeof palavrasPi !== 'undefined') palavrasPi = null;
+    desenharSlots(); desenharPiada(); desenharListaFam(); montarSeq(); if (atual) prepararMosaico();
+    e.textContent = 'importado ✓ (' + (d.famosos || []).length + ' famosos, ' + novos + ' novos, ' + r.fotos + ' fotos)';
+  } catch (err) { e.textContent = 'não deu: ' + (err && err.message || err); }
+});
 let baixandoTodos = false;
 $('#aBaixar').addEventListener('click', async () => {
   if (baixandoTodos) { baixandoTodos = false; return; }
