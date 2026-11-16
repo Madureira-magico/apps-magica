@@ -298,6 +298,12 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
 
     private func receberDados(_ m: [String: Any]) {
         var zerar = (m["zerar"] as? Bool) ?? false
+        // onde a pessoa está, ANTES de qualquer mudança (em colunas e fileiras, para continuar no mesmo lugar)
+        let csA = zoomer.contentSize, oA = zoomer.contentOffset, cA = max(1, C), cSA = cS
+        let celA = csA.width / CGFloat(cA)                       // tamanho de uma coluna na tela
+        let colsA = W / max(0.0001, celA)                         // colunas na tela
+        let colA = celA > 0 ? (oA.x + W / 2) / celA - CGFloat(cSA) : 0      // meio da tela, contado a partir da faixa
+        let filA = celA > 0 ? (csA.height - (oA.y + H / 2)) / celA : 0       // meio da tela, em fileiras a partir de baixo
         if let s = m["seq"] as? [String] { seq = s }
         if let d = m["mos"] as? [String: Any], let ids = d["ids"] as? [String] {
             mosIds = ids
@@ -350,29 +356,24 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tiles.marcas = selecao ? selecionados : []
 
         // monta a imagem gigante
-        // onde a pessoa está (para continuar EXATAMENTE no mesmo lugar depois de refazer a grade)
-        let csA = zoomer.contentSize, oA = zoomer.contentOffset, kA = zoomer.zoomScale, mxA = zoomer.maximumZoomScale
-        let uA = mxA > 1.0001 ? min(1, max(0, log(kA) / log(mxA))) : 1
-        let cxA = csA.width > 0 ? (oA.x + W / 2) / csA.width : 0.5
-        let dbA = csA.width > 0 ? (csA.height - (oA.y + H / 2)) / csA.width : 0
         C = temMos ? mosCols : max(1, Int(n0))
         linhas = Int(ceil(Double(seq.count) / Double(max(1, C))))
         let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)|\(cS)"
         var refez = false
         if chave != geoChave {
-            let manter = ligada && !geoChave.isEmpty && csA.width > 0 && !zerar
+            let manter = ligada && !geoChave.isEmpty && csA.width > 0 && celA > 0 && !zerar
             geoChave = chave
             montarPlano()
             refez = true
             if manter {
-                let mx = zoomer.maximumZoomScale
-                let sc = mx > 1.0001 ? exp(uA * log(mx)) : 1
+                // mesmas colunas na tela, mesmo ponto da faixa no meio, mesmas fileiras a partir de baixo
+                let sc = min(zoomer.maximumZoomScale, max(zoomer.minimumZoomScale, CGFloat(C) / max(0.0001, colsA)))
                 zoomer.setZoomScale(sc, animated: false)
                 centralizar()
-                let cs = zoomer.contentSize
+                let cs = zoomer.contentSize, cel = cs.width / CGFloat(max(1, C))
                 xTravado = nil
                 ajustando = true
-                zoomer.contentOffset = limitar(CGPoint(x: cxA * cs.width - W / 2, y: cs.height - dbA * cs.width - H / 2))
+                zoomer.contentOffset = limitar(CGPoint(x: (colA + CGFloat(cS)) * cel - W / 2, y: cs.height - filA * cel - H / 2))
                 ajustando = false
                 if !travado { zoomer.isScrollEnabled = ligada && ativa }
             } else { zerar = true }
