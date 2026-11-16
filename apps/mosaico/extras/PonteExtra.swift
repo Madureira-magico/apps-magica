@@ -105,37 +105,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
 
     static var barraNotasLigada = false
     static var tecladoSozinho = false
-    static let barraNotas: UIView = {
-        let v = UIView(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60))
-        v.autoresizingMask = [.flexibleWidth]
-        v.backgroundColor = .clear
-        let vidro = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
-        vidro.frame = v.bounds.insetBy(dx: 10, dy: 5)
-        vidro.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        vidro.layer.cornerRadius = 25
-        vidro.layer.cornerCurve = .continuous
-        vidro.clipsToBounds = true
-        v.addSubview(vidro)
-        let pilha = UIStackView()
-        pilha.axis = .horizontal
-        pilha.distribution = .equalSpacing
-        pilha.alignment = .center
-        pilha.translatesAutoresizingMaskIntoConstraints = false
-        vidro.contentView.addSubview(pilha)
-        NSLayoutConstraint.activate([
-            pilha.leadingAnchor.constraint(equalTo: vidro.contentView.leadingAnchor, constant: 22),
-            pilha.trailingAnchor.constraint(equalTo: vidro.contentView.trailingAnchor, constant: -22),
-            pilha.centerYAnchor.constraint(equalTo: vidro.contentView.centerYAnchor)
-        ])
-        let conf = UIImage.SymbolConfiguration(pointSize: 19, weight: .regular)
-        for nome in ["textformat", "checklist", "tablecells", "paperclip", "pencil.tip.crop.circle"] {
-            let iv = UIImageView(image: UIImage(systemName: nome, withConfiguration: conf))
-            iv.tintColor = .label
-            iv.contentMode = .scaleAspectFit
-            pilha.addArrangedSubview(iv)
-        }
-        return v
-    }()
+    static let barraNotas: UIView = BarraNotasView(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60))
 
     // MARK: pastas
     private lazy var docs: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -250,7 +220,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             g.impactOccurred()
             responder(true, nil)
         case "cameraLigar":
-            cameraLigar(num("segundos", 8), responder)
+            cameraLigar(num("segundos", 8), traseira: (m["traseira"] as? Bool) ?? false, responder)
         case "cameraDesligar":
             cameraDesligar(avisar: false)
             responder(true, nil)
@@ -813,13 +783,16 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     }
 
     // MARK: câmera da frente lendo texto (Notas do espectador, cartão escrito à mão)
-    private func cameraLigar(_ segundos: Double, _ r: @escaping Resposta) {
+    private var camTraseira = false
+    private func cameraLigar(_ segundos: Double, traseira: Bool, _ r: @escaping Resposta) {
         let ligar = {
             self.filaCam.async {
+                if let s = self.sessao, self.camTraseira != traseira { s.stopRunning(); self.sessao = nil }   // trocou de câmera: monta de novo
+                self.camTraseira = traseira
                 if self.sessao == nil {
                     let s = AVCaptureSession()
                     s.sessionPreset = .hd1280x720
-                    guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+                    guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: traseira ? .back : .front),
                           let entrada = try? AVCaptureDeviceInput(device: dev), s.canAddInput(entrada) else {
                         return r(false, "sem câmera")
                     }
@@ -1129,6 +1102,50 @@ extension PonteExtra {
             }
             p.delegate = d
             t.present(p, animated: true)
+        }
+    }
+}
+
+/// Barrinha do Notas grudada no teclado: ícones copiados do Notas de verdade, nas mesmas posições
+final class BarraNotasView: UIView {
+    private let pilula = UIView()
+    private var icones: [(UIImageView, CGFloat, CGFloat)] = []
+    private static let dados: [(String, CGFloat, CGFloat)] = [
+        ("iVBORw0KGgoAAAANSUhEUgAAAGsAAABCCAYAAABQHCjyAAAJU0lEQVR4Xu2ddcg1RRSHf7bY3d3drdiKiv2HhY2IiYqFiBhg/iOKqHyiKGKLYiJ2d7fY3S128VxmYb9150zs7r0vvvvAC+q9d3d2zpyYc86sUk9PT8+4ZpIRPP2ykpaRNJ2kDyQ9L+nrEYyjx2AXSS9K+qfy94ekKyQt38/e2OBgSd/XCKosuLskrTc2hjt+2UTS0wFBFUI7T9Ls43eqRs+pkYJCYO9K2n70Qx6bTNrxsFaWtHrCPRaStE7C98cVXQtrFUlrJM4o31878Tfjgi6FNZPTkhkTZ3JNaaCRPRW6FNZKmeH41JJWlTRrL62J6VJYmLIUf1WG363YC2s4wlokoFU3SrpY0m8egbBBTvV1/3u60ixM4LrG7JHJuNKlmnxgChF6j6MrYaEZC3hm+U2XdnpW0jOe7wCBxmrG5+OOLoSFr1nfmMlCSN9Jes6loeqYvzeFEzN5B8sTjWB/5QNhve8+JOP+smEyuQ7aRbpqLDCfsxjzSprKLbQvJH0u6b2MAS4qaSP3O6wMi3dozCLpfCO99JKkzSujOcf4Ptp3wNBG/19mlrSHpOsl/RJIm/3gvreNNNhjhiC5Xb7mn5JOlzRn6IdtQdIWbamWQYp/v1TSXJWb7SnpG+M3F0nJG+umzCPpBEmfJeQ1y8/M7w4zktKk1NCk6jx9LGm3poOP5Wjj4ahbHVlzoeUk3W78jofaMHYALUAi+clMIVUnH/PNAq5ykDSwGnWL+hTfM7QZYGDPCbd94KteqPkQn8Wfj8JvDQMm6qoGm/kqzMe1kg6tfICQpvU80PTDEBaqbRUP0ZCnPAN5wpkcH2Q0WAxdwQSd4Uwf6a42wY9z7bJVmUbytlR4FahNzSL5SpRUB44UraJaXAfm4jFjhkhddZmJP1wamPAUqL3dKek2SQ9I+tD4McLh+vu67/ztTGAdfNYp+B3K8r7A4qGIPRMmyPd7/juRUhfsLenLSB91s6QtjUHMIWlnSY96rne3m4cjXKqt7nmJjjtlv0CPxbkRd99O0mvGpPGg7OHahD3cgxGCeiRDs2kQeqPm2qdJOk7SX577xsxVNtj7C4wHps2MvUoIwuXrjOuwj9kndJFEzowQ1ISa7UYsi0sDbSxrEBtfTOdIhEVqyQp175C0QuTTHRuYPBZFWw01mLPXA/ejMpBaPK2ysIsILRNf/syrWW0EGESBVshOFEiWPQYCDbIcPggy2ugvxBpsLGlJ415oxNlGUBQLgQh+CD/WiKbCosGFcojvOh8lCArIflh5QJLEbfgtOoKt/CWZBEo41v4vBXze5ZJ+TvlRlabCwkFbITVahYmMBf+GZlnhK1qMf2sC47b2hLdIuqbJDWpAUym6ZtNUWEycr24FaAlmIAUEbNW52CA33XNh/qb0DIr++/tTBhzJJ5LukwaBUhZNhMXeyjJJb3nSSyEwhZaPY3FYJixEcTDCBwuFjEoXPCwN/rJoIixWeKhuZWmID1YeptOy77QMxEaYVRYLtAsQWufUpmJg30WONItcYdEmxoRZYS2DQvVzCK3unObRAupFvpoRhUTMYJdQeKUklEyusJYKaNWriYFFFYRlRWKE3vitnD3Q3NIgV1cH/rWoYnfF27n3yBUWE2X19ZFdbxr2oplfGTOGduV07pIF90F5njxhl1CYRIOTyREWpQoCC99vSaMw0U0fGoFbPo/9XWpvIWV6b73IFQQpCnbJt+4+yeQIiwlay7gTpZBsJ1rilUA2AxBYSp2Lgp/PBAJNpz8lz2IaaFbWPXK6m0KFwClcGR4TxfU5t0zuC42zKPJjdA3RPML3idws0HAWDg0tMTAea4H+3kJ6KYasTEaqsBBAKN1D7q6N/F0MdOziO2OFxYKwsiO+du62YVEkk2oGEZaVtB0FLJ7YMVkVWsAqDINUJRmQKiwmZoZhPE0Coci0DOaHLisfBB9dHzXiHpj6ZFKERUtV7AoeJrxPAz8a01hJovjXgLC6XoyM14pIvaQIC0GRVxuLEBWSq4zhR+NLCLxrzeIes8UMtEqssDgkQFkh1KZVdd44UiI74LOYP6LA4jqxnT5EhKHAp4B9jg+SxNWO4bahA2zBnIvGCgszYx2/+VQaNIhM5kJ1wnX+sM04bf6Zz2L+cL7FdcrXuzrwgGQ0YvZctIz5MiMcFGhaKwvBPfhLJlZYCIpeAh/UrShtdMnjgbA7Vrso3fhqbMwH244Y/5cD/hBznRV1xggr5sgoeUDS/11CcthaEOy5YgIgKgFYAh/4P7qSuoA2iKVzLxwjLEoh1iSwUln1XYP21vXKl8FchwINtIpUlg80dAPj8yZsGuFb2bjXEhIWic+QWSAP2EYuMASBAYldK5pj0x5TRaYS7atb4TMRVrYGeGAeOThH6J5FSFiE6qF+B7LjdDENA+5llfyLomhor0TZ3ndIAraStGvLD7SDpK2bXDMkLMyKVTPCV3UdWJSh3G9NMhAMxZhCTHexrajCvHCobacmk1uC/ndazBthCYu9gFUKAVZobANnW4Te/EliN+ZlXZwAudcYFOH1iZI2azjwLSQdLw32qgWcqknGEhZRkWUCybHR45dV9WwAQYbVCMreDO0Knc1lkd0QKInQDHqh20PmgHZeUqlCsEi4bzKWsFid5dVQhYcd6ulyR6hVDTDfMRkNmjl55asFWwJOQ3JAIWRpClgslG24Nj0fZWijZt5C9b1oMCX3BJr2Gfyo2N3tlaxmf+/Z3ApMLM2XsQcHaIU+xkV2S7hkAZHjtpJOCry1lI5csixHSYNUXCvns0KTQSvVgaOSlDtQwLEZa4Jpf7YOHpThdQjW2bBYQVrfQ5uKw+CHGGP3HqbzmUGcq5XQxG/kNHC2BdmS0P1Z9bF5Pswhx0i7ysKQOEDrsFZQtC7U4YtQvcIKhfT4jZQDB13ARtw6x8szEGzEcqukvUoT2hZsNfaXdFPlgr6KgteX+YTiO6gNHIcZtaCAMeA/fJBZpw8wBbYi7K1Ozm0XK4EwOPy3o/OJZchP+lrekv+HBKRGfAe6GQAHnccClGVYPFVfwT6m7gUpKWBGeSUCE5vis1gklwXepYEvxfRWr8tGnfxhMlzwLPd+Ch6ebAWnzEP7l2HDw3H2iZwh4+SgeNupIo7i8rYA7kMimPvgW+jpeMedauRgN++lim3p5mAFoT37VYTG/itmM9/T09MzXvkXyvX3G24PhHkAAAAASUVORK5CYII=", 0.0869, 0.4966),
+        ("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", 0.2913, 0.4966),
+        ("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", 0.4849, 0.4966),
+        ("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", 0.6794, 0.5034),
+        ("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", 0.8683, 0.4966)
+    ]
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        autoresizingMask = [.flexibleWidth]
+        pilula.backgroundColor = UIColor { $0.userInterfaceStyle == .dark ? UIColor(red: 0.17, green: 0.17, blue: 0.18, alpha: 1) : UIColor(red: 0.992, green: 0.992, blue: 0.992, alpha: 1) }
+        pilula.layer.cornerRadius = 24
+        pilula.layer.cornerCurve = .continuous
+        pilula.layer.borderWidth = 0.5
+        pilula.layer.shadowColor = UIColor.black.cgColor
+        pilula.layer.shadowOpacity = 0.06
+        pilula.layer.shadowRadius = 4
+        pilula.layer.shadowOffset = CGSize(width: 0, height: 1)
+        addSubview(pilula)
+        for (b64, fx, fy) in BarraNotasView.dados {
+            guard let d = Data(base64Encoded: b64), let im = UIImage(data: d, scale: 3) else { continue }
+            let iv = UIImageView(image: im.withRenderingMode(.alwaysTemplate))
+            iv.tintColor = .label
+            pilula.addSubview(iv)
+            icones.append((iv, fx, fy))
+        }
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        pilula.frame = CGRect(x: 7, y: 4, width: bounds.width - 14, height: 48)
+        pilula.layer.borderColor = (traitCollection.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.1) : UIColor(white: 0.886, alpha: 1)).cgColor
+        for (iv, fx, fy) in icones {
+            iv.sizeToFit()
+            iv.center = CGPoint(x: pilula.bounds.width * fx, y: pilula.bounds.height * fy)
         }
     }
 }

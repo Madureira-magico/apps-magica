@@ -76,7 +76,7 @@ function listaPadrao() {
   });
 }
 let famosos = guarda.get('famosos', null);
-if (!Array.isArray(famosos) || !famosos.length) famosos = listaPadrao();
+if (!Array.isArray(famosos)) famosos = listaPadrao();   // lista apagada de propósito fica vazia (não volta a padrão)
 const salvarFam = () => guarda.set('famosos', famosos);
 /* lista nova do app: junta com a que já está no iPhone (sem perder fotos, bebês e famosos que você incluiu) */
 (function juntarLista() {
@@ -1341,7 +1341,7 @@ let camLigada = false, camCand = '', camVezes = 0, vozLigada = false;
 async function ligarCamera() {
   if (camLigada) return;
   camLigada = true; camCand = ''; camVezes = 0;
-  try { await nat.call('cameraLigar', { segundos: 8 }); }
+  try { await nat.call('cameraLigar', { segundos: 8, traseira: cfg.camTras === true }); }   // frontal é a padrão
   catch (e) { camLigada = false; vibrar('forte'); }
 }
 function camAchou(nome) {
@@ -1708,6 +1708,7 @@ const CURTO_BEBE = ['Men. br.', 'Mna. br.', 'Men. ng.', 'Mna. ng.'];
 async function encherAjustes() {
   { const d = $('#aDiag'); if (d) d.textContent = guarda.get('diag', '—'); }
   mostrarAtual(); mostrarTirados();
+  $('#aCamTras').value = cfg.camTras === true ? 'tras' : 'frente';
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
 $('#aCentrar').checked = cfg.centrar !== false; $('#aVoltar18').checked = cfg.voltar18 !== false; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
@@ -1858,6 +1859,14 @@ $('#aImportar').addEventListener('click', async () => {
     e.textContent = 'importado ✓ (' + (d.famosos || []).length + ' famosos, ' + novos + ' novos, ' + r.fotos + ' fotos)';
   } catch (err) { e.textContent = 'não deu: ' + (err && err.message || err); }
 });
+$('#aApagarFam').addEventListener('click', () => {
+  if (!famosos.length) { toast('A lista já está vazia'); return; }
+  if (!confirm('Apagar a lista inteira de famosos (' + famosos.length + ' nomes, com as fotos e os bebês marcados)?')) return;
+  if (!confirm('Tem certeza? Dica: use Exportar antes, para poder trazer de volta.')) return;
+  for (const f of famosos) if (f.f) nat.call('apagar', { nome: f.f }).catch(() => {});
+  famosos = []; salvarFam(); if (typeof palavrasPi !== 'undefined') palavrasPi = null;
+  desenharListaFam(); $('#aCopiaEst').textContent = 'lista apagada';
+});
 let baixandoTodos = false;
 $('#aBaixar').addEventListener('click', async () => {
   if (baixandoTodos) { baixandoTodos = false; return; }
@@ -1873,6 +1882,7 @@ $('#aBaixar').addEventListener('click', async () => {
   toast('Fotos dos famosos atualizadas');
 });
 $('#aLimpar').addEventListener('click', limparNome);
+$('#aCamTras').addEventListener('change', e => { cfg.camTras = e.target.value === 'tras'; salvar(); });
 $('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
 $('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
 $('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); });

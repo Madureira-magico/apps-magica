@@ -311,6 +311,7 @@ body:not(.claro) .nok{color:#000}
   <div class="sec" data-ic="🎩" data-cor="#5856d6"><h3>Apresentação</h3><div class="caixa">
     <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
     <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
+    <div class="lin">Câmera para ler o nome<select id="aCamTras"><option value="frente">Frontal</option><option value="tras">Traseira</option></select></div>
   </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
 
   <div class="sec" data-ic="✎" data-cor="#ffcc00"><h3>Post-It</h3><div class="caixa">
@@ -372,8 +373,8 @@ body:not(.claro) .nok{color:#000}
     <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
   </div>
   <div class="caixa" style="margin-top:10px">
-    <div class="lin"><button class="bt" id="aExportar">Exportar</button><button class="bt cinza" id="aImportar">Importar</button><span class="r" id="aCopiaEst"></span></div>
-  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mosaico e no Mozaic Plus.</div>
+    <div class="lin"><button class="bt" id="aExportar">Exportar</button><button class="bt cinza" id="aImportar">Importar</button><button class="bt verm" id="aApagarFam">Apagar</button><span class="r" id="aCopiaEst"></span></div>
+  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mosaico e no Mozaic Plus. Os nomes iguais são trocados pelos do arquivo e os novos entram na lista. Apagar: tira a lista inteira (para ficar só com a sua, apague e depois importe).</div>
   <div class="caixa" id="listaFam" style="margin-top:10px"></div>
   <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div></div>
 

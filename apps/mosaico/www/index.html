@@ -307,6 +307,7 @@ body:not(.claro) .nok{color:#000}
   <div class="sec" data-ic="🎩" data-cor="#5856d6"><h3>Apresentação</h3><div class="caixa">
     <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
     <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
+    <div class="lin">Câmera para ler o nome<select id="aCamTras"><option value="frente">Frontal</option><option value="tras">Traseira</option></select></div>
   </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
 
   <div class="sec" data-ic="📡" data-cor="#007aff"><h3>Receber pelo Inject</h3><div class="caixa">
@@ -353,8 +354,8 @@ body:not(.claro) .nok{color:#000}
     <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
   </div>
   <div class="caixa" style="margin-top:10px">
-    <div class="lin"><button class="bt" id="aExportar">Exportar</button><button class="bt cinza" id="aImportar">Importar</button><span class="r" id="aCopiaEst"></span></div>
-  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mosaico e no Mozaic Plus.</div>
+    <div class="lin"><button class="bt" id="aExportar">Exportar</button><button class="bt cinza" id="aImportar">Importar</button><button class="bt verm" id="aApagarFam">Apagar</button><span class="r" id="aCopiaEst"></span></div>
+  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mosaico e no Mozaic Plus. Os nomes iguais são trocados pelos do arquivo e os novos entram na lista. Apagar: tira a lista inteira (para ficar só com a sua, apague e depois importe).</div>
   <div class="caixa" id="listaFam" style="margin-top:10px"></div>
   <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div></div>
 
@@ -761,7 +762,7 @@ function listaPadrao() {
   });
 }
 let famosos = guarda.get('famosos', null);
-if (!Array.isArray(famosos) || !famosos.length) famosos = listaPadrao();
+if (!Array.isArray(famosos)) famosos = listaPadrao();   // lista apagada de propósito fica vazia (não volta a padrão)
 const salvarFam = () => guarda.set('famosos', famosos);
 /* lista nova do app: junta com a que já está no iPhone (sem perder fotos, bebês e famosos que você incluiu) */
 (function juntarLista() {
@@ -2026,7 +2027,7 @@ let camLigada = false, camCand = '', camVezes = 0, vozLigada = false;
 async function ligarCamera() {
   if (camLigada) return;
   camLigada = true; camCand = ''; camVezes = 0;
-  try { await nat.call('cameraLigar', { segundos: 8 }); }
+  try { await nat.call('cameraLigar', { segundos: 8, traseira: cfg.camTras === true }); }   // frontal é a padrão
   catch (e) { camLigada = false; vibrar('forte'); }
 }
 function camAchou(nome) {
@@ -2393,6 +2394,7 @@ const CURTO_BEBE = ['Men. br.', 'Mna. br.', 'Men. ng.', 'Mna. ng.'];
 async function encherAjustes() {
   { const d = $('#aDiag'); if (d) d.textContent = guarda.get('diag', '—'); }
   mostrarAtual(); mostrarTirados();
+  $('#aCamTras').value = cfg.camTras === true ? 'tras' : 'frente';
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
 $('#aCentrar').checked = cfg.centrar !== false; $('#aVoltar18').checked = cfg.voltar18 !== false; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
@@ -2543,6 +2545,14 @@ $('#aImportar').addEventListener('click', async () => {
     e.textContent = 'importado ✓ (' + (d.famosos || []).length + ' famosos, ' + novos + ' novos, ' + r.fotos + ' fotos)';
   } catch (err) { e.textContent = 'não deu: ' + (err && err.message || err); }
 });
+$('#aApagarFam').addEventListener('click', () => {
+  if (!famosos.length) { toast('A lista já está vazia'); return; }
+  if (!confirm('Apagar a lista inteira de famosos (' + famosos.length + ' nomes, com as fotos e os bebês marcados)?')) return;
+  if (!confirm('Tem certeza? Dica: use Exportar antes, para poder trazer de volta.')) return;
+  for (const f of famosos) if (f.f) nat.call('apagar', { nome: f.f }).catch(() => {});
+  famosos = []; salvarFam(); if (typeof palavrasPi !== 'undefined') palavrasPi = null;
+  desenharListaFam(); $('#aCopiaEst').textContent = 'lista apagada';
+});
 let baixandoTodos = false;
 $('#aBaixar').addEventListener('click', async () => {
   if (baixandoTodos) { baixandoTodos = false; return; }
@@ -2558,6 +2568,7 @@ $('#aBaixar').addEventListener('click', async () => {
   toast('Fotos dos famosos atualizadas');
 });
 $('#aLimpar').addEventListener('click', limparNome);
+$('#aCamTras').addEventListener('change', e => { cfg.camTras = e.target.value === 'tras'; salvar(); });
 $('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
 $('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
 $('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); });
