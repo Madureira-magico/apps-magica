@@ -1083,16 +1083,43 @@ function gradeTexto(nome, cols, rows) {   // igual ao Mozaic: palavra por linha,
   const s = Math.min(...linhas.map(l => c.width * 0.92 / g.measureText(l).width), c.height * 0.22 / (alt * EST));
   const lh = alt * s * EST * 1.3, y0 = (c.height - lh * linhas.length) / 2;
   linhas.forEach((l, i) => { g.save(); g.translate(c.width / 2, y0 + i * lh + (lh + alt * s * EST) / 2); g.scale(s, s * EST); g.fillText(l, 0, 0); g.restore(); });
-  const px = g.getImageData(0, 0, c.width, c.height).data, out = [];
+  const px = g.getImageData(0, 0, c.width, c.height).data, letra = [];
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
     let v = 0;
     for (let dy = 0; dy < k; dy += 2) for (let dx = 0; dx < k; dx += 2) v += px[((y * k + dy) * c.width + x * k + dx) * 4];
-    v /= (k * k / 4) * 255;
-    if (v > 0.5) { const h = 0.13 + 0.45 * (x / cols); out.push(...hsl(h, 0.55, 0.82)); }
-    else out.push(52, 46, 44);
+    letra.push(v / ((k * k / 4) * 255) > 0.5);
+  }
+  // igual ao Mozaic: cada letra de uma cor (contando da última: azul, verde-água, laranja, amarelo, lilás, rosa, verde)
+  const CORES = [[212, .45], [182, .42], [20, .5], [45, .55], [262, .35], [335, .4], [140, .4]];
+  const corLetra = new Array(cols * rows).fill(null);
+  const temLinha = y => { for (let x = 0; x < cols; x++) if (letra[y * cols + x]) return true; return false; };
+  for (let y = 0; y < rows;) {
+    if (!temLinha(y)) { y++; continue; }
+    let y1 = y; while (y1 + 1 < rows && temLinha(y1 + 1)) y1++;
+    const segs = []; let x0 = -1;
+    for (let x = 0; x <= cols; x++) {
+      let tem = false; if (x < cols) for (let yy = y; yy <= y1; yy++) if (letra[yy * cols + x]) { tem = true; break; }
+      if (tem && x0 < 0) x0 = x; else if (!tem && x0 >= 0) { segs.push([x0, x - 1]); x0 = -1; }
+    }
+    segs.forEach(([a, b], i) => {
+      const [h, sat] = CORES[(segs.length - 1 - i) % CORES.length], rgb = hsv(h / 360, sat, 0.9);
+      for (let yy = y; yy <= y1; yy++) for (let x = a; x <= b; x++) if (letra[yy * cols + x]) corLetra[yy * cols + x] = rgb;
+    });
+    y = y1 + 1;
+  }
+  // fundo em degradê: escuro azulado em cima, mais claro no meio, quente embaixo (com variação de quadrado para quadrado)
+  const PTS = [[0, [54, 59, 66]], [0.45, [110, 98, 96]], [0.7, [105, 82, 74]], [1, [66, 50, 42]]];
+  const fundo = u => { for (let i = 0; i < PTS.length - 1; i++) { const [a, ca] = PTS[i], [b, cb] = PTS[i + 1]; if (u <= b) { const w = (u - a) / (b - a); return ca.map((v, j) => v * (1 - w) + cb[j] * w); } } return PTS[PTS.length - 1][1]; };
+  const ruido = (x, y) => { const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return n - Math.floor(n); };
+  const out = [];
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const cl = corLetra[y * cols + x];
+    if (cl) out.push(...cl);
+    else { const f = 0.8 + 0.4 * ruido(x, y); out.push(...fundo(y / Math.max(1, rows - 1)).map(v => Math.max(0, Math.min(255, Math.round(v * f))))); }
   }
   return out;
 }
+function hsv(h, s, v) { const f = n => { const k = (n + h * 6) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; }
 function hsl(h, s, l) { const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); }; return [f(0), f(8), f(4)]; }
 
 /* fotos disponíveis para o mosaico */
