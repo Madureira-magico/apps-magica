@@ -166,7 +166,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         case "baixarRosto":
             baixarRosto(txt("url"), nome: txt("nome"), responder)
         case "escolherFoto":   // várias fotos candidatas: guarda a mais de frente
-            escolherFoto((m["urls"] as? [String]) ?? [], nome: txt("nome"), responder)
+            escolherFoto((m["urls"] as? [String]) ?? [], nome: txt("nome"), atual: txt("atual"), responder)
         case "telaCobrir":   // congela o que está na tela (a tela de início) por cima de tudo, para trocar por baixo
             telaCobrir(); responder(true, nil)
         case "telaAbrir":    // o app novo cresce do ícone até a tela cheia, por cima da tela de início
@@ -1193,7 +1193,7 @@ final class BarraNotasView: UIView {
 // MARK: escolher a melhor foto do famoso (de frente, rosto grande, luz boa)
 extension PonteExtra {
     /// baixa as fotos candidatas, dá nota a cada uma e guarda a melhor em "nome"
-    func escolherFoto(_ enderecos: [String], nome: String, _ r: @escaping Resposta) {
+    func escolherFoto(_ enderecos: [String], nome: String, atual: String = "", _ r: @escaping Resposta) {
         let lista = Array(enderecos.prefix(10))
         guard !lista.isEmpty, !nome.isEmpty else { return r(nil, "sem fotos") }
         let grupo = DispatchGroup(), trava = NSLock()
@@ -1214,6 +1214,11 @@ extension PonteExtra {
         grupo.notify(queue: fila) {
             let todas = notas.sorted { $0.0 != $1.0 ? $0.0 > $1.0 : $0.1 < $1.1 }
             guard let melhor = todas.first else { return r(nil, "não baixou") }
+            // "Trocar todas": só troca se a nova for melhor que a foto que já está lá
+            if !atual.isEmpty, let velha = UIImage(contentsOfFile: self.arq(atual).path) {
+                let nv = self.notaRosto(velha)
+                if melhor.0 <= nv + 0.03 { return r(["manteve": true, "nota": nv, "url": ""], nil) }
+            }
             guard let jpg = melhor.2.jpegData(compressionQuality: 0.9), self.gravar(jpg, self.arq(nome)) else { return r(nil, "não gravou") }
             var d: [String: Any] = ["rosto": melhor.0 > 0, "nota": melhor.0, "url": lista[melhor.1],
                                     "notas": todas.map { ["url": lista[$0.1], "nota": $0.0] as [String: Any] }]

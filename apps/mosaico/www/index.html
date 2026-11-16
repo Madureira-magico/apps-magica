@@ -360,7 +360,8 @@ body:not(.claro) .nok{color:#000}
   <div class="nota">Lixeira da foto da piada: liga o microfone. Automático: menino ou menina pelo cadastro do famoso e o tom de pele pela foto; o bebê marcado na lista de Famosos vale por cima.</div></div>
 
   <div class="sec" data-ic="★" data-cor="#ffcc00"><h3>Famosos</h3><div class="caixa">
-    <div class="lin"><span class="estado" id="aFamEst">—</span><button class="bt" id="aBaixar" style="margin-left:auto">Baixar fotos</button></div>
+    <div class="lin"><span class="estado" id="aFamEst">—</span></div>
+    <div class="lin"><button class="bt" id="aBaixar">Baixar fotos</button><button class="bt cinza" id="aTrocarTodas">Trocar todas</button></div>
     <div class="lin">Mostrar<select id="aFamFiltro"><option value="">Todos</option><option value="sembebe">Sem bebê marcado</option><option value="semfoto">Sem foto</option></select></div>
     <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
   </div>
@@ -1079,18 +1080,19 @@ async function imagensPagina(lang, titulo) {
   } catch (_) { return []; } finally { clearTimeout(t); }
 }
 /* guarda a melhor foto (de frente, rosto grande, luz boa) entre a principal e as outras da página; "pular" = fotos que já foram usadas */
-async function guardarMelhorFoto(f, principal, lang, titulo, nome, pular) {
+async function guardarMelhorFoto(f, principal, lang, titulo, nome, pular, manter) {
   const fora = new Set(pular || []);
   const extras = await imagensPagina(lang, titulo);
   const urls = [principal, ...extras].filter((x, i, a) => x && a.indexOf(x) === i && !fora.has(x)).slice(0, 8);
   if (!urls.length) return null;
   try {
-    const r = await nat.call('escolherFoto', { urls, nome });
+    const r = await nat.call('escolherFoto', { urls, nome, atual: manter || '' });
+    if (r && r.manteve) return { manteve: true, arq: manter, rosto: f.r !== false };
     if (r && r.url) return { arq: nome, rosto: !!r.rosto, pele: r.pele, url: r.url, nota: r.nota };
   } catch (_) {}
   return null;
 }
-async function baixarFamoso(f, novo, estrito, pular) {
+async function baixarFamoso(f, novo, estrito, pular, manter) {
   const tentativas = [];
   if (f.w) tentativas.push(['pt', f.w, '']);
   tentativas.push(['pt', '', f.n], ['en', f.w && !/\(/.test(f.w) ? f.w : '', f.n]);
@@ -1102,13 +1104,14 @@ async function baixarFamoso(f, novo, estrito, pular) {
     if (estrito && busca && !tituloBate(infoWiki.t, busca)) continue;
     if (infoWiki.q) f.q = infoWiki.q;
     const nome = 'famosos/' + slug(f.n) + '.jpg';
-    const melhor = await guardarMelhorFoto(f, url, lang, infoWiki.t, nome, pular);   // a mais de frente entre as fotos da página
+    const melhor = await guardarMelhorFoto(f, url, lang, infoWiki.t, manter || nome, pular, manter);   // a mais de frente entre as fotos da página
+    if (melhor && melhor.manteve) { feito = { arq: manter, rosto: melhor.rosto, manteve: true }; break; }
     if (melhor) {
-      feito = { arq: nome, rosto: melhor.rosto }; if (Array.isArray(melhor.pele)) f.p = melhor.pele;
+      feito = { arq: manter || nome, rosto: melhor.rosto }; if (Array.isArray(melhor.pele)) f.p = melhor.pele; f.gal = false;
       f.usadas = (Array.isArray(f.usadas) ? f.usadas : []).concat(melhor.url).slice(-30);
       if (feito.rosto) break; else continue;
     }
-    if (pular && pular.includes(url)) continue;
+    if (manter || (pular && pular.includes(url))) continue;   // trocando: nunca troca sem comparar
     try {
       const r = await nat.call('baixarRosto', { url, nome });
       feito = { arq: nome, rosto: !!(r && r.rosto) };
@@ -1116,7 +1119,8 @@ async function baixarFamoso(f, novo, estrito, pular) {
       if (feito.rosto) break;
     } catch (_) {}
   }
-  if (!feito) { f.r = false; salvarFam(); return null; }
+  if (!feito) { baixarFamoso.manteve = false; f.r = false; salvarFam(); return null; }
+  baixarFamoso.manteve = !!feito.manteve;
   f.f = feito.arq; f.r = feito.rosto;
   if (novo && !famosos.includes(f)) famosos.push(f);
   salvarFam(); desenharListaFam();
@@ -2627,7 +2631,29 @@ $('#fvBuscar').addEventListener('click', async () => {
 $('#fvGaleria').addEventListener('click', async () => {
   const f = famVer; if (!f) return;
   const nome = 'famosos/' + slug(f.n) + '.jpg';
-  try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; fotoFamMudou(f); } } catch (_) {}
+  try { const r = await nat.call('escolher', { nome, rosto: true }); if (r && r.ok) { f.f = nome; f.r = !!r.rosto; f.gal = true; fotoFamMudou(f); } } catch (_) {}   // da galeria: o Trocar todas não mexe
+});
+/* Trocar todas: refaz a busca de quem já tem foto; não mexe nas escolhidas da galeria e só troca se achar uma melhor */
+let trocandoTodas = false;
+$('#aTrocarTodas').addEventListener('click', async () => {
+  if (trocandoTodas) { trocandoTodas = false; return; }
+  if (baixandoTodos) return;
+  const lista = famosos.filter(f => f.f && !f.gal);
+  if (!lista.length) { toast('Nenhuma foto da internet para trocar'); return; }
+  if (!confirm('Procurar fotos melhores (mais de frente) para ' + lista.length + ' famosos? Só troca quando achar uma melhor, e não mexe nas escolhidas da galeria. Dica: faça um Exportar antes.')) return;
+  trocandoTodas = true; $('#aTrocarTodas').textContent = 'Parar';
+  let feitos = 0, trocadas = 0;
+  for (const f of lista) {
+    if (!trocandoTodas) break;
+    $('#aFamEst').textContent = 'Trocando ' + (++feitos) + ' de ' + lista.length + '… (' + trocadas + ' trocadas)';
+    const antes = f.f, antesR = f.r, antesP = f.p;
+    const r = await baixarFamoso(f, false, false, [], f.f);
+    if (!r) { f.f = antes; f.r = antesR; f.p = antesP; }
+    else if (!baixarFamoso.manteve) trocadas++;
+  }
+  trocandoTodas = false; $('#aTrocarTodas').textContent = 'Trocar todas';
+  cfg.ver++; salvar(); salvarFam(); desenharListaFam();
+  toast('Pronto: ' + trocadas + ' fotos trocadas');
 });
 let baixandoTodos = false;
 $('#aBaixar').addEventListener('click', async () => {
