@@ -39,12 +39,18 @@ if (!Array.isArray(cfg.slots) || cfg.slots.length !== 18) {   // 18 posições d
   const ant = cfg.abert.slice(-17); cfg.slots = new Array(18).fill(null);
   let k = 17; for (let j = ant.length - 1; j >= 0 && k >= 0; j--, k--) { if (k === slotBebe()) k--; if (k >= 0) cfg.slots[k] = ant[j]; }
 }
+if (!Array.isArray(cfg.slots2) || cfg.slots2.length !== 18) cfg.slots2 = new Array(18).fill(null);   // segunda tela (acima da primeira), opcional
 if (!Array.isArray(cfg.icones)) cfg.icones = [];
 if (cfg.auto == null) cfg.auto = true;
 if (cfg.espiaBebe == null) cfg.espiaBebe = true;
 cfg.filtro = true;
 const tokAbert = a => 'arq:abert/' + a.id + '.jpg';
-const abertDe = it => (typeof it === 'string' && it.startsWith('arq:abert/')) ? cfg.slots.find(a => a && tokAbert(a) === it) : null;
+const abertDe = it => (typeof it === 'string' && it.startsWith('arq:abert/')) ? (cfg.slots.find(a => a && tokAbert(a) === it) || cfg.slots2.find(a => a && tokAbert(a) === it)) : null;
+function vaziosFim() {   // últimos quadrados da primeira tela deixados vazios (até 2): a última fileira fica incompleta, como no iPhone
+  if ((+cfg.n0 || 3) !== 3) return 0;
+  const sb = slotBebe(), livre = k => !cfg.slots[k] && !(k === sb && arqPiada());
+  return livre(17) ? (livre(16) ? 2 : 1) : 0;
+}
 function slotBebe() {   // em qual dos 18 quadrados entra a foto da piada
   const t = (innerWidth || 390) / 3, pb = (typeof sbPx === 'function' ? sbPx() : 34) + 70;
   const k = Math.max(0, Math.round(((innerHeight || 844) / 2 - pb) / t - 0.5));
@@ -193,18 +199,20 @@ function montarSeq() {
   let s = base.filter(id => !tirados.has(id) && !(cores.get(id) && cores.get(id).ok === false));   // só fotos boas (sem prints, documentos…)
   if ((+cfg.n0 || 3) === 3) {
     // primeira tela: 18 posições fixas; vazias recebem as fotos mais recentes; a piada no lugar marcado
-    const sb = slotBebe(), cauda = new Array(18);
+    const sb = slotBebe(), cauda = new Array(18), cauda2 = new Array(18), vf = vaziosFim();
     for (let k = 17; k >= 0; k--) {
       const a = cfg.slots[k];
       if (k === sb && arqPiada()) cauda[k] = '#piada';
       else if (a) cauda[k] = tokAbert(a);
+      else if (k >= 18 - vf) cauda[k] = '';   // vazio de propósito (fim da última fileira)
       else cauda[k] = s.length ? s.pop() : '';
     }
-    s = s.slice(s.length % 3).concat(cauda);
+    for (let k = 17; k >= 0; k--) { const a = cfg.slots2[k]; cauda2[k] = a ? tokAbert(a) : (s.length ? s.pop() : ''); }   // segunda tela: vazio = foto normal
+    s = s.slice(s.length % 3).concat(cauda2, cauda);
   } else if (arqPiada()) s.splice(indiceBebe(s.length + 1), 0, '#piada');
   seqNormal = s;
   seq = (mos && mos.seq) ? mos.seq : seqNormal;
-  $('#contagem').textContent = s.length + ' Itens';
+  $('#contagem').textContent = s.filter(Boolean).length + ' Itens';
   pedirDesenho(); enviarGaleria();
 }
 
@@ -450,7 +458,7 @@ async function prepararMosaico() {
   const meu = ++prepararMosaico.vez;
   const n = atual.tipo === 'texto' ? colsTexto(atual.nome) : (+cfg.colsM || 60), t = W / n;
   const rowsVis = Math.ceil(H / t) + 1;
-  const k00 = +cfg.n0 || 3, G = Math.ceil(H / (W / k00)) + 1;   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
+  const k00 = +cfg.n0 || 3, G = Math.max(Math.ceil(H / (W / k00)) + 1, k00 === 3 ? 12 : 0);   // embaixo do rosto: as 2 telas de fotos pessoais (12 fileiras)   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
   let sN = seqNormal.slice();
   const precisa = (rowsVis + G + 2) * n;
   if (sN.length < precisa) sN = new Array(precisa - sN.length).fill('').concat(sN);   // galeria pequena: lugares a mais (preenchidos abaixo)
@@ -498,11 +506,12 @@ async function prepararMosaico() {
   const porCor = (cfg.cor === 'cor' && NP) ? indiceCores(P) : null;   // nome escrito também escolhe pela cor (letras claras e coloridas, fundo escuro)
   // faixa da esquerda (3 colunas): as MESMAS fotos, no mesmo lugar, da Fototeca normal que o público já viu
   const k0 = +cfg.n0 || 3, M = seqNormal.length, uN = Math.floor((M - 1) / k0);
-  const cS = 0;   // a Fototeca de perto fica no canto esquerdo da grade grande (igual ao Mozaic)
+  const cS = Math.floor((n - k0) / 2);   // a Fototeca de perto fica no MEIO da grade grande, embaixo do rosto (igual ao Mozaic)
   const fL = ultima + 1;
   const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + (c - cS); return j >= 0 && j < M ? seqNormal[j] : ''; };
   const nova = sN.slice(), mz = new Array(N).fill(''), ids = [], tinta = [];
   for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) { const f = faixa(r, c); if (f) nova[r * n + c] = f; }   // camada 1: a Fototeca normal (sem buraco no alto)
+  { const vf = vaziosFim(); if (vf) for (let c = cS + k0 - vf; c < n; c++) nova[ultima * n + c] = ''; }   // última fileira incompleta: vazia até a borda direita
   const cima = stPx() + 96, topo = Math.max(0, cima + (ultimaF + 1) * t - H);
   const janela = texto ? Math.max(2, Math.round(NP * 0.06)) : Math.max(2, Math.round(NP * 0.015));   // nome escrito: só as mais claras e as mais escuras
   for (let r = primeira; r <= ultimaF; r++) {
@@ -943,7 +952,7 @@ function enviarGaleria(zerar) {
     envioPedido = false;
     const ap = arqPiada();
     const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
-    const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, img: 'mosaico.jpg', v: String(mos.versao), real: mos.real || '', realRow: mos.realRow || 0, realRows: mos.realRows || 0 } : null;
+    const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, cS: mos.cS || 0, img: 'mosaico.jpg', v: String(mos.versao), real: mos.real || '', realRow: mos.realRow || 0, realRows: mos.realRows || 0 } : null;
     const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.ajuda == null ? 3 : +cfg.ajuda, momento: cfg.momento == null ? 5 : +cfg.momento };
     nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
     zerarGal = false;
@@ -971,7 +980,12 @@ $('#titulo').addEventListener('click', () => { if (emSelecao) return; if (temIni
 })();
 function espiar(on) {
   const r = $('#rotulo');
-  if (!on) { Object.assign(r.style, { color: '', fontSize: '', position: '', left: '', right: '', textAlign: '', maxWidth: '' }); r.textContent = 'Fototeca'; return; }
+  const ic = $('#aba .ico'), bo = $('#bolinha');
+  if (!on) { Object.assign(r.style, { color: '', fontSize: '', position: '', left: '', right: '', textAlign: '', maxWidth: '' }); r.textContent = 'Fototeca'; ic.style.visibility = ''; bo.style.display = 'none'; return; }
+  // pronto com a foto do famoso: a bolinha com o rosto no lugar do ícone (igual ao original)
+  if (atual && atual.pronto && !buscando && atual.tipo === 'rosto' && mos) {
+    bo.style.backgroundImage = 'url("' + URLS.arq('real.jpg', mos.versao) + '")'; bo.style.display = 'block'; ic.style.visibility = 'hidden';
+  }
   if (!atual) { r.textContent = '—'; r.style.color = '#8e8e93'; return; }
   // o nome cabe no espaço entre o ícone e a borda (a letra diminui o necessário)
   const aba = $('#aba'), larg = aba.clientWidth, livre = Math.max(60, larg - 64 - 16);
@@ -1022,7 +1036,7 @@ function tirarDoApp(ids) {
   const ab = ids.filter(id => abertDe(id));
   if (ab.length) {
     for (const id of ab) { nat.call('apagar', { nome: id.slice(4) }).catch(() => {}); }
-    cfg.slots = cfg.slots.map(a => a && ab.includes(tokAbert(a)) ? null : a); salvar();
+    cfg.slots = cfg.slots.map(a => a && ab.includes(tokAbert(a)) ? null : a); cfg.slots2 = cfg.slots2.map(a => a && ab.includes(tokAbert(a)) ? null : a); salvar();
     if (mos) mos.seq = mos.seq.filter(id => !ab.includes(id));
     montarSeq(); if (atual) prepararMosaico(); desenharSlots();
   }
@@ -1047,7 +1061,7 @@ function mostrarTirados() { const e = $('#aTirados'); if (e) e.textContent = 'Fo
 let verI = 0, vSeq = [];
 /* a foto grande anda na ordem da Fototeca de verdade (a que o público viu), não na ordem do mosaico */
 function comMosaico() { return !!(mos && mos.cS != null && seq === mos.seq); }
-function listaVer() { vSeq = comMosaico() ? mos.normal : seq; }
+function listaVer() { const a = comMosaico() ? mos.normal : seq; let e = a.length; while (e && !a[e - 1]) e--; vSeq = e === a.length ? a : a.slice(0, e); }
 function verDeCel(i) {
   if (!comMosaico()) return i;
   const r = Math.floor(i / mos.cols), c = i % mos.cols;
@@ -1330,8 +1344,9 @@ $('#bSel').addEventListener('touchcancel', () => { selSegura = false; }, { passi
 window.__mzEvento = ev => {
   if (!ev || !ev.tipo) return;
   if (ev.tipo === 'gTap') { tocouNativo(ev.i, !!ev.noMosaico, !!ev.b); return; }
-  if (ev.tipo === 'gHold') {   // segurar o bebê 2 s: vira a foto da personalidade (teste, dá para desligar no menu)
+  if (ev.tipo === 'gHold') {   // (segurar o bebê não faz mais nada: o rosto aparece na bolinha do botão do meio)
     if (!ev.on) { nat.call('galeriaTroca', { i: -1 }).catch(() => {}); return; }
+    return;
     if (!cfg.espiaBebe || ev.i < 0 || seq[ev.i] !== '#piada' || !atual) return;
     const fam = acharFamoso(atual.nome), arq = atual.tipo === 'rosto' ? 'real.jpg' : (fam && fam.f);
     if (!arq) { vibrar('forte'); return; }
@@ -1621,7 +1636,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-  $('#aEspiaBebe').checked = !!cfg.espiaBebe; if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
+if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); 
@@ -1669,33 +1684,40 @@ $('#aFixas').addEventListener('click', async e => {
   else if (a === 'tirar' && confirm('Tirar a foto "' + cfg.fixas[i].nome + '"?')) { nat.call('apagar', { nome: 'piada/' + cfg.fixas[i].id + '.jpg' }).catch(() => {}); cfg.fixas.splice(i, 1); if (cfg.fixa >= cfg.fixas.length) cfg.fixa = 0; }
   salvar(); desenharPiada(); montarSeq(); if (atual) prepararMosaico();
 });
-/* primeira tela da Fototeca: 18 posições */
-let slotEsc = -1;
+/* as 2 telas da Fototeca (18 posições cada): Tela 1 com a piada, Tela 2 opcional */
+let slotEsc = -1, slotTela = 1;
+const arrTela = t => t === 2 ? cfg.slots2 : cfg.slots;
 function desenharSlots() {
-  const e = $('#aSlots'); if (!e) return;
-  const sb = slotBebe();
-  e.innerHTML = cfg.slots.map((a, k) => k === sb ? '<div class="sl bebe" data-k="' + k + '">Piada</div>'
-    : '<div class="sl' + (k === slotEsc ? ' esc' : '') + '" data-k="' + k + '"><i>' + (Math.floor(k / 3) + 1) + '</i>' + (a ? '<img src="' + URLS.arq('abert/' + a.id + '.jpg', cfg.ver) + '">' : '+') + '</div>').join('');
+  for (const tela of [1, 2]) {
+    const e = $(tela === 1 ? '#aSlots' : '#aSlots2'); if (!e) continue;
+    const sb = tela === 1 ? slotBebe() : -1, arr = arrTela(tela);
+    e.innerHTML = arr.map((a, k) => k === sb ? '<div class="sl bebe" data-k="' + k + '">Piada</div>'
+      : '<div class="sl' + (k === slotEsc && tela === slotTela ? ' esc' : '') + '" data-k="' + k + '"><i>' + (Math.floor(k / 3) + 1) + '</i>' + (a ? '<img src="' + URLS.arq('abert/' + a.id + '.jpg', cfg.ver) + '">' : '+') + '</div>').join('');
+  }
 }
 function slotsMudaram() { cfg.ver++; salvar(); desenharSlots(); montarSeq(); if (atual) prepararMosaico(); }
-async function escolherParaSlots(lista) {
+async function escolherParaSlots(lista, tela) {
   try {
     const r = await nat.call('escolherVarias', { pasta: 'abert', max: lista.length });
-    if (Array.isArray(r) && r.length) { r.forEach((a, n) => { if (n < lista.length) cfg.slots[lista[n]] = a; }); slotsMudaram(); }
+    if (Array.isArray(r) && r.length) { const arr = arrTela(tela || 1); r.forEach((a, n) => { if (n < lista.length) arr[lista[n]] = a; }); slotsMudaram(); }
   } catch (_) {}
 }
-$('#aSlots').addEventListener('click', e => {
-  const c = e.target.closest('[data-k]'); if (!c) return; const k = +c.dataset.k;
-  if (k === slotBebe()) return;
-  if (slotEsc >= 0) {
-    if (slotEsc === k) { if (cfg.slots[k] && confirm('Tirar esta foto?')) { nat.call('apagar', { nome: 'abert/' + cfg.slots[k].id + '.jpg' }).catch(() => {}); cfg.slots[k] = null; } slotEsc = -1; slotsMudaram(); return; }
-    const t = cfg.slots[k]; cfg.slots[k] = cfg.slots[slotEsc]; cfg.slots[slotEsc] = t; slotEsc = -1; slotsMudaram(); return;
-  }
-  if (cfg.slots[k]) { slotEsc = k; desenharSlots(); return; }
-  escolherParaSlots([k]);
-});
-$('#aSlotsVarias').addEventListener('click', () => { const sb = slotBebe(), v = []; cfg.slots.forEach((a, k) => { if (!a && k !== sb) v.push(k); }); if (v.length) escolherParaSlots(v); else toast('Todos os quadrados já têm foto'); });
-$('#aSlotsLimpar').addEventListener('click', () => { if (!confirm('Tirar as fotos da primeira tela?')) return; for (const a of cfg.slots) if (a) nat.call('apagar', { nome: 'abert/' + a.id + '.jpg' }).catch(() => {}); cfg.slots = new Array(18).fill(null); slotEsc = -1; slotsMudaram(); });
+for (const tela of [1, 2]) {
+  const id = tela === 1 ? '#aSlots' : '#aSlots2', arr = () => arrTela(tela);
+  $(id).addEventListener('click', e => {
+    const c = e.target.closest('[data-k]'); if (!c) return; const k = +c.dataset.k;
+    if (tela === 1 && k === slotBebe()) return;
+    if (slotEsc >= 0) {
+      const de = arrTela(slotTela);
+      if (slotEsc === k && slotTela === tela) { if (arr()[k] && confirm('Tirar esta foto?')) { nat.call('apagar', { nome: 'abert/' + arr()[k].id + '.jpg' }).catch(() => {}); arr()[k] = null; } slotEsc = -1; slotsMudaram(); return; }
+      const t = arr()[k]; arr()[k] = de[slotEsc]; de[slotEsc] = t; slotEsc = -1; slotsMudaram(); return;
+    }
+    if (arr()[k]) { slotEsc = k; slotTela = tela; desenharSlots(); return; }
+    escolherParaSlots([k], tela);
+  });
+  $(id + 'Varias').addEventListener('click', () => { const sb = tela === 1 ? slotBebe() : -1, v = []; arr().forEach((a, k) => { if (!a && k !== sb) v.push(k); }); if (v.length) escolherParaSlots(v, tela); else toast('Todos os quadrados já têm foto'); });
+  $(id + 'Limpar').addEventListener('click', () => { if (!confirm('Tirar as fotos da Tela ' + tela + '?')) return; for (const a of arr()) if (a) nat.call('apagar', { nome: 'abert/' + a.id + '.jpg' }).catch(() => {}); if (tela === 1) cfg.slots = new Array(18).fill(null); else cfg.slots2 = new Array(18).fill(null); slotEsc = -1; slotsMudaram(); });
+}
 desenharSlots();
 function desenharListaFam() {
   atualizarContaFam();
@@ -1763,7 +1785,6 @@ $('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#a
 $('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
-$('#aEspiaBebe').addEventListener('change', e => { cfg.espiaBebe = e.target.checked; salvar(); });
 $('#aAjuda').addEventListener('input', e => { cfg.ajuda = +e.target.value; $('#aAjudaV').textContent = cfg.ajuda; salvar(); enviarGaleria(); });
 $('#aMomento').addEventListener('input', e => { cfg.momento = +e.target.value; $('#aMomentoV').textContent = cfg.momento; salvar(); enviarGaleria(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });

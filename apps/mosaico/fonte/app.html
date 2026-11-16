@@ -48,12 +48,12 @@ svg{display:block}
 .ic .bd{position:absolute;right:-8px;top:-8px;min-width:24px;height:24px;border-radius:12px;background:#ff3b30;color:#fff;font:500 15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;padding:0 7px;box-sizing:border-box}
 .ic.toque{transform:scale(.88);filter:brightness(.75)}
 .bordaBaixo{position:absolute;left:0;right:0;bottom:0;height:26px;z-index:60}
-#aSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:10px}
-#aSlots .sl{aspect-ratio:1;border-radius:6px;background:var(--cel2);display:flex;align-items:center;justify-content:center;color:var(--fg2);font-size:22px;position:relative;overflow:hidden}
-#aSlots .sl img{width:100%;height:100%;object-fit:cover}
-#aSlots .sl.esc{outline:3px solid var(--azul);outline-offset:-3px}
+#aSlots,#aSlots2{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:10px}
+#aSlots .sl,#aSlots2 .sl{aspect-ratio:1;border-radius:6px;background:var(--cel2);display:flex;align-items:center;justify-content:center;color:var(--fg2);font-size:22px;position:relative;overflow:hidden}
+#aSlots .sl img,#aSlots2 .sl img{width:100%;height:100%;object-fit:cover}
+#aSlots .sl.esc,#aSlots2 .sl.esc{outline:3px solid var(--azul);outline-offset:-3px}
 #aSlots .sl.bebe{font-size:12px;font-weight:600;background:repeating-linear-gradient(45deg,var(--cel2),var(--cel2) 6px,transparent 6px,transparent 12px)}
-#aSlots .sl i{position:absolute;left:4px;top:3px;font-style:normal;font-size:10px;color:#fff;text-shadow:0 0 3px #000}
+#aSlots .sl i,#aSlots2 .sl i{position:absolute;left:4px;top:3px;font-style:normal;font-size:10px;color:#fff;text-shadow:0 0 3px #000}
 .indice{margin:14px 16px 0;background:var(--cel);border-radius:12px;overflow:hidden}
 .indice .it{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 14px;font-size:16px;border-bottom:.5px solid var(--linha)}
 .indice .it:last-child{border-bottom:0}
@@ -92,6 +92,7 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 .rodape>*{pointer-events:auto}
 .aba{flex:1;height:58px;border-radius:29px;display:flex;align-items:center;justify-content:center;position:relative;gap:12px;color:var(--azul);font-weight:600;font-size:17px;padding:0 14px}
 .aba .ico{position:absolute;left:18px;top:50%;transform:translateY(-50%)}
+#bolinha{display:none;position:absolute;left:21px;top:13px;width:32px;height:32px;border-radius:50%;background:#333 center 30%/cover no-repeat}
 #rotulo{max-width:72%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s}
 #ponto{position:absolute;right:-4px;top:-3px;min-width:21px;height:21px;border-radius:11px;background:#ff3b30;color:#fff;font-size:13px;font-weight:600;
   display:none;align-items:center;justify-content:center;padding:0 6px;box-shadow:0 0 0 2px rgba(0,0,0,.25)}
@@ -222,6 +223,7 @@ body:not(.claro) .nok{color:#000}
   <div class="rodape" id="barraNormal">
     <div class="aba vid" id="aba">
       <svg class="ico" width="30" height="26" viewBox="0 0 30 26" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="20" height="16" rx="3"/><path d="M3 7v13a3 3 0 0 0 3 3h17"/><circle cx="21" cy="7" r="2" fill="currentColor" stroke="none"/><path d="M8 17l5-6 4 4 3-3 6 5"/></svg>
+      <span id="bolinha"></span>
       <span id="rotulo">Fototeca</span>
       <span id="ponto">1</span>
     </div>
@@ -319,15 +321,18 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Momento da cor<input type="range" id="aMomento" min="0" max="10" step="1"><span class="r" id="aMomentoV" style="margin-left:6px;min-width:22px"></span></div>
   </div><div class="nota">Momento da cor: quando a cor começa a pintar o rosto na pinça. Número menor, o rosto aparece antes; número maior, as fotos ficam puras por mais tempo. Reforço do rosto: a força dessa cor. Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
 
-  <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="caixa"><div id="aSlots"></div>
+  <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="nota" style="margin:0 0 6px">Tela 1 (aparece ao abrir)</div><div class="caixa"><div id="aSlots"></div>
     <div class="lin"><button class="bt cinza" id="aSlotsVarias">Preencher vazios</button><button class="bt cinza" id="aSlotsLimpar" style="margin-left:auto">Limpar</button></div>
+  </div>
+  <div class="nota" style="margin:14px 0 6px">Tela 2 (opcional, aparece ao arrastar para cima)</div><div class="caixa"><div id="aSlots2" class="slots"></div>
+    <div class="lin"><button class="bt cinza" id="aSlots2Varias">Preencher vazios</button><button class="bt cinza" id="aSlots2Limpar" style="margin-left:auto">Limpar</button></div>
+  </div><div class="caixa" style="margin-top:10px">
     <div class="lin">Colunas ao abrir<select id="aN0"><option value="3">3</option><option value="5">5</option></select></div>
-  </div><div class="nota">A primeira tela da Fototeca. Toque num quadrado para escolher a foto; toque numa foto e depois em outro quadrado para trocar de lugar. Quadrado vazio recebe uma foto automática.</div></div>
+  </div><div class="nota">A primeira tela da Fototeca. Toque num quadrado para escolher a foto; toque numa foto e depois em outro quadrado para trocar de lugar. As duas telas ficam no meio da galeria, embaixo do rosto. Tela 1: deixando vazio o último quadrado (ou os 2 últimos), a última fileira fica incompleta, como no iPhone; outros vazios recebem foto automática. Tela 2: quadrado vazio recebe uma foto normal da galeria.</div></div>
 
   <div class="sec" data-ic="👶" data-cor="#ff2d55"><h3>Foto da piada</h3><div class="caixa" id="aPiadaAuto"></div>
   <div class="nota" style="margin-top:14px">Ou deixar uma foto fixa</div>
   <div class="caixa" style="margin-top:6px"><div id="aBebes"></div><div id="aFixas"></div></div>
-  <div class="caixa" style="margin-top:10px"><div class="lin">Segurar o bebê mostra a foto do famoso (teste)<label class="chave"><input type="checkbox" id="aEspiaBebe"><span></span></label></div></div>
   <div class="nota">Lixeira da foto da piada: liga o microfone. Automático: menino ou menina pelo cadastro do famoso e o tom de pele pela foto; o bebê marcado na lista de Famosos vale por cima.</div></div>
 
   <div class="sec" data-ic="★" data-cor="#ffcc00"><h3>Famosos</h3><div class="caixa">

@@ -200,7 +200,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         guard let d = tiles.dados, d.t0 > 0, vista.bounds.width > 0 else { return }
         let z = zoomer.zoomScale, off = zoomer.contentOffset, B = vista.bounds
         let px = z * UIScreen.main.scale
-        let g: CGFloat = d.t0 * px >= 60 ? 2 / px : 0, lado = d.t0 - g
+        let (gp, rp) = TilesMosaico.vao(d.t0 * px)
+        let g: CGFloat = gp / px, lado = d.t0 - g, raio = rp / px * z
         let visivel = CGRect(x: off.x / z, y: off.y / z, width: B.width / z, height: B.height / z)
         let c0 = max(0, Int(floor(visivel.minX / d.t0))), c1 = min(d.cols - 1, Int(floor(visivel.maxX / d.t0)))
         let r0 = max(0, Int(floor(visivel.minY / d.t0))), r1 = min(d.linhas - 1, Int(floor(visivel.maxY / d.t0)))
@@ -227,7 +228,10 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
                     // recorte quadrado do meio (como a grade)
                     let w = CGFloat(cg.width), h = CGFloat(cg.height), l = min(w, h)
                     if let quad = cg.cropping(to: CGRect(x: (w - l) / 2, y: (h - l) / 2, width: l, height: l)) {
+                        ctx.saveGState()
+                        if raio > 0 { ctx.addPath(UIBezierPath(roundedRect: q, cornerRadius: raio).cgPath); ctx.clip() }
                         UIImage(cgImage: quad).draw(in: q)
+                        ctx.restoreGState()
                     }
                 }
             }
@@ -280,6 +284,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             linhasMos = (d["linhas"] as? NSNumber)?.intValue ?? 0
             ini = (d["ini"] as? NSNumber)?.intValue ?? 0
             faixaL = (d["faixaL"] as? NSNumber)?.intValue ?? 0
+            colS = (d["cS"] as? NSNumber)?.intValue ?? 0
             realRow = CGFloat((d["realRow"] as? NSNumber)?.doubleValue ?? 0)
             realRows = CGFloat((d["realRows"] as? NSNumber)?.doubleValue ?? 0)
             let real = (d["real"] as? String) ?? ""
@@ -324,7 +329,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         // monta a imagem gigante
         C = temMos ? mosCols : max(1, Int(n0))
         linhas = Int(ceil(Double(seq.count) / Double(max(1, C))))
-        let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)"
+        let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)|\(cS)"
         if chave != geoChave {
             // se estava vendo as fotos de perto (3 colunas), continua EXATAMENTE no mesmo lugar depois de trocar
             let perto = ligada && !geoChave.isEmpty && abs(visiveis - n0) < 0.1
@@ -408,7 +413,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
 
     /// imagem pequenina com 1 ponto de cor por foto (a cor do rosto), esticada sem borrar
-    private var cS: Int { 0 }   // a Fototeca de perto fica no canto esquerdo da grade grande
+    private var colS = 0
+    private var cS: Int { temMos ? colS : 0 }   // a Fototeca de perto fica no MEIO da grade grande (embaixo do rosto)
     private func imagemTinta(_ soFaixa: Bool) -> UIImage? {
         guard mosCols > 0, linhasMos > 0, mosTinta.count >= 3 else { return nil }
         let w = mosCols, h = linhasMos
@@ -460,6 +466,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             s.contentOffset = CGPoint(x: t.p.x * s.zoomScale - sx, y: t.p.y * s.zoomScale - sy)
             ajustando = false
         }
+        if s.isZooming || s.isZoomBouncing { prenderBordas(s) }
         atualizar()
         if travado && s.zoomScale > s.minimumZoomScale * 1.01 { travado = false; zoomer.isScrollEnabled = ligada && ativa }
     }
@@ -513,6 +520,16 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         if let x = xTravado, !s.isZooming, !ajustando, s.contentOffset.x != x {
             ajustando = true; s.contentOffset.x = x; ajustando = false
         }
+    }
+    /// na pinça, como no Fotos do iPhone: nunca aparece vazio dos lados nem abaixo das últimas fotos
+    private func prenderBordas(_ s: UIScrollView) {
+        let ins = s.contentInset, cs = s.contentSize, o = s.contentOffset
+        var n = o
+        let maxY = cs.height - H + ins.bottom
+        if maxY > -ins.top, n.y > maxY { n.y = maxY }
+        let minX = -ins.left, maxX = cs.width - W + ins.right
+        if maxX >= minX { n.x = min(max(n.x, minX), maxX) }
+        if n != o { ajustando = true; s.contentOffset = n; ajustando = false }
     }
     private func centralizar() {   // afastou demais: o rosto fica no meio enquanto volta
         let largura = plano.frame.width
@@ -719,14 +736,21 @@ final class TilesMosaico: UIView {
         }
     }
     required init?(coder: NSCoder) { fatalError() }
+    /// espaço entre as fotos e arredondado dos cantos, em pixels da tela, pelo tamanho da foto (medido no Fotos do iPhone: 5 pixels)
+    static func vao(_ ladoPx: CGFloat) -> (CGFloat, CGFloat) {
+        if ladoPx >= 120 { return (5, 4) }
+        if ladoPx >= 60 { return (3, 2) }
+        return (0, 0)
+    }
     override func draw(_ rect: CGRect) {
         guard let d = dados, d.t0 > 0, let ctx = UIGraphicsGetCurrentContext() else { return }
         let (corFundo, corVazia) = cores, marcas = self.marcas
         ctx.setFillColor(corFundo)
         ctx.fill(rect)
         let escala = max(1, abs(ctx.ctm.a))
-        // como no Fotos do iPhone: fotos grandes com uma linha fininha (2 pixels); pequenas (mosaico), coladas
-        let g: CGFloat = d.t0 * escala >= 60 ? 2 / escala : 0, lado = d.t0 - g
+        // como no Fotos do iPhone: fotos grandes com linha de 5 pixels e cantinhos arredondados; pequenas (mosaico), coladas
+        let (gp, rp) = TilesMosaico.vao(d.t0 * escala)
+        let g: CGFloat = gp / escala, lado = d.t0 - g, raio = rp / escala
         let c0 = max(0, Int(floor(rect.minX / d.t0))), c1 = min(d.cols - 1, Int(floor(rect.maxX / d.t0)))
         let r0 = max(0, Int(floor(rect.minY / d.t0))), r1 = min(d.linhas - 1, Int(floor(rect.maxY / d.t0)))
         guard c0 <= c1, r0 <= r1 else { return }
@@ -740,12 +764,14 @@ final class TilesMosaico: UIView {
                 if id.isEmpty { continue }
                 if let im = carregar?(id, lado * escala, q) {
                     ctx.saveGState()
+                    if raio > 0 { ctx.addPath(UIBezierPath(roundedRect: q, cornerRadius: raio).cgPath); ctx.clip() }
                     ctx.translateBy(x: q.minX, y: q.maxY); ctx.scaleBy(x: 1, y: -1)
                     ctx.interpolationQuality = .medium
                     ctx.draw(im, in: CGRect(x: 0, y: 0, width: lado, height: lado))
                     ctx.restoreGState()
                 } else {
-                    ctx.setFillColor(corVazia); ctx.fill(q)
+                    ctx.setFillColor(corVazia)
+                    if raio > 0 { ctx.addPath(UIBezierPath(roundedRect: q, cornerRadius: raio).cgPath); ctx.fillPath() } else { ctx.fill(q) }
                 }
                 if marcas.contains(i) {
                     let s = min(22, lado / 4), b = CGRect(x: q.maxX - s - lado * 0.04, y: q.maxY - s - lado * 0.04, width: s, height: s)
