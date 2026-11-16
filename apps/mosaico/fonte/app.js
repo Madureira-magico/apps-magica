@@ -266,7 +266,9 @@ async function definirNome(txt, origem) {
       // só vale o NOME INTEIRO de uma linha da resposta ("Daniel Michael DeVito Jr." não vira o Daniel cantor)
       const naLista = acharFamoso(resp) || (perguntarIA.bruta || '').split('\n').map(l => acharFamoso(limparResposta(l))).find(Boolean) || null;
       const lp = limparPedido(resp), certo = naLista ? naLista.n : (/[A-ZÀ-Ý]/.test(lp) ? lp : maiusculas(lp));   // mantém o jeito certo de escrever (DeVito)
-      if (certo && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
+      const nPal = x => semAcento(x).split(' ').filter(Boolean).length;
+      const cortou = !naLista && nPal(certo) < nPal(limpo);   // fora da lista, a IA não pode cortar palavras ("Shaw Suede" não vira "Shaw")
+      if (certo && !cortou && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
         let g = naLista || acharFamoso(certo);
         const fotosIA = perguntarIA.fotos || [];
         if (!g || !g.f) g = await baixarFamoso(g || { n: certo, w: '', a: [], b: -1, f: '', r: null }, !g, false);

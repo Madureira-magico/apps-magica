@@ -266,7 +266,9 @@ async function definirNome(txt, origem) {
       // só vale o NOME INTEIRO de uma linha da resposta ("Daniel Michael DeVito Jr." não vira o Daniel cantor)
       const naLista = acharFamoso(resp) || (perguntarIA.bruta || '').split('\n').map(l => acharFamoso(limparResposta(l))).find(Boolean) || null;
       const lp = limparPedido(resp), certo = naLista ? naLista.n : (/[A-ZÀ-Ý]/.test(lp) ? lp : maiusculas(lp));   // mantém o jeito certo de escrever (DeVito)
-      if (certo && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
+      const nPal = x => semAcento(x).split(' ').filter(Boolean).length;
+      const cortou = !naLista && nPal(certo) < nPal(limpo);   // fora da lista, a IA não pode cortar palavras ("Shaw Suede" não vira "Shaw")
+      if (certo && !cortou && semAcento(certo) !== semAcento(limpo) && certo.length <= 50) {
         let g = naLista || acharFamoso(certo);
         const fotosIA = perguntarIA.fotos || [];
         if (!g || !g.f) g = await baixarFamoso(g || { n: certo, w: '', a: [], b: -1, f: '', r: null }, !g, false);
@@ -1925,7 +1927,7 @@ const PI_SVC = '58570001-b5a3-f393-e0a9-e50e24dcca9e', PI_WRITE = '58570002-b5a3
 if (cfg.pi == null) cfg.pi = true;
 const pit = {
   dev: null, wr: null, nc: null, ligado: false, bat: null, tipo: guarda.get('padType', 0x1B),
-  tracos: [], cur: null, ultT: 0, ultRaw: '', lendo: false, abrirTent: 0, ops: {}, batTimer: 0, tentando: false, token: 0
+  tracos: [], cur: null, lido: false, ultT: 0, ultRaw: '', lendo: false, abrirTent: 0, ops: {}, batTimer: 0, tentando: false, token: 0
 };
 function sha1pi(bytes) {
   const rotl = (x, n) => (x << n) | (x >>> (32 - n));
@@ -2030,6 +2032,7 @@ function piNotif(ev) {
   if (pit.cur && agora - pit.ultT > 350) piFimTraco();
   for (let i = 0; i < n; i++) {
     const o = 11 + i * 5, down = b[o] !== 0, x = (b[o + 1] << 8) | b[o + 2], y = (b[o + 3] << 8) | b[o + 4];
+    if (down && pit.lido) { pit.lido = false; pit.tracos = []; pit.cur = null; if (PIT.falhou) { PIT.falhou = false; desenharInicio(); } }   // já apertou o volume: a escrita nova começa do zero
     if (down) { if (!pit.cur) pit.cur = []; pit.cur.push({ x, y }); pit.ultT = agora; }
     else if (pit.cur) piFimTraco();
   }
@@ -2038,7 +2041,7 @@ function piNotif(ev) {
 }
 function piFimTraco() { if (pit.cur && pit.cur.length) pit.tracos.push(pit.cur); pit.cur = null; }
 const piTracos = () => pit.cur ? pit.tracos.concat([pit.cur]) : pit.tracos;
-function piLimpar() { pit.tracos = []; pit.cur = null; PIT.falhou = false; desenharInicio(); if (telaAtual === 'ajustes') piTeste(); }
+function piLimpar() { pit.tracos = []; pit.cur = null; pit.lido = false; PIT.falhou = false; desenharInicio(); if (telaAtual === 'ajustes') piTeste(); }
 function piSinais() { const e = $('#aPiOps'); if (e) e.textContent = Object.keys(pit.ops).map(k => 'op ' + k + ' (' + pit.ops[k] + 'x)').join(' · ') || '—'; }
 
 /* desenha a escrita (branca no preto ou preta no branco), girada, recortada justinha */
@@ -2090,7 +2093,7 @@ async function lerPostit(mostrar) {
 }
 async function postitVolume() {   // volume + na tela de início
   if (pit.lendo || !piTracos().some(t => t.length)) return;   // nada escrito: não faz nada
-  pit.lendo = true; piFimTraco();
+  pit.lendo = true; piFimTraco(); pit.lido = true;
   try {
     const r = await lerPostit();
     if (r.nome) { PIT.falhou = false; if (atual && semAcento(atual.nome) === semAcento(r.nome) && atual.pronto) desenharInicio(); else definirNome(r.nome, 'postit'); }
