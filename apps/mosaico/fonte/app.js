@@ -422,6 +422,11 @@ function hsl(h, s, l) { const f = n => { const k = (n + h * 12) % 12, a = s * Ma
 
 /* fotos disponíveis para o mosaico */
 /* foto quase toda branca e lisa (print, papel, parede branca): no mosaico parece um buraco, igual ao fundo do app */
+/* foto quase toda preta e lisa (lente tapada, foto no escuro): no mosaico parece um buraco preto */
+function pretaLisa(p) {
+  if (p.q) { const ls = [0, 1, 2, 3].map(k => lum([p.q[k * 3], p.q[k * 3 + 1], p.q[k * 3 + 2]])); return Math.max(...ls) < 26 && Math.max(...ls) - Math.min(...ls) < 12; }
+  return p.l < 14;
+}
 function brancaLisa(p) {
   if (p.q) { const ls = [0, 1, 2, 3].map(k => lum([p.q[k * 3], p.q[k * 3 + 1], p.q[k * 3 + 2]])); return Math.min(...ls) > 222 && Math.max(...ls) - Math.min(...ls) < 28; }
   return p.l > 236;
@@ -430,8 +435,8 @@ function pool() {
   const todas = [], boas = [];
   for (const [id, v] of cores) { if (tirados.has(id)) continue; const p = { id, c: v.c, q: v.q || null, l: lum(v.c) }; todas.push(p); if (v.ok) boas.push(p); }
   const P = cfg.filtro && boas.length >= 300 ? boas : todas;
-  const semBrancas = P.filter(p => !brancaLisa(p));   // as escuras ficam (cabelo, roupa, sombra); só as brancas lisas saem
-  return semBrancas.length >= 100 ? semBrancas : P;
+  const lisas = P.filter(p => !brancaLisa(p) && !pretaLisa(p));   // escuras com alguma coisa ficam (cabelo, roupa, sombra); só as lisas (brancas ou pretas) saem
+  return lisas.length >= 100 ? lisas : P;
 }
 /* para cada cor (8x8x8 caixinhas), as fotos de cor mais parecida */
 function indiceCores(P) {
@@ -461,10 +466,10 @@ async function prepararMosaico() {
   // fileiras da faixa com as fotos de verdade: as 18 da primeira tela (escondidas atrás da barra);
   // se o nome chegar com a Fototeca aberta e a pessoa tiver subido, TODAS as fileiras que estão na tela continuam verdadeiras
   let fReais = k00 === 3 ? 6 : Math.ceil(H / (W / k00)) + 1;
-  if (nativo && telaAtual === 'fototeca') {
+  if (nativo && (telaAtual === 'fototeca' || telaAtual === 'ver')) {   // com a grade aberta, ou com uma foto aberta por cima dela
     try {
       const e = await nat.call('galeriaEstado');
-      if (e && e.ligada && Math.abs(e.zoom - k00) < 0.2) fReais = Math.max(fReais, Math.min(40, Math.ceil((e.alt - e.y) / (W / k00))));
+      if (e && Math.abs(e.zoom - k00) < 0.2) fReais = Math.max(fReais, Math.min(40, Math.ceil((e.alt - e.y) / (W / k00))));
       else if (mos && mos.fL) fReais = Math.max(fReais, mos.fL);   // no meio da pinça: mantém a faixa que já estava
     } catch (_) {}
   }   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
@@ -935,7 +940,7 @@ function tocou(x, y) {
   abrirFoto(i);
 }
 function tocouNativo(i, noMosaico, emB) {
-  if (emB && comMosaico() && !emSelecao) {   // tocou numa foto do mosaico: abre essa foto
+  if (emB && comMosaico() && !emSelecao && verDeCelFaixa(i) < 0) {   // tocou numa foto do mosaico (fora da faixa das fotos de verdade): abre essa foto
     const id = mos.ids[i - mos.ini], j = id ? mos.normal.indexOf(id) : -1;
     if (j >= 0) abrirFoto(i, j);
     return;
@@ -964,7 +969,7 @@ function enviarGaleria(zerar) {
     const ap = arqPiada();
     const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
     const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, cS: mos.cS || 0, img: 'mosaico.jpg', v: String(mos.versao), real: mos.real || '', realRow: mos.realRow || 0, realRows: mos.realRows || 0 } : null;
-    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.centrar === false ? 0 : 1, momento: cfg.momento == null ? 5 : +cfg.momento };
+    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.centrar === false ? 0 : 1, descer: cfg.voltar18 !== false, momento: cfg.momento == null ? 5 : +cfg.momento };
     nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
     zerarGal = false;
   }, 0);
@@ -1069,6 +1074,12 @@ let verI = 0, vSeq = [];
 /* a foto grande anda na ordem da Fototeca de verdade (a que o público viu), não na ordem do mosaico */
 function comMosaico() { return !!(mos && mos.cS != null && seq === mos.seq); }
 function listaVer() { const a = comMosaico() ? mos.normal : seq; let e = a.length; while (e && !a[e - 1]) e--; vSeq = e === a.length ? a : a.slice(0, e); }
+function verDeCelFaixa(i) {   // a célula é da faixa das fotos de verdade (as 18, o bebê)? devolve a posição na Fototeca, senão -1
+  if (!comMosaico()) return -1;
+  const r = Math.floor(i / mos.cols), c = i % mos.cols;
+  if (c >= mos.cS && c < mos.cS + mos.k0 && r > mos.ultima - mos.fL) { const j = (mos.uN - (mos.ultima - r)) * mos.k0 + (c - mos.cS); if (j >= 0 && j < mos.normal.length && mos.normal[j]) return j; }
+  return -1;
+}
 function verDeCel(i) {
   if (!comMosaico()) return i;
   const r = Math.floor(i / mos.cols), c = i % mos.cols;
@@ -1240,6 +1251,7 @@ async function fecharFoto() {
   const src = im && im.src ? im.src : '';
   const [fw, fh] = await tamanhoFoto(it), de = encaixe(fw, fh);
   mostrar('fototeca');
+  if (nativo) nat.call('galeriaCapa').catch(() => {});
   let para;
   const cel = celDeVer(verI);
   if (cel < 0) return;
@@ -1643,7 +1655,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-$('#aCentrar').checked = cfg.centrar !== false; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
+$('#aCentrar').checked = cfg.centrar !== false; $('#aVoltar18').checked = cfg.voltar18 !== false; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); 
@@ -1793,6 +1805,7 @@ $('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
 $('#aCentrar').addEventListener('change', e => { cfg.centrar = e.target.checked; salvar(); enviarGaleria(); });
+$('#aVoltar18').addEventListener('change', e => { cfg.voltar18 = e.target.checked; salvar(); enviarGaleria(); });
 $('#aMomento').addEventListener('input', e => { cfg.momento = +e.target.value; $('#aMomentoV').textContent = cfg.momento; salvar(); enviarGaleria(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });

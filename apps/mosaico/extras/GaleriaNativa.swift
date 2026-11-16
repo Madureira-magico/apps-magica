@@ -11,7 +11,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let capa = CapaToques()
     private let zoomer = UIScrollView()
     private let plano = UIView()
-    private let tiles = TilesMosaico()      // camada 1: a Fototeca normal (grade grande)
+    private var tiles = TilesMosaico()      // camada 1: a grade (trocada inteira a cada mosaico novo: nada de camadas velhas guardadas)
     private let tilesB = TilesMosaico()     // camada 2: o mosaico do rosto (aparece dissolvendo ao afastar)
     private var bAtual: CGFloat = 0
     private let tinta = UIImageView()
@@ -20,6 +20,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let baseMos = UIImageView()       // o mosaico pronto (miniatura) por baixo: onde a grade ainda não se desenhou, aparece ele (nunca preto)
     private let pinca = UIPinchGestureRecognizer()
     private var pinchando = false, pS0: CGFloat = 1, pAnc = CGPoint.zero
+    private var pBase: CGFloat = 1, pToques = 2, pLivre = CGPoint.zero   // base da escala, dedos na tela, lugar sem a ajuda
+    private var descer = true                                             // a ajuda na volta também desce até as 18 fotos
     private var animador: CADisplayLink?
     private var anim: (t0: CFTimeInterval, dur: Double, s0: CGFloat, s1: CGFloat, o0: CGPoint, o1: CGPoint)?
     private var fundoChave = ""
@@ -203,6 +205,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             posicaoInicial()
             mostrarCapaInicio()
             r(true, nil)
+        case "galeriaCapa":    // voltando de uma foto aberta: a tela pronta por cima enquanto a grade termina de se desenhar
+            if visiveis <= 8 { mostrarCapaInicio() }
+            r(true, nil)
         case "galeriaReal":
             realImg.alpha = max(0, min(1, num("a", 0)))
             r(true, nil)
@@ -347,6 +352,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             }
             if let a = c["ativa"] as? Bool { ativa = a }
             ajuda = CGFloat((c["ajuda"] as? NSNumber)?.doubleValue ?? 3)
+            descer = (c["descer"] as? Bool) ?? true
         }
         vista.backgroundColor = escuro ? .black : .white
         tiles.backgroundColor = .clear
@@ -361,7 +367,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)|\(cS)"
         var refez = false
         if chave != geoChave {
-            let manter = ligada && !geoChave.isEmpty && csA.width > 0 && celA > 0 && !zerar
+            let manter = !geoChave.isEmpty && csA.width > 0 && celA > 0 && !zerar   // também com uma foto aberta por cima
             geoChave = chave
             montarPlano()
             refez = true
@@ -397,6 +403,19 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         // a galeria JÁ É o mosaico: as fotos do rosto entram direto na camada de fotos (nada por cima, nada troca)
         var seq1 = seq
         if temMos { for (k, id) in mosIds.enumerated() where ini + k < seq1.count && !id.isEmpty { seq1[ini + k] = id } }
+        if tiles.dados != nil, let pai = tiles.superview {
+            // o iPhone às vezes guarda pedaços do desenho antigo em outros tamanhos de zoom (aparecem num salto):
+            // uma grade nova, sem nada guardado
+            let novo = TilesMosaico()
+            novo.carregar = tiles.carregar
+            novo.cores = tiles.cores
+            novo.marcas = tiles.marcas
+            novo.backgroundColor = .clear
+            novo.pxPerto = tiles.pxPerto
+            pai.insertSubview(novo, aboveSubview: tiles)
+            tiles.removeFromSuperview()
+            tiles = novo
+        }
         tiles.dados = TilesMosaico.Dados(seq: seq1, mos: [], ini: 0, cols: C, linhas: linhas, t0: t)
         if temMos { aquecer(seq1) }
         var idsB = [String](repeating: "", count: C * linhas)
@@ -507,7 +526,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var ajuda: CGFloat = 3   // 0 = sem ajuda, 3 = como era, 10 = bem forte
     private func xFaixa(_ sc: CGFloat) -> CGFloat {   // offset de lado com a faixa das fotos de verdade no meio da tela
         let x = (CGFloat(cS) + n0 / 2) * t0 * sc - W / 2
-        let ins = zoomer.contentInset, maxX = zoomer.contentSize.width - W + ins.right
+        let ins = zoomer.contentInset, maxX = plano.bounds.width * sc - W + ins.right
         return min(max(x, -ins.left), max(-ins.left, maxX))
     }
     private func guiarVolta(_ s: UIScrollView) {
@@ -588,7 +607,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetRosto() }
     }
     /// arrastar só para cima e para baixo (como no app Fotos); de lado só a pinça mexe
-    func scrollViewWillBeginDragging(_ s: UIScrollView) { if !s.isZooming { xTravado = s.contentOffset.x } }
+    func scrollViewWillBeginDragging(_ s: UIScrollView) { pararAnimacao(); if !s.isZooming { xTravado = s.contentOffset.x } }   // o dedo manda: para qualquer encaixe animado
     /// linha entre as fotos (como no Fotos do iPhone): 5 pixels com as fotos grandes, afinando aos poucos até sumir no mosaico
     private func atualizarLinhas() {
         guard ligada, let d = tiles.dados, d.t0 > 0 else { linhasCam.isHidden = true; return }
@@ -621,17 +640,42 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         }
     }
     /// posição permitida: sem vazio dos lados nem abaixo das últimas fotos (como no Fotos do iPhone)
-    private func limitar(_ p: CGPoint) -> CGPoint {
-        let ins = zoomer.contentInset, cs = zoomer.contentSize
+    /// quanto do caminho entre o rosto inteiro (0) e as fotos grandes (1)
+    private func fracao(_ sc: CGFloat) -> CGFloat {
+        let mn = max(0.0001, zoomer.minimumZoomScale), mx = zoomer.maximumZoomScale
+        guard mx > mn * 1.0001 else { return 1 }
+        return min(1, max(0, log(sc / mn) / log(mx / mn)))
+    }
+    /// força da cortina que esconde as fotos acima da cabeça (a mesma conta de atualizar)
+    private func forcaCobre(_ sc: CGFloat) -> CGFloat {
+        guard temMos else { return 0 }
+        let cc = CGFloat(C), v = cc / max(0.0001, sc)
+        let ini = (0.15 + 0.05 * max(0, min(10, momento))) * cc
+        let cobreIni = min(0.9 * cc, max(0.55 * cc, ini + 0.2 * cc))
+        return suave(cobreIni, 0.97 * cc, v)
+    }
+    /// limites de cima e de baixo para um zoom: embaixo, o espaço acima da barra só existe com as fotos grandes
+    /// (no rosto a imagem vai até o fim da tela); em cima, perto do rosto, nunca aparece a cortina acima da cabeça
+    private func limitesY(_ sc: CGFloat) -> (CGFloat, CGFloat) {
+        let ins = zoomer.contentInset, h = plano.bounds.height * sc
+        let maxY = h - H + ins.bottom * fracao(sc)
+        var minY = -ins.top
+        if temMos {
+            let topoRosto = CGFloat(primeira) * t0 * sc, a = forcaCobre(sc)
+            minY = minY + (topoRosto - minY) * a
+        }
+        return (min(minY, maxY), maxY)
+    }
+    private func limitar(_ p: CGPoint, _ escala: CGFloat? = nil) -> CGPoint {
+        let sc = escala ?? zoomer.zoomScale
+        let ins = zoomer.contentInset, cw = plano.bounds.width * sc
         var n = p
-        let maxY = cs.height - H + ins.bottom, minY = -ins.top
-        if maxY >= minY { n.y = min(max(n.y, minY), maxY) } else { n.y = minY }
-        let minX = -ins.left, maxX = cs.width - W + ins.right
+        let (minY, maxY) = limitesY(sc)
+        n.y = min(max(n.y, minY), maxY)
+        let minX = -ins.left, maxX = cw - W + ins.right
         n.x = maxX >= minX ? min(max(n.x, minX), maxX) : minX
         return n
     }
-    /// a pinça: o ponto que estava entre os dedos fica entre os dedos (conta exata a cada quadro, sem correções depois = sem tremer).
-    /// Na volta (abrindo), o lado vai sendo levado aos poucos até a faixa das fotos de verdade.
     @objc private func pincou(_ g: UIPinchGestureRecognizer) {
         let p = g.location(in: vista)
         switch g.state {
@@ -643,22 +687,33 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             pinchando = true
             zoomer.setContentOffset(zoomer.contentOffset, animated: false)   // para qualquer embalo
             zoomer.isScrollEnabled = false
-            pS0 = zoomer.zoomScale
+            pS0 = zoomer.zoomScale; pBase = pS0; pToques = g.numberOfTouches
             let o = zoomer.contentOffset
+            pLivre = o
             pAnc = CGPoint(x: (o.x + p.x) / pS0, y: (o.y + p.y) / pS0)
         case .changed:
             let mn = zoomer.minimumZoomScale, mx = zoomer.maximumZoomScale
-            let sc = min(max(pS0 * g.scale, mn), mx)
+            if g.numberOfTouches != pToques {
+                // um dedo saiu (ou entrou): continua do lugar em que está, sem pular para o dedo que ficou
+                let k0 = zoomer.zoomScale
+                pBase = k0 / max(0.0001, g.scale)
+                pAnc = CGPoint(x: (pLivre.x + p.x) / k0, y: (pLivre.y + p.y) / k0)
+                pToques = g.numberOfTouches
+            }
+            let sc = min(max(pBase * g.scale, mn), mx)
             zoomer.zoomScale = sc
             centralizar()
             var off = CGPoint(x: pAnc.x * sc - p.x, y: pAnc.y * sc - p.y)
+            pLivre = off
             if ajuda > 0, temMos, sc > pS0, mx > 1.0001 {
-                let u0 = min(1, max(0, log(pS0) / log(mx))), u = min(1, max(0, log(sc) / log(mx)))
+                // volta: a cada abertura, leva aos poucos até a faixa (de lado) e, se ligado, até as 18 fotos (para baixo)
+                let u0 = fracao(pS0), u = fracao(sc)
                 let w = min(1, max(0, (u - u0) / max(0.0001, 1 - u0))), k = w * w * (3 - 2 * w)
                 off.x += (xFaixa(sc) - off.x) * k
+                if descer { off.y += (limitesY(sc).1 - off.y) * k }
             }
             ajustando = true
-            zoomer.contentOffset = limitar(off)
+            zoomer.contentOffset = limitar(off, sc)
             ajustando = false
             atualizar()
         case .ended, .cancelled, .failed:
@@ -687,11 +742,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         }
         if ajuda > 0, temMos, e >= mx * 0.75 {   // quase nas fotos grandes: encaixa as 3 colunas da faixa certinho
             let o = zoomer.contentOffset
-            let cy = (o.y + H / 2) / e
-            let alvoY = cy * mx - H / 2
-            let cs = CGSize(width: plano.bounds.width * mx, height: plano.bounds.height * mx), ins = zoomer.contentInset
-            let y = min(max(alvoY, -ins.top), max(-ins.top, cs.height - H + ins.bottom))
-            animarPara(mx, CGPoint(x: xFaixa(mx), y: y), 0.22)
+            let alvoY = descer ? limitesY(mx).1 : (o.y + H / 2) / e * mx - H / 2
+            animarPara(mx, limitar(CGPoint(x: xFaixa(mx), y: alvoY), mx), 0.22)
         }
     }
     /// anima zoom e lugar quadro a quadro (assim a linha entre as fotos acompanha exatamente)
