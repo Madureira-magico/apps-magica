@@ -199,7 +199,7 @@ function montarSeq() {
   let s = base.filter(id => !tirados.has(id) && !(cores.get(id) && cores.get(id).ok === false));   // só fotos boas (sem prints, documentos…)
   if ((+cfg.n0 || 3) === 3) {
     // primeira tela: 18 posições fixas; vazias recebem as fotos mais recentes; a piada no lugar marcado
-    const sb = slotBebe(), cauda = new Array(18), cauda2 = new Array(18), vf = vaziosFim();
+    const sb = slotBebe(), cauda = new Array(18), vf = vaziosFim();
     for (let k = 17; k >= 0; k--) {
       const a = cfg.slots[k];
       if (k === sb && arqPiada()) cauda[k] = '#piada';
@@ -207,8 +207,7 @@ function montarSeq() {
       else if (k >= 18 - vf) cauda[k] = '';   // vazio de propósito (fim da última fileira)
       else cauda[k] = s.length ? s.pop() : '';
     }
-    for (let k = 17; k >= 0; k--) { const a = cfg.slots2[k]; cauda2[k] = a ? tokAbert(a) : (s.length ? s.pop() : ''); }   // segunda tela: vazio = foto normal
-    s = s.slice(s.length % 3).concat(cauda2, cauda);
+    s = s.slice(s.length % 3).concat(cauda);
   } else if (arqPiada()) s.splice(indiceBebe(s.length + 1), 0, '#piada');
   seqNormal = s;
   seq = (mos && mos.seq) ? mos.seq : seqNormal;
@@ -459,7 +458,16 @@ async function prepararMosaico() {
   const n = atual.tipo === 'texto' ? colsTexto(atual.nome) : (+cfg.colsM || 60), t = W / n;
   const rowsVis = Math.ceil(H / t) + 1;
   const k00 = +cfg.n0 || 3, G = 0;   // a imagem do famoso enche a última tela inteira; as fotos pessoais ficam DENTRO dela, no meio, lá embaixo (igual ao original)
-  const fReais = k00 === 3 ? 12 : Math.ceil(H / (W / k00)) + 1;   // fileiras da faixa com as fotos de verdade (Tela 1 + Tela 2)   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
+  // fileiras da faixa com as fotos de verdade: as 18 da primeira tela (escondidas atrás da barra);
+  // se o nome chegar com a Fototeca aberta e a pessoa tiver subido, TODAS as fileiras que estão na tela continuam verdadeiras
+  let fReais = k00 === 3 ? 6 : Math.ceil(H / (W / k00)) + 1;
+  if (nativo && telaAtual === 'fototeca') {
+    try {
+      const e = await nat.call('galeriaEstado');
+      if (e && e.ligada && Math.abs(e.zoom - k00) < 0.2) fReais = Math.max(fReais, Math.min(40, Math.ceil((e.alt - e.y) / (W / k00))));
+      else if (mos && mos.fL) fReais = Math.max(fReais, mos.fL);   // no meio da pinça: mantém a faixa que já estava
+    } catch (_) {}
+  }   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
   let sN = seqNormal.slice();
   const precisa = (rowsVis + G + 2) * n;
   if (sN.length < precisa) sN = new Array(precisa - sN.length).fill('').concat(sN);   // galeria pequena: lugares a mais (preenchidos abaixo)
@@ -1687,7 +1695,7 @@ $('#aFixas').addEventListener('click', async e => {
 let slotEsc = -1, slotTela = 1;
 const arrTela = t => t === 2 ? cfg.slots2 : cfg.slots;
 function desenharSlots() {
-  for (const tela of [1, 2]) {
+  for (const tela of [1]) {
     const e = $(tela === 1 ? '#aSlots' : '#aSlots2'); if (!e) continue;
     const sb = tela === 1 ? slotBebe() : -1, arr = arrTela(tela);
     e.innerHTML = arr.map((a, k) => k === sb ? '<div class="sl bebe" data-k="' + k + '">Piada</div>'
@@ -1701,7 +1709,7 @@ async function escolherParaSlots(lista, tela) {
     if (Array.isArray(r) && r.length) { const arr = arrTela(tela || 1); r.forEach((a, n) => { if (n < lista.length) arr[lista[n]] = a; }); slotsMudaram(); }
   } catch (_) {}
 }
-for (const tela of [1, 2]) {
+for (const tela of [1]) {
   const id = tela === 1 ? '#aSlots' : '#aSlots2', arr = () => arrTela(tela);
   $(id).addEventListener('click', e => {
     const c = e.target.closest('[data-k]'); if (!c) return; const k = +c.dataset.k;

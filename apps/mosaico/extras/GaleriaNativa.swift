@@ -16,6 +16,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var bAtual: CGFloat = 0
     private let tinta = UIImageView()
     private let fundo = UIImageView()
+    private let linhasCam = CAShapeLayer()
     private var fundoChave = ""
     private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
     private let cobre = UIView()             // esconde as fotos de cima da cabeça quando o rosto aparece
@@ -112,6 +113,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         realImg.isUserInteractionEnabled = false
         plano.addSubview(realImg)
         vista.addSubview(zoomer)
+        linhasCam.fillRule = .evenOdd
+        linhasCam.actions = ["path": NSNull(), "hidden": NSNull(), "fillColor": NSNull()]
+        vista.layer.addSublayer(linhasCam)   // a linha entre as fotos, por cima, desenhada na tela (muda suave, sem piscar)
         corCamada.compositingFilter = "colorBlendMode"
         corCamada.opacity = 0
         vista.layer.addSublayer(corCamada)
@@ -270,6 +274,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         vista.isHidden = !on
         capa.isHidden = !on
         atualizarGestos()
+        atualizarLinhas()
     }
     private func atualizarGestos() {
         let pode = ligada && ativa
@@ -332,12 +337,13 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tiles.marcas = selecao ? selecionados : []
 
         // monta a imagem gigante
+        let cAnt = C
         C = temMos ? mosCols : max(1, Int(n0))
         linhas = Int(ceil(Double(seq.count) / Double(max(1, C))))
         let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)|\(cS)"
         if chave != geoChave {
             // se estava vendo as fotos de perto (3 colunas), continua EXATAMENTE no mesmo lugar depois de trocar
-            let perto = ligada && !geoChave.isEmpty && abs(visiveis - n0) < 0.1
+            let perto = ligada && !geoChave.isEmpty && abs(CGFloat(cAnt) / max(0.01, zoomer.zoomScale) - n0) < 0.1   // conta com as colunas de ANTES (fotos grandes)
             let doFim = zoomer.contentSize.height - zoomer.contentOffset.y
             geoChave = chave
             montarPlano()
@@ -562,7 +568,33 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     }
     /// arrastar só para cima e para baixo (como no app Fotos); de lado só a pinça mexe
     func scrollViewWillBeginDragging(_ s: UIScrollView) { if !s.isZooming { xTravado = s.contentOffset.x } }
+    /// linha entre as fotos (como no Fotos do iPhone): 5 pixels com as fotos grandes, afinando aos poucos até sumir no mosaico
+    private func atualizarLinhas() {
+        guard ligada, let d = tiles.dados, d.t0 > 0 else { linhasCam.isHidden = true; return }
+        let z = zoomer.zoomScale, esc = UIScreen.main.scale, cel = d.t0 * z, celPx = cel * esc
+        let u = min(1, max(0, (celPx - 70) / (220 - 70)))
+        let g = 5 * u * u * (3 - 2 * u) / esc          // espessura em pontos
+        guard g > 0.15 else { linhasCam.isHidden = true; return }
+        let raio = min(cel / 4, g * 1.5)
+        let o = zoomer.contentOffset, B = vista.bounds
+        let c0 = max(0, Int(floor(o.x / cel))), c1 = min(d.cols - 1, Int(floor((o.x + B.width) / cel)))
+        let r0 = max(0, Int(floor(o.y / cel))), r1 = min(d.linhas - 1, Int(floor((o.y + B.height) / cel)))
+        guard c0 <= c1, r0 <= r1, (c1 - c0 + 1) * (r1 - r0 + 1) < 4000 else { linhasCam.isHidden = true; return }
+        let p = CGMutablePath()
+        for r in r0...r1 { for c in c0...c1 {
+            let q = CGRect(x: CGFloat(c) * cel - o.x, y: CGFloat(r) * cel - o.y, width: cel, height: cel)
+            p.addRect(q)
+            p.addRoundedRect(in: q.insetBy(dx: g / 2, dy: g / 2), cornerWidth: raio, cornerHeight: raio)
+        } }
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        linhasCam.frame = B
+        linhasCam.fillColor = tiles.cores.0
+        linhasCam.path = p
+        linhasCam.isHidden = false
+        CATransaction.commit()
+    }
     func scrollViewDidScroll(_ s: UIScrollView) {
+        atualizarLinhas()
         if let x = xTravado, !s.isZooming, !ajustando, s.contentOffset.x != x {
             ajustando = true; s.contentOffset.x = x; ajustando = false
         }
@@ -613,6 +645,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             corCamada.opacity = Float(ramp * (corModo == "sepia" ? 0.9 : 1))
         } else { corCamada.opacity = 0 }
         CATransaction.commit()
+        atualizarLinhas()
     }
 
     // MARK: posições
@@ -785,9 +818,7 @@ final class TilesMosaico: UIView {
     required init?(coder: NSCoder) { fatalError() }
     /// espaço entre as fotos e arredondado dos cantos, em pixels da tela, pelo tamanho da foto (medido no Fotos do iPhone: 5 pixels)
     static func vao(_ ladoPx: CGFloat) -> (CGFloat, CGFloat) {
-        if ladoPx >= 120 { return (5, 7.5) }   // raio ~1,5 vez a linha: o "nozinho" nos cruzamentos
-        if ladoPx >= 60 { return (3, 4) }
-        return (0, 0)
+        return (0, 0)   // as fotos ficam coladas; a linha é desenhada por cima, na tela (atualizarLinhas)
     }
     override func draw(_ rect: CGRect) {
         guard let d = dados, d.t0 > 0, let ctx = UIGraphicsGetCurrentContext() else { return }
