@@ -81,13 +81,61 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         let nomeNovo = String(cString: class_getName(base)) + "_SemBarra"
         var nova: AnyClass? = NSClassFromString(nomeNovo)
         if nova == nil, let n = objc_allocateClassPair(base, nomeNovo, 0) {
-            let bloco: @convention(block) (AnyObject) -> AnyObject? = { _ in nil }
+            // em cima do teclado: nada, ou a barrinha do Notas (Aa, lista, tabela, clipe, caneta), que sobe e desce junto com o teclado
+            let bloco: @convention(block) (AnyObject) -> AnyObject? = { _ in PonteExtra.barraNotasLigada ? PonteExtra.barraNotas : nil }
             class_addMethod(n, NSSelectorFromString("inputAccessoryView"), imp_implementationWithBlock(bloco), "@@:")
+            // o teclado pode abrir sozinho (sem tocar na tela): o Notas falso abre já com o teclado, igual ao de verdade
+            for nomeSel in ["_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:",
+                            "_elementDidFocus:userIsInteracting:blurPreviousNode:changingActivityState:userObject:"] {
+                let sel = NSSelectorFromString(nomeSel)
+                guard class_getInstanceMethod(base, sel) != nil else { continue }
+                let original = class_getMethodImplementation(base, sel)
+                typealias Orig = @convention(c) (AnyObject, Selector, UnsafeRawPointer?, Bool, Bool, UInt64, AnyObject?) -> Void
+                let chamar = unsafeBitCast(original, to: Orig.self)
+                let foco: @convention(block) (AnyObject, UnsafeRawPointer?, Bool, Bool, UInt64, AnyObject?) -> Void = { eu, no, interagindo, borrar, estado, obj in
+                    chamar(eu, sel, no, PonteExtra.tecladoSozinho || interagindo, borrar, estado, obj)
+                }
+                class_addMethod(n, sel, imp_implementationWithBlock(foco), method_getTypeEncoding(class_getInstanceMethod(base, sel)!))
+            }
             objc_registerClassPair(n)
             nova = n
         }
         if let n = nova { object_setClass(alvo, n) }
     }
+
+    static var barraNotasLigada = false
+    static var tecladoSozinho = false
+    static let barraNotas: UIView = {
+        let v = UIView(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 60))
+        v.autoresizingMask = [.flexibleWidth]
+        v.backgroundColor = .clear
+        let vidro = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+        vidro.frame = v.bounds.insetBy(dx: 10, dy: 5)
+        vidro.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        vidro.layer.cornerRadius = 25
+        vidro.layer.cornerCurve = .continuous
+        vidro.clipsToBounds = true
+        v.addSubview(vidro)
+        let pilha = UIStackView()
+        pilha.axis = .horizontal
+        pilha.distribution = .equalSpacing
+        pilha.alignment = .center
+        pilha.translatesAutoresizingMaskIntoConstraints = false
+        vidro.contentView.addSubview(pilha)
+        NSLayoutConstraint.activate([
+            pilha.leadingAnchor.constraint(equalTo: vidro.contentView.leadingAnchor, constant: 22),
+            pilha.trailingAnchor.constraint(equalTo: vidro.contentView.trailingAnchor, constant: -22),
+            pilha.centerYAnchor.constraint(equalTo: vidro.contentView.centerYAnchor)
+        ])
+        let conf = UIImage.SymbolConfiguration(pointSize: 19, weight: .regular)
+        for nome in ["textformat", "checklist", "tablecells", "paperclip", "pencil.tip.crop.circle"] {
+            let iv = UIImageView(image: UIImage(systemName: nome, withConfiguration: conf))
+            iv.tintColor = .label
+            iv.contentMode = .scaleAspectFit
+            pilha.addArrangedSubview(iv)
+        }
+        return v
+    }()
 
     // MARK: pastas
     private lazy var docs: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -218,6 +266,10 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             exportarCopia(dados: txt("dados"), pastas: (m["pastas"] as? [String]) ?? [], nome: txt("nome"), responder)
         case "importar":
             importarCopia(responder)
+        case "notasTeclado":   // Notas falso: barrinha grudada no teclado e teclado abrindo sozinho
+            PonteExtra.barraNotasLigada = (m["barra"] as? Bool) ?? false
+            PonteExtra.tecladoSozinho = (m["sozinho"] as? Bool) ?? false
+            responder(true, nil)
         case "lerImagens":   // Post-It: lê a escrita (desenhada pela página em várias inclinações) com o mesmo leitor da câmera
             let imgs = (m["imgs"] as? [String]) ?? []
             let palavras = (m["palavras"] as? [String]) ?? []

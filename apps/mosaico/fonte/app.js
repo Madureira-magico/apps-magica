@@ -1434,8 +1434,9 @@ const fmtNota = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long'
 function abrirNotas() {
   const t = $('#ntexto'); t.textContent = ''; notaEnviada = ''; notaMaior = ''; notaAntes = 0;
   const d = new Date(); $('#nData').textContent = fmtNota.format(d) + ' às ' + fmtHora.format(d);
+  $('#notas').classList.remove('temDesf');
   mostrar('notas', true);
-  setTimeout(() => t.focus(), 250);
+  if (!nat.tem) setTimeout(() => t.focus(), 250);   // no app, o teclado sobe junto com a abertura (abrirDoIcone)
 }
 function linhaDaNota() { return ($('#ntexto').innerText || '').split('\n').map(s => s.trim()).find(Boolean) || ''; }
 function enviarNota() {   // ✓ amarelo: esconde o teclado e manda o nome
@@ -1453,6 +1454,7 @@ $('#nOk').addEventListener('click', enviarNota);
 let notaMaior = '', notaAntes = 0;
 $('#ntexto').addEventListener('input', () => {
   const l = linhaDaNota(), n = l.length;
+  if (n) $('#notas').classList.add('temDesf');   // o desfazer aparece depois de digitar
   // apagando do fim (o texto é só o começo do nome guardado, mesmo sem o espaço): não troca; entrou letra nova: guarda
   const apagando = notaMaior && semAcento(notaMaior).startsWith(semAcento(l)) && n <= notaAntes;
   if (n >= 2 && !apagando) notaMaior = l;
@@ -1471,8 +1473,14 @@ if (window.visualViewport) { visualViewport.addEventListener('resize', posiciona
 function prenderPagina() { if (telaAtual === 'notas' && (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop)) { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } }
 window.addEventListener('scroll', prenderPagina, { passive: true });
 if (window.visualViewport) { visualViewport.addEventListener('resize', () => { prenderPagina(); setTimeout(prenderPagina, 60); setTimeout(prenderPagina, 300); }); visualViewport.addEventListener('scroll', prenderPagina); }
-$('#ntexto').addEventListener('focus', () => setTimeout(posicionarFerramentas, 350));
-$('#ntexto').addEventListener('blur', () => $('#nferr').classList.remove('on'));
+$('#ntexto').addEventListener('focus', () => $('#notas').classList.add('digitando'));     // ✓ aparece, barrinha de baixo some
+$('#ntexto').addEventListener('blur', () => $('#notas').classList.remove('digitando'));   // ✓ some, barrinha de baixo aparece
+/* desfazer (↶): apaga a escrita e manda o nome (igual a apagar tudo) */
+$('#nDesf').addEventListener('pointerdown', e => e.preventDefault());   // não tira o teclado
+$('#nDesf').addEventListener('click', () => {
+  const v = notaMaior || linhaDaNota(); $('#ntexto').textContent = ''; notaMaior = ''; notaAntes = 0;
+  if (v && v.length >= 2 && v !== notaEnviada) { notaEnviada = v; definirNome(v, 'notas'); }
+});
 
 /* três pontinhos = sinal secreto: 1 nome recebido, 2 foto do famoso achada, 3 mosaico pronto */
 let etapa = { n: 0, foto: false };
@@ -1586,7 +1594,9 @@ async function abrirDoIcone(qual, p) {
       if (qual === 'fototeca' && nativo) await Promise.race([nat.call('galeriaInicio').catch(() => {}), espera(800)]);   // as 18 fotos prontas, inteiras
       await doisQuadros(); await espera(30);
       const ic = iconeNaTela(p);
-      await nat.call('telaAbrir', ic).catch(() => {});
+      const abre = nat.call('telaAbrir', ic).catch(() => {});
+      if (qual === 'notas') setTimeout(() => $('#ntexto').focus(), 60);   // o teclado sobe junto com a nota abrindo (igual ao Notas)
+      await abre;
       if (qual === 'fototeca') setTimeout(() => { enviarGaleria(); guardarDiag(); }, 600);
     } catch (_) {} finally { animando = false; }
     return;
@@ -1641,6 +1651,7 @@ function mostrar(id, guardaAnterior) {
   const escuro = escuroAgora() || id === 'inicio' || id === 'marcar';
   nat.msg('barra', id === 'marcar');
   nat.msg('estilo', escuro ? 'claro' : 'escuro');
+  if (nat.tem) nat.call('notasTeclado', { barra: id === 'notas', sozinho: id === 'notas' }).catch(() => {});   // barrinha grudada no teclado e teclado abrindo sozinho (só no Notas)
   if (id === 'fototeca') { if (nativo && !vozLigada) nat.call('volumeAtivar').catch(() => {}); pedirDesenho(); setTimeout(preCarregarPrimeira, 500); if (iniciado && atual) bebeTravado = true; }   // o público viu a Fototeca COM o artista: o bebê não muda mais (sem artista não trava)
 }
 function abrirAjustes() { if (emSelecao) sairSelecao(); mostrar('ajustes', true); menuInicio(); encherAjustes(); }
