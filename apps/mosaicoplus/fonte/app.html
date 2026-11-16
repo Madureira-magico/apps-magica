@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Fotos</title>
+<style>
+:root{
+  --st:env(safe-area-inset-top,47px);--sb:env(safe-area-inset-bottom,34px);
+  --bg:#000;--fg:#fff;--fg2:rgba(255,255,255,.62);--glass:rgba(38,38,42,.6);--azul:#0a84ff;
+  --linha:rgba(255,255,255,.12);--cel:#1c1c1e;--cel2:#2c2c2e;--grupo:#000;
+}
+body.claro{--bg:#fff;--fg:#000;--fg2:rgba(0,0,0,.55);--glass:rgba(250,250,252,.72);--azul:#007aff;
+  --linha:rgba(0,0,0,.12);--cel:#fff;--cel2:#f2f2f7;--grupo:#f2f2f7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:-apple-system,"SF Pro Text",system-ui,sans-serif;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%}
+.tela{position:fixed;inset:0;display:none}
+.tela.on{display:block}
+svg{display:block}
+@font-face{font-family:MzLetra;font-weight:800;src:url(data:font/otf;base64,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AAD/0gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/8YAAAAA/0r/Iv+HAAAAAAAA/1oAAP+WAAAAAAAA/0YAAAAAAAAAAAAA/6MAAAAAAAAAAAAA/sYAAAAAAAAAAP+7AAAAAAAAAAD/uAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP9OAAAAAAAA/+oAAAAAAAAAAAAAAAD/r/87AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/7n/YAAAAAAAAP+z/+8AAAAAABYAAAAq/zv/gAAAAAAAAAAAAAD/uwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP+p/1YAAAAAAAD/hgAAAAAAAAAeAAAAAP87/zv/vgAAAAAAAAAA/7sAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/pgAAAAD/u/9iAAAAAAAAAAAAAAAAAAAAAAAA/8H/J//U/0wAAAAAAAD/RAAAAAD/wv/BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/0AAAAAAAAAAA/9cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/0YAAAAAAAAAAAAAAAAAAAAAAAAAAP+v/3UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP9eAAAAAAAAAAAAAAAAAAAAAAAAAAD/Qv6vAAAAAAAAAAAAAP+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/7sAAAAA/7IAAP++AAAAAP/BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/qAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/7sAAAAAAAAAAAAAAAAAAAAA/6MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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) format("opentype")}
+#inicio{background:#000;overflow:hidden}
+#cartaoIg{position:absolute;left:50%;width:300px;margin-left:-150px;z-index:40;border-radius:16px;overflow:hidden;background:rgba(245,245,247,.92);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);color:#000;opacity:0;transform:scale(.85);pointer-events:none;transition:opacity .18s,transform .22s cubic-bezier(.2,.9,.3,1.2)}
+#cartaoIg.on{opacity:1;transform:none}
+#cartaoIg .cab{display:flex;align-items:center;gap:12px;padding:14px}
+#cigFoto{width:56px;height:56px;border-radius:50%;background:#ccc center/cover no-repeat;flex:none}
+#cigFoto.vazia{background:#d1d1d6}
+#cartaoIg b{display:block;font:600 15px -apple-system,system-ui}#cartaoIg small{font:400 13px -apple-system,system-ui;color:#6e6e73}
+#cartaoIg .op{display:flex;justify-content:space-between;padding:11px 14px;font:400 16px -apple-system,system-ui;border-top:.5px solid rgba(0,0,0,.15)}
+#iniPalco{position:absolute;overflow:hidden}
+#iniFundo{position:absolute;inset:0;background:#000 center/cover no-repeat}
+.vidro{position:absolute;background:rgba(255,255,255,.17);-webkit-backdrop-filter:blur(9px) saturate(1.4);backdrop-filter:blur(9px) saturate(1.4);box-shadow:inset 0 0 0 1px rgba(255,255,255,.33),inset 0 1px 1px rgba(255,255,255,.25)}
+#iniVidroDock{left:4.139%;top:86.14%;width:91.55%;height:11.80%}
+#iniVidroBusca{left:40.12%;top:80.47%;width:19.59%;height:3.416%;border-radius:999px;display:flex;align-items:center;justify-content:center;transition:width .25s,left .25s}
+#iniVidroBusca .txt{display:flex;align-items:center;color:rgba(255,255,255,.84);font-weight:600;font-family:-apple-system,system-ui;white-space:nowrap;transition:opacity .15s}
+#iniVidroBusca .pts{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+#iniVidroBusca .pts i{border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s}#iniVidroBusca .pts i.on{background:#fff}
+#iniVidroBusca.pg{left:43.5%;width:12.8%}#iniVidroBusca.pg .txt{opacity:0}#iniVidroBusca.pg .pts{opacity:1}
+#iniPags{position:absolute;inset:0;will-change:transform}
+#iniPags .pag{position:absolute;inset:0}#iniPags .pag.p2{left:100%;right:-100%}
+#iniPags img,#iniDockIc{position:absolute;left:0;width:100%;pointer-events:none;-webkit-user-select:none;user-select:none}
+#iniPags img{top:0;height:100%}
+#iniDockIc{top:85.404%;height:14.596%}
+#cvIni{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#cvDock{position:absolute;left:0;width:100%;top:85.404%;height:14.596%;pointer-events:none}
+#ilha{position:fixed;left:50%;top:11px;transform:translateX(-50%);background:#000;display:none;z-index:9999;overflow:hidden;pointer-events:none;align-items:center;justify-content:center}
+#ilha.on{display:flex}#ilhaCv{opacity:0;transition:opacity .18s}#ilha.grande #ilhaCv{opacity:1;transition:opacity .25s .12s}
+#aPiCv{display:block;width:100%;height:170px;background:#000;border-radius:10px}
+.ic{position:absolute;transition:transform .12s,filter .12s}
+.ic img{display:block;width:100%;height:100%;border-radius:22.5%;object-fit:cover}
+.ic .nm{position:absolute;left:-16px;right:-16px;text-align:center;font:500 12px -apple-system,system-ui;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px}
+.ic .bd{position:absolute;right:-8px;top:-8px;min-width:24px;height:24px;border-radius:12px;background:#ff3b30;color:#fff;font:500 15px -apple-system,system-ui;display:flex;align-items:center;justify-content:center;padding:0 7px;box-sizing:border-box}
+.ic.toque{transform:scale(.88);filter:brightness(.75)}
+.bordaBaixo{position:absolute;left:0;right:0;bottom:0;height:26px;z-index:60}
+#aSlots,#aSlots2{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:10px}
+#aSlots .sl,#aSlots2 .sl{aspect-ratio:1;border-radius:6px;background:var(--cel2);display:flex;align-items:center;justify-content:center;color:var(--fg2);font-size:22px;position:relative;overflow:hidden}
+#aSlots .sl img,#aSlots2 .sl img{width:100%;height:100%;object-fit:cover}
+#aSlots .sl.esc,#aSlots2 .sl.esc{outline:3px solid var(--azul);outline-offset:-3px}
+#aSlots .sl.bebe{font-size:12px;font-weight:600;background:repeating-linear-gradient(45deg,var(--cel2),var(--cel2) 6px,transparent 6px,transparent 12px)}
+#aSlots .sl i,#aSlots2 .sl i{position:absolute;left:4px;top:3px;font-style:normal;font-size:10px;color:#fff;text-shadow:0 0 3px #000}
+.indice{margin:14px 16px 0;background:var(--cel);border-radius:12px;overflow:hidden}
+.indice .it{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 14px;font-size:16px;border-bottom:.5px solid var(--linha)}
+.indice .it:last-child{border-bottom:0}
+.indice .it b{width:29px;height:29px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex:none}
+.indice .it span{flex:1}
+.indice .it:after{content:'›';color:var(--fg2);font-size:22px}
+.painel{margin:14px 16px 0;background:var(--cel);border-radius:12px;padding:12px 14px}
+.painel .tt{font-size:20px;font-weight:700;margin-bottom:8px}
+.painel .pl{display:flex;justify-content:space-between;font-size:15px;padding:4px 0}
+.painel .pl em{font-style:normal;font-weight:600}
+.painel .pl em.v{color:#34c759}.painel .pl em.a{color:#ff9500}
+#ajustes.dentro .sec{display:none}#ajustes.dentro .sec.on{display:block}
+#ajustes.dentro .indice,#ajustes.dentro .painel{display:none}
+#ajustes.dentro .sec h3{display:none}
+#ajustes:not(.dentro) .sec{display:none}
+#inicio .vazio{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-size:15px;text-align:center;padding:30px}
+#fototeca{background:var(--bg);touch-action:none}
+html.galNat.transp,html.galNat.transp body,html.galNat #fototeca{background:transparent!important}
+html.galNat #cv{display:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;transition:filter .25s}
+.fade-top{position:absolute;left:0;right:0;top:0;height:calc(var(--st) + 120px);pointer-events:none;
+  background:linear-gradient(rgba(0,0,0,.72),rgba(0,0,0,.35) 55%,rgba(0,0,0,0));
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);-webkit-mask-image:linear-gradient(#000 45%,transparent);mask-image:linear-gradient(#000 45%,transparent)}
+body.claro .fade-top{background:linear-gradient(rgba(255,255,255,.85),rgba(255,255,255,.4) 55%,rgba(255,255,255,0))}
+.cab{position:absolute;left:0;right:0;top:calc(var(--st) + 2px);padding:0 16px;display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none}
+.titulo{pointer-events:auto;min-width:150px;min-height:60px}
+.titulo b{display:block;font-size:34px;font-weight:700;letter-spacing:.2px;line-height:41px;text-shadow:0 1px 8px rgba(0,0,0,.25)}
+.titulo small{display:block;font-size:15px;font-weight:600;color:var(--fg2);margin-top:-1px}
+.botoes{display:flex;gap:10px;margin-top:2px;pointer-events:auto}
+.vid{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);
+  border:.5px solid rgba(255,255,255,.14);box-shadow:0 2px 14px rgba(0,0,0,.22)}
+body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1)}
+.circ{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--fg)}
+.pilula{height:46px;border-radius:23px;padding:0 18px;display:flex;align-items:center;font-size:17px;font-weight:500;color:var(--fg)}
+.rodape{position:absolute;left:0;right:0;bottom:max(calc(var(--sb) - 8px),10px);display:flex;align-items:center;gap:10px;padding:0 16px;pointer-events:none}
+.rodape>*{pointer-events:auto}
+.aba{flex:1;height:58px;border-radius:29px;display:flex;align-items:center;justify-content:center;position:relative;gap:12px;color:var(--azul);font-weight:600;font-size:17px;padding:0 14px}
+.aba .ico{position:absolute;left:18px;top:50%;transform:translateY(-50%)}
+#bolinha{display:none;position:absolute;left:21px;top:13px;width:32px;height:32px;border-radius:50%;background:#333 center 30%/cover no-repeat}
+#rotulo{max-width:72%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s}
+#ponto{position:absolute;right:-4px;top:-3px;min-width:21px;height:21px;border-radius:11px;background:#ff3b30;color:#fff;font-size:13px;font-weight:600;
+  display:none;align-items:center;justify-content:center;padding:0 6px;box-shadow:0 0 0 2px rgba(0,0,0,.25)}
+#ponto.on{display:flex}
+.redondo{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--fg);flex:none}
+.canto{position:absolute;width:46px;height:46px;z-index:30}
+#cTL{left:0;top:0}#cTR{right:0;top:0}#cBL{left:0;bottom:0}#cBR{right:0;bottom:0}
+#real{position:absolute;inset:0;background:#000 center/cover no-repeat;opacity:0;pointer-events:none;transition:opacity 1.6s ease}
+#real.on{opacity:1}
+#fototeca.selecao .titulo b{font-size:24px;white-space:nowrap}
+#barraSel{display:none}
+#fototeca.selecao #barraSel{display:flex}
+#fototeca.selecao #barraNormal{display:none}
+#barraSel .aba{color:var(--fg);font-weight:600}
+#barraSel .lixo{color:#ff453a}
+#busca{position:absolute;inset:0;background:rgba(0,0,0,.35);display:none;z-index:20}
+#busca .alerta{position:absolute;left:50%;top:36%;transform:translate(-50%,-50%);width:270px;border-radius:14px;background:var(--cel);color:var(--fg);text-align:center;overflow:hidden}
+#busca .atit{font-weight:600;font-size:17px;padding:19px 16px 12px}
+#busca input{width:calc(100% - 32px);margin:0 16px 16px;box-sizing:border-box;border:.5px solid rgba(128,128,128,.4);border-radius:7px;padding:7px 8px;font-size:15px;background:var(--cel2);color:var(--fg)}
+#busca .abts{display:flex;border-top:.5px solid rgba(128,128,128,.4)}
+#busca .abts div{flex:1;padding:11px 0;font-size:17px;color:#0a84ff}
+#busca .abts div+div{border-left:.5px solid rgba(128,128,128,.4);font-weight:600}
+#busca.on{display:block}
+.bbar{position:absolute;left:0;right:0;top:calc(var(--st) + 6px);display:flex;align-items:center;gap:10px;padding:0 16px}
+.bcampo{flex:1;height:44px;border-radius:22px;display:flex;align-items:center;gap:8px;padding:0 14px;color:var(--fg2)}
+.bcampo input{flex:1;background:none;border:0;outline:0;color:var(--fg);font-size:17px;font-family:inherit;-webkit-user-select:text;user-select:text}
+.bcanc{color:var(--fg);font-size:17px;padding:10px 4px}
+.bmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--fg2);font-size:16px;padding:0 30px}
+.bmsg b{display:block;color:var(--fg);font-size:22px;margin-bottom:6px}
+#ver{background:var(--bg);z-index:5;touch-action:none}
+#ver .palco{position:absolute;inset:0;overflow-x:scroll;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:none;overscroll-behavior-x:contain}
+#ver .palco::-webkit-scrollbar{display:none}
+#ver .fx{position:absolute;top:0;bottom:0;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center}
+#ver .fx img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;transition:transform .35s ease,opacity .35s ease}
+#ver .fx img.indo{transform:translate(30%,60%) scale(.05);opacity:0}
+#ver .vcab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;transition:opacity .2s}
+#ver .vdata{text-align:center;font-size:15px;font-weight:600;line-height:19px;text-shadow:0 1px 6px rgba(0,0,0,.3)}
+#ver .vdata small{display:block;font-weight:400;font-size:13px;color:var(--fg2)}
+#ver .vrod{position:absolute;left:16px;right:16px;bottom:max(calc(var(--sb) - 6px),10px);display:flex;gap:10px;transition:opacity .2s}
+#ver .vrod .barra{flex:1;height:54px;border-radius:27px;display:flex;align-items:center;justify-content:space-around;color:var(--fg)}
+#ver .vrod .barra>*{padding:10px}
+#ver.limpo .vcab,#ver.limpo .vrod,#ver.limpo .tiraCx{opacity:0;pointer-events:none}
+#ver .tiraCx{position:absolute;left:0;right:0;bottom:calc(max(calc(var(--sb) - 6px),10px) + 64px);height:46px;overflow:hidden;transition:opacity .2s}
+#tira{display:flex;gap:2px;align-items:center;height:46px;transition:transform .25s ease}
+#tira img{width:26px;height:40px;object-fit:cover;flex:none;border-radius:2px}
+#tira img.atual{width:46px;height:46px;margin:0 6px}
+#voo{position:fixed;inset:0;z-index:60;display:none;pointer-events:none}
+#vooFundo{position:absolute;inset:0;background:var(--bg)}
+#vooCx{position:absolute;overflow:hidden}
+#vooCx img{width:100%;height:100%;object-fit:cover;display:block}
+#ver.limpo{background:#000}
+#notas{background:var(--bg);z-index:6}
+.ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 16px;z-index:2}
+.ndir{display:flex;align-items:center;gap:10px}
+.npil{height:46px;border-radius:23px;display:flex;align-items:center;gap:16px;padding:0 16px 0 18px;color:var(--fg)}
+.pts{display:flex;gap:5px}
+.pts i{width:6px;height:6px;border-radius:50%;background:#a1a1a6;transition:background .3s}
+.pts i.on{background:#ffcc00}
+.nok{width:52px;height:52px;border-radius:50%;background:#ffcc00;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+body:not(.claro) .nok{color:#000}
+.ndata{position:absolute;left:0;right:0;top:calc(var(--st) + 66px);text-align:center;color:var(--fg2);font-size:13px}
+#ntexto{position:absolute;left:0;right:0;top:calc(var(--st) + 92px);bottom:0;padding:4px 22px 140px;outline:0;overflow-y:auto;
+  color:var(--fg);font:400 17px/1.35 -apple-system,system-ui,sans-serif;caret-color:#ffcc00;-webkit-user-select:text;user-select:text;white-space:pre-wrap;word-break:break-word}
+#ntexto::first-line{font-size:28px;font-weight:700;line-height:1.25}
+#nferr{position:fixed;left:12px;right:12px;height:50px;border-radius:25px;display:none;align-items:center;justify-content:space-around;color:var(--fg);z-index:7}
+#nferr.on{display:flex}
+#marcar{z-index:40;background:#000 center/cover no-repeat}
+#marcar .aviso{position:absolute;left:12px;right:12px;top:calc(var(--st) + 10px);background:rgba(0,0,0,.78);color:#fff;border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.35}
+#marcar .aviso button{margin-top:8px;margin-right:6px}
+#marcar .alvo{position:absolute;width:68px;height:68px;margin:-34px 0 0 -34px;border:3px solid #34c759;border-radius:18px;pointer-events:none}
+#ajustes{background:var(--grupo);z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.acab{position:sticky;top:0;z-index:2;padding:calc(var(--st) + 6px) 16px 8px;background:var(--grupo);display:flex;align-items:center;justify-content:space-between}
+.acab b{font-size:30px}
+.acab button{font-size:17px;color:var(--azul);background:none;border:0;font-weight:600}
+.sec{margin:18px 16px 0}
+.sec h3{font-size:13px;font-weight:400;text-transform:uppercase;color:var(--fg2);margin:0 0 6px 14px;letter-spacing:.2px}
+.caixa{background:var(--cel);border-radius:12px;overflow:hidden}
+.lin{display:flex;align-items:center;gap:10px;min-height:46px;padding:8px 14px;border-bottom:.5px solid var(--linha);font-size:16px}
+.lin:last-child{border-bottom:0}
+.lin .r{margin-left:auto;color:var(--fg2);text-align:right;font-size:15px}
+.lin input[type=text],.lin select{margin-left:auto;background:var(--cel2);color:var(--fg);border:0;border-radius:8px;padding:8px 10px;font-size:16px;font-family:inherit;max-width:60%;-webkit-user-select:text;user-select:text}
+.lin input[type=text]{flex:1;max-width:none;min-width:0}
+.lin input[type=range]{margin-left:auto;width:44%}
+.miniGrade{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;margin-top:8px}.miniGrade img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.bt{background:var(--azul);color:#fff;border:0;border-radius:9px;padding:8px 12px;font-size:15px;font-weight:600;font-family:inherit;flex:none}
+.bt.cinza{background:var(--cel2);color:var(--fg)}
+.bt.verm{background:#ff3b30}
+.nota{font-size:13px;color:var(--fg2);margin:6px 14px 0;line-height:1.4}
+.chave{position:relative;width:51px;height:31px;flex:none;margin-left:auto}
+.chave input{opacity:0;position:absolute;inset:0;margin:0;z-index:2}
+.chave span{position:absolute;inset:0;border-radius:16px;background:var(--cel2);transition:.2s}
+.chave span:after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.25);transition:.2s}
+.chave input:checked+span{background:#34c759}
+.chave input:checked+span:after{left:22px}
+.mini{width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--cel2);flex:none}
+.estado{font-size:14px;color:var(--fg2)}
+.ok{color:#34c759}.erro{color:#ff453a}
+#listaFam .lin{gap:8px;flex-wrap:wrap}
+#listaFam .nm{flex:1;min-width:120px}
+#listaFam .nm b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#listaFam .nm small{color:var(--fg2);font-size:12px}
+.bbs{display:flex;gap:5px;width:100%;padding-left:52px}
+.bbs button{flex:1;border:0;border-radius:8px;padding:6px 2px;font-size:12px;background:var(--cel2);color:var(--fg);font-family:inherit}
+.bbs button.sim{background:var(--azul);color:#fff}
+.grade4{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.grade4 div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;color:var(--fg2);text-align:center}
+.grade4 img{width:100%;aspect-ratio:1;border-radius:10px;object-fit:cover;background:var(--cel2)}
+.grade4 div.atual img{outline:3px solid #34c759}
+#toast{position:fixed;left:50%;top:calc(var(--st) + 8px);transform:translateX(-50%);background:rgba(30,30,30,.92);color:#fff;padding:8px 14px;border-radius:12px;font-size:14px;z-index:99;display:none;max-width:90%}
+</style>
+</head>
+<body>
+
+<div class="tela" id="inicio"><div id="iniPalco"><div id="iniFundo"></div><div class="vidro" id="iniVidroDock"></div><div class="vidro" id="iniVidroBusca"><span class="txt"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Buscar</span></span><span class="pts"><i class="on"></i><i></i></span></div><div id="iniPags"><div class="pag"><img src="ini/pag1.webp" alt=""><canvas id="cvIni"></canvas></div><div class="pag p2"><img src="ini/pag2.webp" alt=""></div></div><img id="iniDockIc" src="ini/dock.webp" alt=""><canvas id="cvDock"></canvas></div></div><div id="ilha"><canvas id="ilhaCv"></canvas></div>
+
+<div class="tela" id="fototeca">
+  <canvas id="cv"></canvas>
+  <div id="real"></div>
+  <div class="bordaBaixo"></div>
+  <div class="fade-top"></div>
+  <div class="cab">
+    <div class="titulo" id="titulo"><b id="tituloTxt">Fototeca</b><small id="contagem">0 Itens</small></div>
+    <div class="botoes">
+      <div class="circ vid" id="bOrdem"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h16M6 11h10M9 16h4"/></svg></div>
+      <div class="pilula vid" id="bSel">Selecionar</div>
+    </div>
+  </div>
+  <div class="rodape" id="barraNormal">
+    <div class="aba vid" id="aba">
+      <svg class="ico" width="30" height="26" viewBox="0 0 30 26" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="20" height="16" rx="3"/><path d="M3 7v13a3 3 0 0 0 3 3h17"/><circle cx="21" cy="7" r="2" fill="currentColor" stroke="none"/><path d="M8 17l5-6 4 4 3-3 6 5"/></svg>
+      <span id="bolinha"></span>
+      <span id="rotulo">Fototeca</span>
+      <span id="ponto">1</span>
+    </div>
+    <div class="redondo vid" id="meio"><svg width="24" height="26" viewBox="0 0 24 26" fill="currentColor"><rect x="1.5" y="8" width="21" height="17" rx="4.5"/><rect x="4.5" y="4" width="15" height="2.6" rx="1.3"/><rect x="7.5" y="0.6" width="9" height="2.2" rx="1.1"/></svg></div>
+    <div class="redondo vid" id="lupa"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><path d="M17 17l6 6"/></svg></div>
+  </div>
+  <div class="rodape" id="barraSel">
+    <div class="redondo vid"><svg width="22" height="26" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg></div>
+    <div class="aba vid"><span id="selConta">Selecionar Itens</span></div>
+    <div class="redondo vid lixo" id="selLixo"><svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg></div>
+  </div>
+
+  <div id="busca"><div class="alerta">
+    <div class="atit">Pesquisar</div>
+    <input id="bInput" type="text" placeholder="Nome da celebridade" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <div class="abts"><div id="bCanc">Cancelar</div><div id="bOk">Pesquisar</div></div>
+    <div id="bMsg" style="display:none"></div>
+  </div></div>
+</div>
+
+<div class="tela" id="ver">
+  <div class="palco" id="palco"></div>
+  <div class="vcab">
+    <div class="circ vid" id="vVolta"><svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg></div>
+    <div class="vdata" id="vData"></div>
+    <div class="circ vid"><svg width="22" height="6" viewBox="0 0 22 6" fill="currentColor"><circle cx="3" cy="3" r="2.4"/><circle cx="11" cy="3" r="2.4"/><circle cx="19" cy="3" r="2.4"/></svg></div>
+  </div>
+  <div class="tiraCx"><div id="tira"></div></div>
+  <div class="vrod"><div class="barra vid">
+    <svg width="22" height="26" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg>
+    <svg width="26" height="24" viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 22S2 15.5 2 8.5A5.5 5.5 0 0 1 13 5a5.5 5.5 0 0 1 11 3.5C24 15.5 13 22 13 22z"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 11v6" stroke-linecap="round"/><circle cx="12" cy="7.3" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <svg width="24" height="22" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h12M18 5h4M2 11h4M10 11h12M2 17h10M16 17h6"/><circle cx="16" cy="5" r="2"/><circle cx="8" cy="11" r="2"/><circle cx="14" cy="17" r="2"/></svg>
+    <div id="vLixo"><svg width="22" height="24" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5h18M8 5V2h6v3M4 5l1.4 17h11.2L18 5"/></svg></div>
+  </div></div>
+</div>
+
+<div class="tela" id="notas">
+  <div class="ncab">
+    <div class="circ vid" id="nVolta"><svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2L3 11l8 9"/></svg></div>
+    <div class="ndir">
+      <div class="circ vid"><svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3L3 7l4 4"/><path d="M3 7h10a6 6 0 0 1 0 12H8"/></svg></div>
+      <div class="npil vid"><svg width="20" height="24" viewBox="0 0 22 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 16V2M6 7l5-5 5 5M4 11H2v13h18V11h-2"/></svg><span class="pts" id="pts"><i></i><i></i><i></i></span></div>
+      <div class="nok" id="nOk"><svg width="22" height="18" viewBox="0 0 22 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5l6 6L20 2.5"/></svg></div>
+    </div>
+  </div>
+  <div class="ndata" id="nData"></div>
+  <div id="ntexto" contenteditable="true" autocapitalize="sentences" autocorrect="off" spellcheck="false"></div>
+  <div id="nferr" class="vid">
+    <span style="font-size:19px">Aa</span>
+    <svg width="24" height="22" viewBox="0 0 24 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="4" cy="5" r="2.6"/><circle cx="4" cy="16" r="2.6"/><path d="M10 5h12M10 16h12"/></svg>
+    <svg width="24" height="20" viewBox="0 0 24 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1.5" y="1.5" width="21" height="17" rx="2.5"/><path d="M1.5 7.5h21M1.5 13h21M9 7.5v11"/></svg>
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 11l-6.5 6.5a3.2 3.2 0 0 1-4.5-4.5L12 5a2.2 2.2 0 0 1 3 3l-7.5 7.5"/></svg>
+    <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 2l-6 18h12z"/><path d="M7 12h6"/></svg>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6"/><path d="M17 2l3 3-8 8H9v-3z"/></svg>
+  </div>
+</div>
+
+<div class="tela" id="marcar"><div class="aviso"><span id="mMsg"></span><br><button class="bt cinza" id="mPula">Pular</button><button class="bt verm" id="mSai">Sair</button></div></div>
+
+<div class="tela" id="ajustes">
+  <div class="acab"><button id="aVolta" style="visibility:hidden">‹ Ajustes</button><b id="aTit">Ajustes</b><button id="aFecha">Fechar</button></div>
+  <div class="painel" id="aPainel"></div>
+  <div class="indice" id="aIndice"></div>
+
+  <div class="sec" data-ic="🎩" data-cor="#5856d6"><h3>Apresentação</h3><div class="caixa">
+    <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
+    <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
+  </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
+
+  <div class="sec" data-ic="✎" data-cor="#ffcc00"><h3>Post-It</h3><div class="caixa">
+    <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aPi"><span></span></label></div>
+    <div class="lin"><button class="bt" id="aPiCon">Conectar</button><span class="r" id="aPiEst">—</span></div>
+    <div class="lin">Bateria<span class="r" id="aPiBat">—</span></div>
+  </div><div class="nota">Na tela de início: volume + lê a escrita (sem nada escrito, não faz nada). Segurar o Instagram mostra a escrita. Bateria no ícone do Telefone (5 = 50%).</div>
+  <div class="caixa" style="margin-top:14px">
+    <div class="lin" style="display:block"><canvas id="aPiCv"></canvas></div>
+    <div class="lin"><button class="bt" id="aPiLer">Ler agora</button><button class="bt cinza" id="aPiLimpa">Limpar escrita</button><span class="r" id="aPiN"></span></div>
+    <div class="lin">Resultado<span class="r" id="aPiRes">—</span></div>
+    <div class="lin" style="display:block;font-size:13px;color:var(--fg2)" id="aPiCands"></div>
+    <div class="lin">Sinais do Post-It<span class="r" id="aPiOps">—</span></div>
+    <div class="lin">Sinal de apagar (op)<input type="text" id="aPiOp" inputmode="numeric" placeholder="nenhum"></div>
+  </div><div class="nota">Teste: escreva, toque em Ler agora. "Sinais" mostra os avisos que o Post-It manda além da escrita; se aparecer um ao apagar o Post-It, coloque o número em "Sinal de apagar". A escrita também zera depois que o rosto inteiro aparece.</div></div>
+
+  <div class="sec" data-ic="📡" data-cor="#007aff"><h3>Receber pelo Inject</h3><div class="caixa">
+    <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aInj"><span></span></label></div>
+    <div class="lin">ID do Inject<input type="text" id="aInjId" inputmode="numeric" placeholder="13579"></div>
+    <div class="lin">Última<span class="r" id="aInjUlt">—</span></div>
+  </div><div class="nota">Vai direto no Inject, 2 vezes por segundo. O mesmo ID do app Listas.</div></div>
+
+  <div class="sec" data-ic="✨" data-cor="#af52de"><h3>Corrigir o nome com IA</h3><div class="caixa">
+    <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aIa"><span></span></label></div>
+    <div class="lin">Intermediário<input type="text" id="aWk" placeholder="https://….workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    <div class="lin" style="display:block"><div style="margin-bottom:6px">Pedido para a IA</div><textarea id="aIaPrompt" rows="5" style="width:100%;box-sizing:border-box;font:inherit;font-size:14px;border-radius:8px;border:1px solid rgba(128,128,128,.3);padding:8px;background:transparent;color:inherit"></textarea><button class="bt cinza" id="aIaPadrao" style="margin-top:6px">Voltar ao pedido padrão</button></div>
+    <div class="lin">Testar<input type="text" id="aIaTeste" placeholder="ex: tom cruz" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="bt" id="aIaTestar">Testar</button></div>
+    <div class="lin">Última<span class="r" id="aIaUlt">—</span></div>
+  </div><div class="nota">Só é usada quando o nome não está na lista nem é achado na Wikipédia. {x} é o nome recebido. Serve o intermediário do app Listas ou o do app famosos.</div></div>
+
+  <div class="sec" data-ic="▦" data-cor="#ff9500"><h3>Mosaico</h3><div class="caixa">
+    <div class="lin">Colunas<select id="aCols"><option>25</option><option>30</option><option>35</option><option>40</option><option>45</option><option>50</option><option>55</option><option>60</option><option>65</option><option>70</option></select></div>
+    <div class="lin">Cor<select id="aCor"><option value="cor">Colorido</option><option value="sepia">Sépia</option><option value="pb">Preto e branco</option></select></div>
+    <div class="lin">Reforço do rosto<input type="range" id="aRef" min="0" max="0.7" step="0.05"><span class="r" id="aRefV" style="margin-left:6px;min-width:38px"></span></div>
+    <div class="lin">Enquadramento<select id="aEnq"><option value="perto">Rosto de perto</option><option value="cabelo">Rosto e cabelo</option><option value="inteira">Foto inteira</option></select></div>
+    <div class="lin">Bolinha quando pronto<label class="chave"><input type="checkbox" id="aAviso"><span></span></label></div>
+    <div class="lin">Vibrar quando pronto<label class="chave"><input type="checkbox" id="aVib"><span></span></label></div>
+    <div class="lin">Foto real no final<label class="chave"><input type="checkbox" id="aReal"><span></span></label></div>
+    <div class="lin">Centralizar na volta<label class="chave"><input type="checkbox" id="aCentrar"><span></span></label></div>
+    <div class="lin">Voltar até as 18 fotos<label class="chave"><input type="checkbox" id="aVoltar18"><span></span></label></div>
+    <div class="lin">Momento da cor<input type="range" id="aMomento" min="0" max="10" step="1"><span class="r" id="aMomentoV" style="margin-left:6px;min-width:22px"></span></div>
+  </div><div class="nota">Centralizar na volta: abrindo a pinça a partir do rosto, o app vai levando de lado até a faixa das suas fotos. Voltar até as 18 fotos: também desce, e a volta termina na primeira tela, com o bebê (desligado, para cima e para baixo fica livre). Momento da cor: quando a cor começa a pintar o rosto na pinça. Número menor, o rosto aparece antes; número maior, as fotos ficam puras por mais tempo. Reforço do rosto: a força dessa cor. Com o rosto inteiro na tela, segure o volume para cima (ou o botão Selecionar) e o mosaico vira a foto de verdade; soltando, volta. Com "Foto real no final" ligado, se chegar até o fim ela fica.</div></div>
+
+  <div class="sec" data-ic="🖼" data-cor="#34c759"><h3>Fototeca</h3><div class="caixa"><div id="aSlots"></div>
+    <div class="lin"><button class="bt cinza" id="aSlotsVarias">Preencher vazios</button><button class="bt cinza" id="aSlotsLimpar" style="margin-left:auto">Limpar</button></div>
+  </div><div class="caixa" style="margin-top:10px">
+    <div class="lin">Colunas ao abrir<select id="aN0"><option value="3">3</option><option value="5">5</option></select></div>
+  </div><div class="nota">A primeira tela da Fototeca. Toque num quadrado para escolher a foto; toque numa foto e depois em outro quadrado para trocar de lugar. Elas ficam no meio da galeria, lá embaixo, dentro do rosto (escondidas atrás da barra). Deixando vazio o último quadrado (ou os 2 últimos), a última fileira fica incompleta, como no iPhone; outros vazios recebem foto automática.</div></div>
+
+  <div class="sec" data-ic="👶" data-cor="#ff2d55"><h3>Foto da piada</h3><div class="caixa" id="aPiadaAuto"></div>
+  <div class="nota" style="margin-top:14px">Ou deixar uma foto fixa</div>
+  <div class="caixa" style="margin-top:6px"><div id="aBebes"></div><div id="aFixas"></div></div>
+  <div class="nota">Lixeira da foto da piada: liga o microfone. Automático: menino ou menina pelo cadastro do famoso e o tom de pele pela foto; o bebê marcado na lista de Famosos vale por cima.</div></div>
+
+  <div class="sec" data-ic="★" data-cor="#ffcc00"><h3>Famosos</h3><div class="caixa">
+    <div class="lin"><span class="estado" id="aFamEst">—</span><button class="bt" id="aBaixar" style="margin-left:auto">Baixar fotos</button></div>
+    <div class="lin">Mostrar<select id="aFamFiltro"><option value="">Todos</option><option value="sembebe">Sem bebê marcado</option><option value="semfoto">Sem foto</option></select></div>
+    <div class="lin"><input type="text" id="aBuscaFam" placeholder="Procurar ou adicionar nome" autocapitalize="words" autocorrect="off" spellcheck="false"><button class="bt cinza" id="aAdd">+</button></div>
+  </div>
+  <div class="caixa" id="listaFam" style="margin-top:10px"></div>
+  <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div></div>
+
+  <div class="sec" data-ic="◉" data-cor="#8e8e93"><h3>Fotos da galeria</h3><div class="caixa">
+    <div class="lin">Usar<select id="aOrigem"><option value="">Todas as fotos</option></select></div>
+    <div class="lin">Preparar para o mosaico<select id="aLimite"><option value="3000">3.000 mais recentes</option><option value="5000">5.000 mais recentes</option><option value="8000">8.000 mais recentes</option><option value="12000">12.000 mais recentes</option></select></div>
+    <div class="lin"><span class="estado" id="aAnalise">—</span><button class="bt cinza" id="aReanalisar" style="margin-left:auto">Atualizar</button></div>
+    <div class="lin" style="display:block"><div style="font-size:13px;color:#8e8e93">Diagnóstico (última abertura)</div><div id="aDiag" style="font-size:12px;color:#8e8e93;margin-top:4px">—</div></div>
+    <div class="lin"><span class="estado" id="aTirados">—</span><button class="bt cinza" id="aDevolver" style="margin-left:auto">Devolver todas</button></div>
+  </div><div class="nota">Fotos tiradas pela lixeira ou por Selecionar somem só do app, nunca do iPhone.</div></div>
+
+  <div class="sec" data-ic="▢" data-cor="#30b0c7"><h3>Tela de início</h3><div class="caixa">
+    <div class="lin">Abrir o app em<select id="aAbrir"><option value="fototeca">Fototeca</option><option value="inicio">Tela de início</option></select></div>
+    <div class="lin">Papel de parede<button class="bt cinza" id="aFundoOrig" style="margin-left:auto">Original</button><button class="bt cinza" id="aFundo" style="margin-left:8px">Escolher</button></div>
+  </div><div class="nota">Os ícones ficam por cima de qualquer papel de parede. Deslizar para o lado mostra a 2ª página, que volta sozinha. O app escreve "Instagram" ou o nome do famoso. Voltar da Fototeca ou das Notas: deslize de baixo para cima a partir da borda.</div></div>
+
+  <div class="sec" data-ic="◐" data-cor="#636366"><h3>Aparência</h3><div class="caixa">
+    <div class="lin">Tema<select id="aTema"><option value="auto">Automático (igual ao iPhone)</option><option value="escuro">Escuro</option><option value="claro">Claro</option></select></div>
+  </div><div class="nota">Abrir estes ajustes: ícone Ajustes da tela de início.</div></div>
+  <div style="height:80px"></div>
+</div>
+
+<div id="voo"><div id="vooFundo"></div><div id="vooCx"><img id="vooImg"></div></div>
+<div id="toast"></div>
+
+<script type="text/plain" id="dadosFamosos">/*FAMOSOS*/</script>
+<script src="app.js"></script>
+</body>
+</html>
