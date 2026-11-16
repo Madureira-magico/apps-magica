@@ -1223,13 +1223,24 @@ function montarTira() {
   if (at) t.style.transform = 'translateX(' + (W / 2 - at.offsetLeft - at.offsetWidth / 2) + 'px)';
 }
 $('#tira').addEventListener('click', e => { const im = e.target.closest('[data-i]'); if (im) { verI = +im.dataset.i; montarPalco(); } });
+/* dia como no Fotos: Hoje / Ontem / dia da semana (até 6 dias) / data */
+const fmtSemana = new Intl.DateTimeFormat('pt-BR', { weekday: 'long' });
+function diaFotos(dt) {
+  const h = new Date(); h.setHours(0, 0, 0, 0); const d = new Date(dt); d.setHours(0, 0, 0, 0);
+  const dias = Math.round((h - d) / 86400000);
+  if (dias === 0) return 'Hoje'; if (dias === 1) return 'Ontem';
+  if (dias > 1 && dias < 7) { const s = fmtSemana.format(dt).replace('-feira', ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+  return fmtData.format(dt);
+}
+const dataHtml = dt => diaFotos(dt) + '<small>' + fmtHora.format(dt) + '</small>';
 async function mostrarData() {
   const it = vSeq[verI], el = $('#vData');
+  const reserva = new Date(Date.now() - 35 * 60000);   // sem data conhecida: "Hoje", igual ao bebê
   const ab = abertDe(it);
-  if (ab) { if (ab.data) { const dt = new Date(ab.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } else el.innerHTML = ''; return; }
-  if (it === '#piada') { el.innerHTML = 'Hoje<small>' + fmtHora.format(new Date(Date.now() - 35 * 60000)) + '</small>'; return; }
+  if (ab) { el.innerHTML = dataHtml(ab.data ? new Date(ab.data) : reserva); return; }
+  if (it === '#piada' || String(it).startsWith('arq:')) { el.innerHTML = dataHtml(reserva); return; }
   el.innerHTML = '';
-  try { const d = await nat.call('info', { id: it }); if (d && d.data && vSeq[verI] === it) { const dt = new Date(d.data); el.innerHTML = fmtData.format(dt) + '<small>' + fmtHora.format(dt) + '</small>'; } } catch (_) {}
+  try { const d = await nat.call('info', { id: it }); if (d && d.data && vSeq[verI] === it) el.innerHTML = dataHtml(new Date(d.data)); } catch (_) {}
 }
 /* abrir e fechar como o app Fotos: a foto cresce a partir da miniatura e volta para ela */
 const tams = new Map();
