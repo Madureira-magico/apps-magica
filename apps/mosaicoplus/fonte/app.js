@@ -2138,7 +2138,7 @@ async function postitVolume() {   // volume + na tela de início
     else { PIT.falhou = true; desenharInicio(); }
   } finally { pit.lendo = false; }
 }
-function postitRevelou() { if (piTracos().length) { pit.tracos = []; pit.cur = null; } PIT.falhou = false; }   // rosto inteiro: a próxima escrita começa do zero
+function postitRevelou() { if (telaAtual !== 'fototeca' || animando) return; if (piTracos().length) { pit.tracos = []; pit.cur = null; } PIT.falhou = false; }   // rosto inteiro: a próxima escrita começa do zero
 function postitIniciar() { desenharDock(); setTimeout(piAuto, 800); }
 function postitVoltou() { if (!pit.ligado) piAuto(); else piAbrir(); }
 
