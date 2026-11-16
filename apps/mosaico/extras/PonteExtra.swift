@@ -206,7 +206,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             vozLigar(num("segundos", 7), responder)
         case "volumeAtivar":   // abriu o Fotos / chegou no rosto: confere a escuta do volume e deixa o volume no meio
             if motor == nil { volume.reativar(depois: 0) }
-            r(true, nil)
+            responder(true, nil)
         case "vozDesligar":
             pararVoz(avisar: false)
             responder(true, nil)
