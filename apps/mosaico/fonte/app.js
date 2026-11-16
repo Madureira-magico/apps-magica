@@ -967,15 +967,11 @@ async function rectNat(i) {
 /* título "Fototeca": um toque volta para a tela de início (sem ela configurada, abre os ajustes) */
 $('#titulo').addEventListener('click', () => { if (emSelecao) return; if (temInicio()) voltarInicio(); else abrirAjustes(); });
 
-/* botão redondo do meio: toque = câmera escondida; segurar = espiar o nome */
+/* botão redondo do meio: segurando mostra o nome (e o rosto); tirou o dedo, some */
 (function () {
   const el = $('#meio'); let t = 0, espiando = false;
   el.addEventListener('touchstart', e => { e.preventDefault(); espiando = true; espiar(true); }, { passive: false });
-  el.addEventListener('touchend', e => {
-    e.preventDefault();
-    if (t) clearTimeout(t);
-    t = setTimeout(() => { t = 0; if (espiando) { espiando = false; espiar(false); } }, 900);   // um toque: mostra o nome por um instante
-  }, { passive: false });
+  el.addEventListener('touchend', e => { e.preventDefault(); if (t) clearTimeout(t); t = 0; espiando = false; espiar(false); }, { passive: false });   // tirou o dedo: some na hora
   el.addEventListener('touchcancel', () => { if (t) clearTimeout(t); t = 0; if (espiando) { espiando = false; espiar(false); } });
 })();
 function espiar(on) {

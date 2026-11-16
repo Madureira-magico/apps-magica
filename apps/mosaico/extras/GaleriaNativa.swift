@@ -15,6 +15,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let tilesB = TilesMosaico()     // camada 2: o mosaico do rosto (aparece dissolvendo ao afastar)
     private var bAtual: CGFloat = 0
     private let tinta = UIImageView()
+    private let fundo = UIImageView()
+    private var fundoChave = ""
     private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
     private let cobre = UIView()             // esconde as fotos de cima da cabeça quando o rosto aparece
     private let cobreBaixo = UIView()        // e as de baixo do rosto (a primeira tela)
@@ -80,12 +82,15 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.showsHorizontalScrollIndicator = false
         zoomer.contentInsetAdjustmentBehavior = .never
         zoomer.scrollsToTop = false
-        zoomer.bouncesZoom = true
+        zoomer.bouncesZoom = false   // o rosto para exatamente na largura da tela (sem encolher além e voltar)
         zoomer.alwaysBounceVertical = true
         zoomer.alwaysBounceHorizontal = false
         zoomer.bounces = true
         zoomer.decelerationRate = .normal
         zoomer.addSubview(plano)
+        fundo.contentMode = .scaleToFill
+        fundo.isUserInteractionEnabled = false
+        plano.addSubview(fundo)   // fotos de baixo já prontas (em miniatura) enquanto a grade de verdade se desenha por cima
         plano.addSubview(tiles)
         tilesB.isHidden = true
         plano.addSubview(tilesB)
@@ -100,6 +105,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         cobre.isUserInteractionEnabled = false
         plano.addSubview(cobre)
         cobreBaixo.isUserInteractionEnabled = false
+        cobreBaixo.isHidden = true
         plano.addSubview(cobreBaixo)
         realImg.contentMode = .scaleToFill
         realImg.alpha = 0
@@ -320,7 +326,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             ajuda = CGFloat((c["ajuda"] as? NSNumber)?.doubleValue ?? 3)
         }
         vista.backgroundColor = escuro ? .black : .white
-        tiles.backgroundColor = vista.backgroundColor
+        tiles.backgroundColor = .clear
         tiles.cores = (escuro ? UIColor.black.cgColor : UIColor.white.cgColor, escuro ? UIColor(white: 0.12, alpha: 1).cgColor : UIColor(white: 0.9, alpha: 1).cgColor)
         tilesB.backgroundColor = vista.backgroundColor
         tilesB.cores = tiles.cores
@@ -387,7 +393,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let fimRosto = CGFloat(primeira + linhasMos) * t
         cobreBaixo.frame = CGRect(x: -W, y: fimRosto, width: W * 3, height: max(0, CGFloat(linhas) * t - fimRosto) + H * 4)
         cobreBaixo.backgroundColor = vista.backgroundColor
-        cobreBaixo.isHidden = !temMos
+        cobreBaixo.isHidden = true   // as fotos de baixo do rosto ficam sempre (a "gravata" do original)
         tinta.isHidden = !temMos
         tintaFaixa.isHidden = !temMos
         magImg.isHidden = !temMos
@@ -398,7 +404,41 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.minimumZoomScale = 1
         zoomer.maximumZoomScale = max(1.2, CGFloat(C) / max(1, min(CGFloat(C), n0)))
         if let p = zoomer.pinchGestureRecognizer, p.view !== capa { capa.addGestureRecognizer(p) }   // a pinça sempre na camada de toques
+        tiles.pxPerto = zoomer.maximumZoomScale * UIScreen.main.scale
         tiles.setNeedsDisplay()
+        montarFundo(seq1, t)
+    }
+    /// as últimas fileiras inteiras (as 2 telas e as fotos dos lados) em miniatura, embaixo da grade: nada aparece preto no começo da pinça
+    private func montarFundo(_ ids: [String], _ t: CGFloat) {
+        let cols = C, nl = linhas
+        guard temMos, cols > 3, nl > 0 else { fundo.image = nil; fundoChave = ""; return }
+        let r0 = max(0, nl - 24), chave = "\(mosV)|\(cols)|\(nl)|\(ids.count)|\(t)"
+        fundo.frame = CGRect(x: 0, y: CGFloat(r0) * t, width: CGFloat(cols) * t, height: CGFloat(nl - r0) * t)
+        fundo.backgroundColor = vista.backgroundColor
+        if chave == fundoChave { return }
+        fundoChave = chave; fundo.image = nil
+        let cel: CGFloat = 40, corF = tiles.cores.0
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1; fmt.opaque = true
+            let img = UIGraphicsImageRenderer(size: CGSize(width: CGFloat(cols) * cel, height: CGFloat(nl - r0) * cel), format: fmt).image { cx in
+                let ctx = cx.cgContext
+                ctx.setFillColor(corF); ctx.fill(CGRect(x: 0, y: 0, width: CGFloat(cols) * cel, height: CGFloat(nl - r0) * cel))
+                for r in r0..<nl { for c in 0..<cols {
+                    guard self.fundoChave == chave else { return }
+                    let i = r * cols + c
+                    guard i < ids.count, !ids[i].isEmpty else { continue }
+                    let k = "\(ids[i])|64" as NSString
+                    var im = self.cache.object(forKey: k)?.img
+                    if im == nil { im = self.carregar(ids[i], 64); if let m = im { self.cache.setObject(Caixa(m), forKey: k, cost: m.width * m.height * 4) } }
+                    guard let cg = im else { continue }
+                    let w = CGFloat(cg.width), h = CGFloat(cg.height), l = min(w, h)
+                    guard let q = cg.cropping(to: CGRect(x: (w - l) / 2, y: (h - l) / 2, width: l, height: l)) else { continue }
+                    UIImage(cgImage: q).draw(in: CGRect(x: CGFloat(c) * cel, y: CGFloat(r - r0) * cel, width: cel, height: cel))
+                } }
+            }
+            DispatchQueue.main.async { if self.fundoChave == chave { self.fundo.image = img } }
+        }
     }
     private func posicaoInicial() {
         travado = false
@@ -558,7 +598,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tinta.alpha = reforco * pow(ramp, 1.2) * (1 - mag)
         tintaFaixa.alpha = 0
         cobre.alpha = temMos ? suave(cobreIni, 0.97 * cc, v) : 0
-        cobreBaixo.alpha = cobre.alpha
+        cobreBaixo.alpha = 0
         let face = temMos && v >= CGFloat(C) * 0.97
         if face != naFace { naFace = face; evento(["tipo": "gFace", "on": face]) }
         if corModo != "cor" && ramp > 0 {
@@ -725,10 +765,11 @@ final class TilesMosaico: UIView {
         set { trava.lock(); _marcas = newValue; trava.unlock() }
     }
     var carregar: ((String, CGFloat, CGRect) -> CGImage?)?
+    var pxPerto: CGFloat = 0   // pixels de tela por ponto com as fotos grandes (3 colunas)
     override class var layerClass: AnyClass { CATiledLayerRapido.self }
     override init(frame: CGRect) {
         super.init(frame: frame)
-        isOpaque = true
+        isOpaque = false   // onde a grade ainda não se desenhou aparece o fundo pronto (miniaturas), não preto
         if let t = layer as? CATiledLayer {
             t.tileSize = CGSize(width: 512, height: 512)
             t.levelsOfDetail = 7
@@ -738,8 +779,8 @@ final class TilesMosaico: UIView {
     required init?(coder: NSCoder) { fatalError() }
     /// espaço entre as fotos e arredondado dos cantos, em pixels da tela, pelo tamanho da foto (medido no Fotos do iPhone: 5 pixels)
     static func vao(_ ladoPx: CGFloat) -> (CGFloat, CGFloat) {
-        if ladoPx >= 120 { return (5, 4) }
-        if ladoPx >= 60 { return (3, 2) }
+        if ladoPx >= 120 { return (5, 7.5) }   // raio ~1,5 vez a linha: o "nozinho" nos cruzamentos
+        if ladoPx >= 60 { return (3, 4) }
         return (0, 0)
     }
     override func draw(_ rect: CGRect) {
@@ -749,8 +790,10 @@ final class TilesMosaico: UIView {
         ctx.fill(rect)
         let escala = max(1, abs(ctx.ctm.a))
         // como no Fotos do iPhone: fotos grandes com linha de 5 pixels e cantinhos arredondados; pequenas (mosaico), coladas
-        let (gp, rp) = TilesMosaico.vao(d.t0 * escala)
-        let g: CGFloat = gp / escala, lado = d.t0 - g, raio = rp / escala
+        // (medido pela tela, não pela camada: a camada das fotos grandes tem mais detalhe que a tela)
+        let tela = pxPerto > 0 ? min(escala, pxPerto) : escala
+        let (gp, rp) = TilesMosaico.vao(d.t0 * tela)
+        let g: CGFloat = gp / tela, lado = d.t0 - g, raio = rp / tela
         let c0 = max(0, Int(floor(rect.minX / d.t0))), c1 = min(d.cols - 1, Int(floor(rect.maxX / d.t0)))
         let r0 = max(0, Int(floor(rect.minY / d.t0))), r1 = min(d.linhas - 1, Int(floor(rect.maxY / d.t0)))
         guard c0 <= c1, r0 <= r1 else { return }
