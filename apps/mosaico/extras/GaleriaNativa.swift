@@ -17,6 +17,11 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private let tinta = UIImageView()
     private let fundo = UIImageView()
     private let linhasCam = CAShapeLayer()
+    private let baseMos = UIImageView()       // o mosaico pronto (miniatura) por baixo: onde a grade ainda não se desenhou, aparece ele (nunca preto)
+    private let pinca = UIPinchGestureRecognizer()
+    private var pinchando = false, pS0: CGFloat = 1, pAnc = CGPoint.zero
+    private var animador: CADisplayLink?
+    private var anim: (t0: CFTimeInterval, dur: Double, s0: CGFloat, s1: CGFloat, o0: CGPoint, o1: CGPoint)?
     private var fundoChave = ""
     private let tintaFaixa = UIImageView()   // pinta forte as fotos do começo quando o rosto aparece
     private let cobre = UIView()             // esconde as fotos de cima da cabeça quando o rosto aparece
@@ -91,6 +96,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.addSubview(plano)
         fundo.contentMode = .scaleToFill
         fundo.isUserInteractionEnabled = false
+        baseMos.contentMode = .scaleToFill
+        baseMos.isUserInteractionEnabled = false
+        plano.addSubview(baseMos)
         plano.addSubview(fundo)   // fotos de baixo já prontas (em miniatura) enquanto a grade de verdade se desenha por cima
         plano.addSubview(tiles)
         tilesB.isHidden = true
@@ -134,8 +142,12 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         webView.addSubview(capa)
         zoomer.minimumZoomScale = 1
         zoomer.maximumZoomScale = 5
+        zoomer.panGestureRecognizer.maximumNumberOfTouches = 1   // dois dedos = pinça (a pinça acompanha os dedos sozinha)
         capa.addGestureRecognizer(zoomer.panGestureRecognizer)
-        if let p = zoomer.pinchGestureRecognizer { capa.addGestureRecognizer(p) }
+        zoomer.pinchGestureRecognizer?.isEnabled = false   // a pinça é nossa (sem brigar com o iPhone: nada treme)
+        pinca.addTarget(self, action: #selector(pincou(_:)))
+        pinca.delegate = self
+        capa.addGestureRecognizer(pinca)
         toque = UITapGestureRecognizer(target: self, action: #selector(tocou(_:)))
         toque.delegate = self
         capa.addGestureRecognizer(toque)
@@ -280,7 +292,8 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let pode = ligada && ativa
         toque.isEnabled = pode
         zoomer.isScrollEnabled = pode && !travado
-        zoomer.pinchGestureRecognizer?.isEnabled = pode
+        zoomer.pinchGestureRecognizer?.isEnabled = false
+        pinca.isEnabled = pode
     }
 
     private func receberDados(_ m: [String: Any]) {
@@ -337,24 +350,31 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         tiles.marcas = selecao ? selecionados : []
 
         // monta a imagem gigante
-        let cAnt = C
+        // onde a pessoa está (para continuar EXATAMENTE no mesmo lugar depois de refazer a grade)
+        let csA = zoomer.contentSize, oA = zoomer.contentOffset, kA = zoomer.zoomScale, mxA = zoomer.maximumZoomScale
+        let uA = mxA > 1.0001 ? min(1, max(0, log(kA) / log(mxA))) : 1
+        let cxA = csA.width > 0 ? (oA.x + W / 2) / csA.width : 0.5
+        let dbA = csA.width > 0 ? (csA.height - (oA.y + H / 2)) / csA.width : 0
         C = temMos ? mosCols : max(1, Int(n0))
         linhas = Int(ceil(Double(seq.count) / Double(max(1, C))))
         let chave = "\(C)|\(seq.count)|\(mosV)|\(W)|\(escuro)|\(seq.hashValue)|\(cS)"
+        var refez = false
         if chave != geoChave {
-            // se estava vendo as fotos de perto (3 colunas), continua EXATAMENTE no mesmo lugar depois de trocar
-            let perto = ligada && !geoChave.isEmpty && abs(CGFloat(cAnt) / max(0.01, zoomer.zoomScale) - n0) < 0.1   // conta com as colunas de ANTES (fotos grandes)
-            let doFim = zoomer.contentSize.height - zoomer.contentOffset.y
+            let manter = ligada && !geoChave.isEmpty && csA.width > 0 && !zerar
             geoChave = chave
             montarPlano()
-            if perto && !zerar {
-                let sc = min(zoomer.maximumZoomScale, CGFloat(C) / max(1, min(CGFloat(C), n0)))
+            refez = true
+            if manter {
+                let mx = zoomer.maximumZoomScale
+                let sc = mx > 1.0001 ? exp(uA * log(mx)) : 1
                 zoomer.setZoomScale(sc, animated: false)
-                travado = false
-                let ins = zoomer.contentInset, cs = zoomer.contentSize
-                let y = min(max(-ins.top, cs.height - doFim), cs.height - H + ins.bottom)
+                centralizar()
+                let cs = zoomer.contentSize
                 xTravado = nil
-                zoomer.contentOffset = CGPoint(x: CGFloat(cS) * t0 * sc, y: y)
+                ajustando = true
+                zoomer.contentOffset = limitar(CGPoint(x: cxA * cs.width - W / 2, y: cs.height - dbA * cs.width - H / 2))
+                ajustando = false
+                if !travado { zoomer.isScrollEnabled = ligada && ativa }
             } else { zerar = true }
         } else {
             // só a seleção mudou: redesenha só essas fotos
@@ -364,17 +384,14 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         if zerar { posicaoInicial() }
         atualizarGestos()
         atualizar()
+        // grade refeita com a Fototeca aberta: a tela pronta (mesmas fotos, mesmo lugar) fica por cima enquanto a grade nova se desenha
+        if refez, ligada, !vista.isHidden, visiveis <= 8 { mostrarCapaInicio() }
     }
 
     private var mudouFechada = false
     private func montarPlano() {
         if !ligada { mudouFechada = true }
         tirarCapaInicio()   // a capa é da grade antiga
-        // segura a imagem antiga na tela enquanto a nova se desenha (sem piscar branco)
-        if ligada, !vista.isHidden, plano.bounds.width > 0, let foto = vista.snapshotView(afterScreenUpdates: false) {
-            vista.addSubview(foto)
-            UIView.animate(withDuration: 0.25, delay: 0.45, options: []) { foto.alpha = 0 } completion: { _ in foto.removeFromSuperview() }
-        }
         let t = t0
         // a galeria JÁ É o mosaico: as fotos do rosto entram direto na camada de fotos (nada por cima, nada troca)
         var seq1 = seq
@@ -393,6 +410,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let faixa = CGRect(x: 0, y: CGFloat(primeira) * t, width: W, height: CGFloat(linhasMos) * t)
         tinta.frame = faixa
         magImg.frame = faixa
+        baseMos.frame = faixa
+        baseMos.image = temMos ? magImg.image : nil
+        baseMos.isHidden = !temMos
         tintaFaixa.frame = faixa
         cobre.frame = CGRect(x: -W, y: -H * 4, width: W * 3, height: H * 4 + CGFloat(primeira) * t)
         cobre.backgroundColor = vista.backgroundColor
@@ -410,7 +430,6 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         zoomer.contentInset = UIEdgeInsets(top: cima, left: 0, bottom: sb + 70, right: 0)
         zoomer.minimumZoomScale = 1
         zoomer.maximumZoomScale = max(1.2, CGFloat(C) / max(1, min(CGFloat(C), n0)))
-        if let p = zoomer.pinchGestureRecognizer, p.view !== capa { capa.addGestureRecognizer(p) }   // a pinça sempre na camada de toques
         tiles.pxPerto = zoomer.maximumZoomScale * UIScreen.main.scale
         tiles.setNeedsDisplay()
         montarFundo(seq1, t)
@@ -503,6 +522,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         ajustando = false
     }
     func scrollViewDidZoom(_ s: UIScrollView) {
+        if pinchando || animador != nil { centralizar(); atualizar(); return }   // a nossa pinça/animação já cuida do lugar
         if !trilho { guiarVolta(s) }
         centralizar()
         if trilho, let t = dadosTrilho, s.zoomScale >= 1 {
@@ -599,6 +619,92 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             ajustando = true; s.contentOffset.x = x; ajustando = false
         }
     }
+    /// posição permitida: sem vazio dos lados nem abaixo das últimas fotos (como no Fotos do iPhone)
+    private func limitar(_ p: CGPoint) -> CGPoint {
+        let ins = zoomer.contentInset, cs = zoomer.contentSize
+        var n = p
+        let maxY = cs.height - H + ins.bottom, minY = -ins.top
+        if maxY >= minY { n.y = min(max(n.y, minY), maxY) } else { n.y = minY }
+        let minX = -ins.left, maxX = cs.width - W + ins.right
+        n.x = maxX >= minX ? min(max(n.x, minX), maxX) : minX
+        return n
+    }
+    /// a pinça: o ponto que estava entre os dedos fica entre os dedos (conta exata a cada quadro, sem correções depois = sem tremer).
+    /// Na volta (abrindo), o lado vai sendo levado aos poucos até a faixa das fotos de verdade.
+    @objc private func pincou(_ g: UIPinchGestureRecognizer) {
+        let p = g.location(in: vista)
+        switch g.state {
+        case .began:
+            pararAnimacao()
+            tirarCapaInicio()
+            evento(["tipo": "gZoom"])
+            trilho = false; xTravado = nil; travado = false
+            pinchando = true
+            zoomer.setContentOffset(zoomer.contentOffset, animated: false)   // para qualquer embalo
+            zoomer.isScrollEnabled = false
+            pS0 = zoomer.zoomScale
+            let o = zoomer.contentOffset
+            pAnc = CGPoint(x: (o.x + p.x) / pS0, y: (o.y + p.y) / pS0)
+        case .changed:
+            let mn = zoomer.minimumZoomScale, mx = zoomer.maximumZoomScale
+            let sc = min(max(pS0 * g.scale, mn), mx)
+            zoomer.zoomScale = sc
+            centralizar()
+            var off = CGPoint(x: pAnc.x * sc - p.x, y: pAnc.y * sc - p.y)
+            if ajuda > 0, temMos, sc > pS0, mx > 1.0001 {
+                let u0 = min(1, max(0, log(pS0) / log(mx))), u = min(1, max(0, log(sc) / log(mx)))
+                let w = min(1, max(0, (u - u0) / max(0.0001, 1 - u0))), k = w * w * (3 - 2 * w)
+                off.x += (xFaixa(sc) - off.x) * k
+            }
+            ajustando = true
+            zoomer.contentOffset = limitar(off)
+            ajustando = false
+            atualizar()
+        case .ended, .cancelled, .failed:
+            pinchando = false
+            fimPinca()
+        default: break
+        }
+    }
+    private func fimPinca() {
+        let e = zoomer.zoomScale, mn = zoomer.minimumZoomScale, mx = zoomer.maximumZoomScale
+        if temMos && e <= mn * 1.01 {   // rosto inteiro: fica parado no lugar dele
+            travado = true
+            zoomer.isScrollEnabled = false
+            animarPara(mn, offsetRosto(), 0.25)
+            return
+        }
+        zoomer.isScrollEnabled = ligada && ativa
+        if ajuda > 0, temMos, e >= mx * 0.75 {   // quase nas fotos grandes: encaixa as 3 colunas da faixa certinho
+            let o = zoomer.contentOffset
+            let cy = (o.y + H / 2) / e
+            let alvoY = cy * mx - H / 2
+            let cs = CGSize(width: plano.bounds.width * mx, height: plano.bounds.height * mx), ins = zoomer.contentInset
+            let y = min(max(alvoY, -ins.top), max(-ins.top, cs.height - H + ins.bottom))
+            animarPara(mx, CGPoint(x: xFaixa(mx), y: y), 0.22)
+        }
+    }
+    /// anima zoom e lugar quadro a quadro (assim a linha entre as fotos acompanha exatamente)
+    private func animarPara(_ s1: CGFloat, _ o1: CGPoint, _ dur: Double) {
+        pararAnimacao()
+        anim = (CACurrentMediaTime(), dur, zoomer.zoomScale, s1, zoomer.contentOffset, o1)
+        let l = CADisplayLink(target: self, selector: #selector(passoAnim))
+        l.add(to: .main, forMode: .common)
+        animador = l
+    }
+    private func pararAnimacao() { animador?.invalidate(); animador = nil; anim = nil }
+    @objc private func passoAnim() {
+        guard let a = anim else { pararAnimacao(); return }
+        let t = min(1, (CACurrentMediaTime() - a.t0) / a.dur), k = CGFloat(1 - pow(1 - t, 3))
+        let sc = a.s0 + (a.s1 - a.s0) * k
+        zoomer.zoomScale = sc
+        centralizar()
+        ajustando = true
+        zoomer.contentOffset = CGPoint(x: a.o0.x + (a.o1.x - a.o0.x) * k, y: a.o0.y + (a.o1.y - a.o0.y) * k)
+        ajustando = false
+        atualizar()
+        if t >= 1 { pararAnimacao(); xTravado = nil }
+    }
     /// na pinça, como no Fotos do iPhone: nunca aparece vazio dos lados nem abaixo das últimas fotos
     private func prenderBordas(_ s: UIScrollView) {
         let ins = s.contentInset, cs = s.contentSize, o = s.contentOffset
@@ -684,7 +790,9 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
 
     // MARK: gestos
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldReceive t: UITouch) -> Bool { ligada && ativa }
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { g is UILongPressGestureRecognizer || o is UILongPressGestureRecognizer }
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool {
+        g is UILongPressGestureRecognizer || o is UILongPressGestureRecognizer || g === pinca || o === pinca
+    }
     @objc private func tocou(_ g: UITapGestureRecognizer) {
         let p = g.location(in: vista)
         let i = indice(g.location(in: plano))
