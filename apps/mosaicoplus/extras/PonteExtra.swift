@@ -835,10 +835,12 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     // MARK: Post-It (escrita desenhada pela página → texto)
     /// para cada imagem e cada leitura (sem e com correção): as linhas, de cima para baixo, cada uma com até 3 palpites
     private func lerImagens(_ imgs: [String], _ palavras: [String]) -> [[[[String]]]] {
-        var saida: [[[[String]]]] = []
-        for s in imgs {
+        var saida = [[[[String]]]](repeating: [], count: imgs.count)
+        let trava = NSLock()
+        DispatchQueue.concurrentPerform(iterations: imgs.count) { n in   // as imagens ao mesmo tempo (mais rápido)
+            let s = imgs[n]
             let b64 = s.components(separatedBy: ",").last ?? s
-            guard let d = Data(base64Encoded: b64), let im = UIImage(data: d), let cg = im.cgImage else { saida.append([]); continue }
+            guard let d = Data(base64Encoded: b64), let im = UIImage(data: d), let cg = im.cgImage else { return }
             var leituras: [[[String]]] = []
             for corrigir in [false, true] {   // sem correção (letra por letra) e com correção puxando para os nomes da lista
                 let pedido = VNRecognizeTextRequest()
@@ -859,7 +861,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
                 let linhas: [[String]] = obs.map { o in o.topCandidates(3).map { $0.string }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty } }.filter { !$0.isEmpty }
                 leituras.append(linhas)
             }
-            saida.append(leituras)
+            trava.lock(); saida[n] = leituras; trava.unlock()
         }
         return saida
     }

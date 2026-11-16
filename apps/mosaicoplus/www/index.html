@@ -310,6 +310,7 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Resultado<span class="r" id="aPiRes">—</span></div>
     <div class="lin" style="display:block;font-size:13px;color:var(--fg2)" id="aPiCands"></div>
     <div class="lin">Sinais do Post-It<span class="r" id="aPiOps">—</span></div>
+    <div class="lin">Proporção da letra<input type="text" id="aPiProp" inputmode="decimal" placeholder="1.7"></div>
     <div class="lin">Sinal de apagar (op)<input type="text" id="aPiOp" inputmode="numeric" placeholder="nenhum"></div>
   </div><div class="nota">Teste: escreva, toque em Ler agora. "Sinais" mostra os avisos que o Post-It manda além da escrita; se aparecer um ao apagar o Post-It, coloque o número em "Sinal de apagar". A escrita também zera depois que o rosto inteiro aparece.</div></div>
 
@@ -2800,65 +2801,167 @@ const piTracos = () => pit.cur ? pit.tracos.concat([pit.cur]) : pit.tracos;
 function piLimpar() { pit.tracos = []; pit.cur = null; pit.lido = false; PIT.falhou = false; desenharInicio(); if (telaAtual === 'ajustes') piTeste(); }
 function piSinais() { const e = $('#aPiOps'); if (e) e.textContent = Object.keys(pit.ops).map(k => 'op ' + k + ' (' + pit.ops[k] + 'x)').join(' · ') || '—'; }
 
-/* desenha a escrita (branca no preto ou preta no branco), girada, recortada justinha */
-function desenharTracos(g, lista, cw, ch, ang, cor, fundo, mg) {
+/* =====================================================================
+   ESCRITA DO POST-IT: limpeza (proporção, letras grudadas, círculo e riscos), linhas e leitura
+   ===================================================================== */
+if (cfg.piProp == null) cfg.piProp = 1.7;   // o Post-It mede a largura numa escala menor que a altura: estica para ficar igual ao papel
+const bboxT = t => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; t.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }); return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 }; };
+const comprT = t => { let L = 0; for (let i = 1; i < t.length; i++) L += Math.hypot(t[i].x - t[i - 1].x, t[i].y - t[i - 1].y); return L; };
+const medianaArr = a => { if (!a.length) return 0; const b = a.slice().sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
+/* devolve { todos: traços limpos, linhas: [[traços da linha de cima], [de baixo]…], ref: altura da letra } */
+function escritaLimpa(lista) {
+  const k = +cfg.piProp || 1;
+  let tr = (lista || piTracos()).filter(t => t.length).map(t => t.map(p => ({ x: p.x * k, y: p.y })));
+  if (!tr.length) return { todos: [], linhas: [], ref: 1, deco: [] };
+  // 1) letras grudadas: a caneta "pulou" para longe sem o Post-It avisar que levantou → corta o traço ali
+  const passos = []; tr.forEach(t => { for (let i = 1; i < t.length; i++) { const d = Math.hypot(t[i].x - t[i - 1].x, t[i].y - t[i - 1].y); if (d > 0) passos.push(d); } });
+  const passo = medianaArr(passos) || 1;
+  const alt0 = medianaArr(tr.map(t => bboxT(t).h).filter(h => h > 0)) || 1000;
+  const pulo = Math.max(passo * 5, alt0 * 0.4);
+  const cortados = [];
+  tr.forEach(t => { let cur = [t[0]]; for (let i = 1; i < t.length; i++) { const d = Math.hypot(t[i].x - t[i - 1].x, t[i].y - t[i - 1].y); if (d > pulo) { cortados.push(cur); cur = [t[i]]; } else cur.push(t[i]); } cortados.push(cur); });
+  tr = cortados;
+  // 2) altura da letra: mediana dos traços "de verdade" (sem pontinhos)
+  const bx = tr.map(bboxT), maiorH = Math.max(...bx.map(b => Math.max(b.h, b.w)));
+  const ref = medianaArr(bx.map(b => b.h).filter(h => h > maiorH * 0.08)) || alt0;
+  // 3) desenho que não é letra: círculo/moldura em volta da escrita ou risco comprido
+  const deco = new Set();
+  tr.forEach((t, i) => {
+    const b = bx[i], L = comprT(t), corda = Math.hypot(t[t.length - 1].x - t[0].x, t[t.length - 1].y - t[0].y), tam = Math.max(b.w, b.h);
+    if (tam < ref * 2.4) return;
+    const dentro = tr.filter((u, j) => j !== i && bx[j].cx > b.x0 && bx[j].cx < b.x1 && bx[j].cy > b.y0 && bx[j].cy < b.y1).length;
+    const reto = L > 0 && corda / L > 0.85;
+    const volta = L > 0 && corda < 0.35 * tam && L > 2.2 * tam;   // fecha (ou quase) em volta: círculo, oval, retângulo
+    if ((reto && corda > ref * 2.6) || (volta && dentro >= Math.max(2, (tr.length - 1) * 0.5)) || b.h > ref * 3.2 && dentro >= 2) deco.add(i);
+  });
+  let todos = tr.filter((_, i) => !deco.has(i));
+  if (!todos.length) todos = tr;
+  // 4) linhas: nome em cima, sobrenome embaixo
+  const bs = todos.map(bboxT), linhas = [];
+  const peq = i => bs[i].h < ref * 0.45;   // pontinho, acento, traço deitado (corte do T, do H): entra na linha mais perto
+  const ordem = todos.map((_, i) => i).sort((a, b) => (peq(a) - peq(b)) || (bs[a].cy - bs[b].cy));
+  for (const i of ordem) {
+    const b = bs[i], pequeno = peq(i);
+    let melhor = null, dm = Infinity;
+    for (const l of linhas) {
+      const sobre = Math.min(b.y1, l.y1) - Math.max(b.y0, l.y0), d = b.cy < l.y0 ? l.y0 - b.cy : b.cy > l.y1 ? b.cy - l.y1 : 0;
+      if ((pequeno ? d < ref * 0.6 : sobre > 0.35 * Math.min(b.h || 1, l.y1 - l.y0 || 1)) && d < dm) { dm = d; melhor = l; }
+    }
+    if (melhor) { melhor.t.push(todos[i]); if (!pequeno) { melhor.y0 = Math.min(melhor.y0, b.y0); melhor.y1 = Math.max(melhor.y1, b.y1); } }
+    else linhas.push({ y0: b.y0, y1: b.y1, t: [todos[i]] });
+  }
+  linhas.sort((a, b) => a.y0 - b.y0);
+  const boas = linhas.filter(l => l.y1 - l.y0 > ref * 0.4 || l.t.length > 1);
+  return { todos, linhas: (boas.length ? boas : linhas).map(l => l.t), ref, deco: tr.filter((_, i) => deco.has(i)) };
+}
+/* desenha a escrita (branca no preto ou preta no branco), girada, recortada justinha, traço fino como no papel */
+function desenharTracos(g, lista, cw, ch, ang, cor, fundo, mg, refAlt) {
   if (fundo) { g.fillStyle = fundo; g.fillRect(0, 0, cw, ch); } else g.clearRect(0, 0, cw, ch);
   const pts = lista.flat(); if (!pts.length) return;
   const c = Math.cos(ang * Math.PI / 180), s = Math.sin(ang * Math.PI / 180);
   const rot = lista.map(t => t.map(p => ({ x: p.x * c - p.y * s, y: p.x * s + p.y * c })));
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  rot.flat().forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
-  const k = Math.min((cw - 2 * mg) / Math.max(x1 - x0, 1), (ch - 2 * mg) / Math.max(y1 - y0, 1));
-  const ox = (cw - (x1 - x0) * k) / 2, oy = (ch - (y1 - y0) * k) / 2;
-  const alts = lista.map(t => { let a = Infinity, b = -Infinity; t.forEach(p => { a = Math.min(a, p.y); b = Math.max(b, p.y); }); return b - a; }).filter(h => h > 0).sort((a, b) => a - b);
-  const hMed = alts.length ? alts[Math.floor(alts.length / 2)] * k : 60;
-  g.strokeStyle = cor; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = Math.max(3, Math.min(cw / 60, hMed / 7));
-  rot.forEach(t => { g.beginPath(); t.forEach((p, i) => { const X = ox + (p.x - x0) * k, Y = oy + (p.y - y0) * k; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); if (t.length === 1) g.lineTo(ox + (t[0].x - x0) * k + 0.5, oy + (t[0].y - y0) * k); g.stroke(); });
+  const b = bboxT(rot.flat());
+  const k = Math.min((cw - 2 * mg) / Math.max(b.w, 1), (ch - 2 * mg) / Math.max(b.h, 1));
+  const ox = (cw - b.w * k) / 2, oy = (ch - b.h * k) / 2;
+  const ref = (refAlt || medianaArr(lista.map(t => bboxT(t).h).filter(h => h > 0)) || b.h) * k;
+  g.strokeStyle = cor; g.fillStyle = cor; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = Math.max(2, ref / 13);
+  rot.forEach(t => {
+    if (t.length === 1) { g.beginPath(); g.arc(ox + (t[0].x - b.x0) * k, oy + (t[0].y - b.y0) * k, g.lineWidth / 2, 0, 7); g.fill(); return; }
+    g.beginPath(); t.forEach((p, i) => { const X = ox + (p.x - b.x0) * k, Y = oy + (p.y - b.y0) * k; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.stroke();
+  });
 }
-function imagemTracos(lista, ang) {   // imagem para o leitor: preto no branco, proporção da escrita girada
+function imagemTracos(lista, ang, refAlt) {   // imagem para o leitor: preto no branco, letra com uns 110 px de altura
   const c = Math.cos(ang * Math.PI / 180), s = Math.sin(ang * Math.PI / 180);
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  lista.flat().forEach(p => { const X = p.x * c - p.y * s, Y = p.x * s + p.y * c; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); });
-  const asp = Math.max(0.15, Math.min(8, (x1 - x0) / Math.max(1, y1 - y0)));
-  const L = 1100, w = asp >= 1 ? L : Math.round(L * asp), h = asp >= 1 ? Math.round(L / asp) : L;
-  const cv = document.createElement('canvas'); cv.width = w + 160; cv.height = h + 160;
-  desenharTracos(cv.getContext('2d'), lista, cv.width, cv.height, ang, '#000', '#fff', 80);
-  return cv.toDataURL('image/jpeg', 0.9);
+  const b = bboxT(lista.flat().map(p => ({ x: p.x * c - p.y * s, y: p.x * s + p.y * c })));
+  const ref = refAlt || b.h || 1, k = 110 / ref;
+  let w = b.w * k, h = b.h * k; const m = Math.min(1, 1600 / Math.max(w, h)); w *= m; h *= m;
+  const cv = document.createElement('canvas'); cv.width = Math.round(w + 120); cv.height = Math.round(h + 120);
+  desenharTracos(cv.getContext('2d'), lista, cv.width, cv.height, ang, '#000', '#fff', 60, refAlt);
+  return cv.toDataURL('image/jpeg', 0.92);
 }
 let palavrasPi = null;
 function palavrasLeitor() {
   if (!palavrasPi) { const s = new Set(); famosos.forEach(f => { s.add(f.n); f.n.split(' ').forEach(p => p.length >= 3 && s.add(p)); }); palavrasPi = [...s]; }
   return palavrasPi;
 }
-/* o famoso tem que bater com o TEXTO TODO escrito (todas as linhas juntas), não com uma palavra solta ("ELIS REGINA" não vira Elvis) */
-function famosoDoTexto(t) {
-  const f = acharFamoso(t) || acharFamoso(limparPedido(t)); if (f) return f;
-  const g = acharFamosoEm(t); if (!g) return null;
-  const letras = semAcento(t).replace(/ /g, '').length, nome = Math.max(...nomesDe(g).map(x => x.replace(/ /g, '').length));
-  return nome >= 0.7 * letras ? g : null;
+/* letras parecidas que o leitor troca (cirílico, números, sinais) */
+const PARECIDAS = { 'а': 'a', 'в': 'b', 'е': 'e', 'к': 'k', 'м': 'm', 'н': 'h', 'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'х': 'x', 'у': 'y', 'э': 'o', 'з': 'z', 'и': 'n', 'л': 'l', 'п': 'n', 'ш': 'w', 'ь': 'b', 'я': 'r', 'д': 'a', 'ц': 'u', 'ч': 'y', 'ю': 'o', 'і': 'i', '0': 'o', '1': 'i', '2': 'z', '3': 'e', '4': 'a', '5': 's', '6': 'g', '7': 't', '8': 'b', '9': 'g', '+': 't', '|': 'i', '!': 'i', '$': 's', '€': 'e', '@': 'a', 'ł': 'l' };
+const soLetras = t => semAcento(String(t || '').toLowerCase().split('').map(ch => PARECIDAS[ch] || ch).join('')).replace(/ /g, '');
+function lev(a, b) {
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let p = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) { const q = [i]; for (let j = 1; j <= n; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = q; }
+  return p[n];
 }
-function textosDaLeitura(linhas) {   // junta as linhas em todas as combinações de palpites; os palpites mais seguros primeiro
+/* palpites de UMA imagem do leitor → textos, os mais seguros primeiro */
+function textosDaLeitura(linhas) {
   linhas = (linhas || []).slice(0, 5).map((l, k, a) => l.slice(0, a.length > 3 ? 2 : 3));
   let combos = [{ t: [], r: 0 }];
   for (const l of linhas) { const n = []; for (const c of combos) l.forEach((x, k) => n.push({ t: c.t.concat(x), r: c.r + k })); combos = n.slice(0, 250); }
   return combos.filter(c => c.t.length).map(c => ({ texto: c.t.join(' ').replace(/\s+/g, ' ').trim(), r: c.r }));
 }
-/* lê a escrita: tenta reto, depois inclinado, depois de cabeça para baixo / de lado */
-async function lerPostit(mostrar) {
-  const lista = piTracos().filter(t => t.length);
-  if (!lista.length) return { nome: null, cands: [] };
-  const etapas = [[0, -8, 8], [-16, 16, 180], [-25, 25, 90, -90]], todos = [];
-  for (const angs of etapas) {
-    let r = [];
-    try { r = await nat.call('lerImagens', { imgs: angs.map(a => imagemTracos(lista, a)), palavras: palavrasLeitor() }); } catch (_) { r = []; }
-    const op = [];
-    angs.forEach((ang, i) => (r[i] || []).forEach((linhas, passo) => textosDaLeitura(linhas).forEach(c => op.push({ texto: c.texto, ang, nota: c.r + passo * 0.5 + i * 0.3 }))));
-    op.sort((a, b) => a.nota - b.nota);
-    for (const o of op) if (!todos.includes(o.texto)) todos.push(o.texto);
-    if (mostrar) mostrar(todos);
-    for (const o of op) { const f = famosoDoTexto(o.texto); if (f) return { nome: f.n, cands: todos, ang: o.ang, lido: o.texto }; }
+/* nota de cada famoso (0 = perfeito): linha de cima com o nome, de baixo com o sobrenome (ou o contrário, com um custo pequeno) */
+function custoLinha(cands, alvo) {
+  if (!alvo) return 1; let m = 1;
+  for (const c of cands) { if (!c.s) continue; const v = lev(c.s, alvo) / alvo.length + 0.025 * c.r; if (v < m) m = v; }
+  return Math.min(1, m);
+}
+function notaFamoso(f, L, junto) {
+  let melhor = 9;
+  const vars = new Set([f.n, (f.w || '').replace(/\s*\(.*\)$/, ''), ...(f.a || [])].filter(Boolean));
+  for (const v of vars) {
+    const pal = semAcento(v).split(' ').filter(p => p.length > 1 && !/^(da|de|do|das|dos|e|jr)$/.test(p)).map(soLetras); if (!pal.length) continue;
+    const cheio = pal.join('');
+    if (cheio.length < 4) { if (custoLinha(junto, cheio) === 0 || L.some(l => custoLinha(l, cheio) === 0)) melhor = Math.min(melhor, 0.05); continue; }   // apelido curto (Ney): só se vier exato
+    melhor = Math.min(melhor, custoLinha(junto, cheio));                       // tudo junto contra o nome inteiro
+    if (L.length >= 2 && pal.length >= 2) {
+      const prim = L[0], ult = L[L.length - 1], meio = pal.slice(1, -1).join('');
+      const peso = (a, b) => a.length + b.length;
+      const reto = (pal[0].length * custoLinha(prim, pal[0]) + pal[pal.length - 1].length * custoLinha(ult, pal[pal.length - 1])) / peso(pal[0], pal[pal.length - 1]);
+      const invertido = (pal[0].length * custoLinha(ult, pal[0]) + pal[pal.length - 1].length * custoLinha(prim, pal[pal.length - 1])) / peso(pal[0], pal[pal.length - 1]) + 0.08;
+      // nome do meio (Elis Regina Carvalho Costa): a linha de baixo pode ser o nome do meio + sobrenome
+      const ultMeio = meio ? (pal[0].length * custoLinha(prim, pal[0]) + (meio.length + pal[pal.length - 1].length) * custoLinha(ult, meio + pal[pal.length - 1])) / cheio.length : 9;
+      melhor = Math.min(melhor, reto, invertido, ultMeio);
+    }
+    if (L.length === 1 && pal.length >= 2) melhor = Math.min(melhor, custoLinha(L[0], cheio));
   }
-  return { nome: null, cands: todos };
+  return melhor;
+}
+function escolherFamoso(L, junto) {
+  const notas = famosos.map(f => [notaFamoso(f, L, junto), f]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0]);
+  if (!notas.length) return { f: null, notas };
+  const [n1, f1] = notas[0], seg = notas.find(x => x[1] !== f1 && semAcento(x[1].n) !== semAcento(f1.n));
+  const n2 = seg ? seg[0] : 1;
+  return { f: n1 <= 0.34 && n2 - n1 >= 0.1 ? f1 : null, n1, n2, notas };
+}
+/* lê a escrita: cada linha sozinha (e o nome inteiro), reto e um pouco inclinado; se não der, de cabeça para baixo e mais inclinado */
+async function lerPostit(mostrar) {
+  const E = escritaLimpa(); if (!E.todos.length) return { nome: null, cands: [] };
+  const nl = E.linhas.length, etapas = [[0], [-6, 6], [180, -12, 12]], todos = [];
+  const L = E.linhas.map(() => []), junto = [];
+  const juntar = (lista, textos, base) => textos.forEach(c => { const s = soLetras(c.texto); if (s.length >= 2) lista.push({ s, r: c.r + base, t: c.texto }); });
+  let ultimo = { f: null };
+  for (let e = 0; e < etapas.length; e++) {
+    const angs = etapas[e], imgs = [], quem = [];
+    for (const a of angs) {
+      E.linhas.forEach((l, i) => { imgs.push(imagemTracos(l, a, E.ref)); quem.push({ a, i }); });
+      if (nl > 1 || !nl) { imgs.push(imagemTracos(E.todos, a, E.ref)); quem.push({ a, i: -1 }); }
+    }
+    let r = [];
+    try { r = await nat.call('lerImagens', { imgs, palavras: palavrasLeitor() }); } catch (_) { r = []; }
+    quem.forEach((q, k) => (r[k] || []).forEach((linhasImg, passo) => {
+      const base = passo * 0.5 + (q.a === 0 ? 0 : q.a === 180 ? 0.6 : 0.3 + Math.abs(q.a) / 60);
+      const textos = textosDaLeitura(linhasImg);
+      textos.forEach(c => { if (!todos.includes(c.texto)) todos.push(c.texto); });
+      if (q.i < 0) juntar(junto, textos, base);
+      else juntar(L[q.a === 180 ? nl - 1 - q.i : q.i], textos, base);   // de cabeça para baixo: a linha de cima vira a de baixo
+    }));
+    if (mostrar) mostrar(todos);
+    if (nl === 1) L[0].forEach(c => junto.push(c));
+    ultimo = escolherFamoso(L, junto);
+    if (ultimo.f) return { nome: ultimo.f.n, cands: todos, nota: ultimo.n1, folga: ultimo.n2 - ultimo.n1, lido: L.map(l => (l.slice().sort((a, b) => a.r - b.r)[0] || {}).t || '?').join(' / ') };
+  }
+  return { nome: null, cands: todos, nota: ultimo.n1, folga: ultimo.n2 != null ? ultimo.n2 - ultimo.n1 : null, quase: ultimo.notas && ultimo.notas[0] ? ultimo.notas[0][1].n : '' };
 }
 async function postitVolume() {   // volume + na tela de início
   if (pit.lendo || !piTracos().some(t => t.length)) return;   // nada escrito: não faz nada
@@ -2878,21 +2981,19 @@ let ilhaAberta = false, ilhaT = 0;
 /* janela no topo: a letra fica sempre do mesmo tamanho e a janela cresce só o necessário; a escrita começa abaixo da hora e da bateria */
 const ILHA = { letra: 48, topo: 50, pe: 16, folga: 8 };
 function medidaIlha() {
-  const w = Math.min(W - 18, 400), cw = w - 40, lista = piTracos().filter(t => t.length), pts = lista.flat();
-  if (!pts.length) return { w, cw, ch: 60 };
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  pts.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
-  const alts = lista.map(t => { let a = Infinity, b = -Infinity; t.forEach(p => { a = Math.min(a, p.y); b = Math.max(b, p.y); }); return b - a; }).sort((a, b) => a - b);
-  const grandes = alts.filter(h => h > alts[alts.length - 1] * 0.15), ref = grandes.length ? grandes[Math.floor(grandes.length * 0.75)] : (y1 - y0);
-  let k = ILHA.letra / Math.max(1, ref);                       // tamanho da letra fixo
-  if ((x1 - x0) * k > cw) k = cw / Math.max(1, x1 - x0);       // nome muito comprido: diminui só o necessário
-  const maxH = H * 0.42; if ((y1 - y0) * k > maxH) k = maxH / Math.max(1, y1 - y0);
-  return { w, cw, ch: Math.max(40, (y1 - y0) * k + 2 * ILHA.folga) };
+  const w = Math.min(W - 18, 400), cw = w - 40, E = escritaLimpa(), pts = E.todos.flat();
+  if (!pts.length) return { w, cw, ch: 60, E };
+  const b = bboxT(pts);
+  let k = ILHA.letra / Math.max(1, E.ref);                     // tamanho da letra fixo
+  if (b.w * k > cw) k = cw / Math.max(1, b.w);                // nome muito comprido: diminui só o necessário
+  const maxH = H * 0.42; if (b.h * k > maxH) k = maxH / Math.max(1, b.h);
+  return { w, cw, ch: Math.max(40, b.h * k + 2 * ILHA.folga), E };
 }
 function desenharIlha() {
   const cv = $('#ilhaCv'), w = parseFloat(cv.style.width), h = parseFloat(cv.style.height); if (!w || !h) return;
   cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
-  desenharTracos(cv.getContext('2d'), piTracos(), cv.width, cv.height, 0, '#fff', null, ILHA.folga * DPR);
+  const E = escritaLimpa();   // só o nome (sem círculo e sem riscos), na proporção do papel
+  desenharTracos(cv.getContext('2d'), E.todos, cv.width, cv.height, 0, '#fff', null, ILHA.folga * DPR, E.ref);
 }
 function abrirIlha() {
   if (ilhaAberta) return; ilhaAberta = true; clearTimeout(ilhaT);
@@ -2944,23 +3045,26 @@ function desenharDock() {
 function piTeste() {
   const cv = $('#aPiCv'); if (!cv) return; const r = cv.getBoundingClientRect(); if (!r.width) return;
   cv.width = Math.round(r.width * DPR); cv.height = Math.round(r.height * DPR);
-  desenharTracos(cv.getContext('2d'), piTracos(), cv.width, cv.height, 0, '#fff', '#000', 12 * DPR);
-  const n = $('#aPiN'); if (n) n.textContent = piTracos().length + ' traços';
+  const E = escritaLimpa();
+  desenharTracos(cv.getContext('2d'), E.todos, cv.width, cv.height, 0, '#fff', '#000', 12 * DPR, E.ref);
+  const n = $('#aPiN'); if (n) n.textContent = E.linhas.length + (E.linhas.length === 1 ? ' linha' : ' linhas') + (E.deco.length ? ' · ' + E.deco.length + ' desenho ignorado' : '');
 }
 function encherPostit() {
-  $('#aPi').checked = cfg.pi !== false; $('#aPiOp').value = cfg.piOpLimpa == null ? '' : String(cfg.piOpLimpa);
+  $('#aPiProp').value = String(cfg.piProp); $('#aPi').checked = cfg.pi !== false; $('#aPiOp').value = cfg.piOpLimpa == null ? '' : String(cfg.piOpLimpa);
   piEstado(pit.ligado ? 'conectado ✓ ' + (pit.dev && pit.dev.name || '') : (guarda.get('padName', '') ? 'desconectado' : 'não conectado'));
   piSinais(); setTimeout(piTeste, 50);
 }
 $('#aPi').addEventListener('change', e => { cfg.pi = e.target.checked; salvar(); if (cfg.pi) piAuto(); });
 $('#aPiCon').addEventListener('click', piConectar);
+$('#aPiProp').addEventListener('change', e => { const v = parseFloat(String(e.target.value).replace(',', '.')); if (v >= 0.5 && v <= 3) { cfg.piProp = v; salvar(); piTeste(); } else e.target.value = String(cfg.piProp); });
 $('#aPiLimpa').addEventListener('click', () => { piLimpar(); $('#aPiRes').textContent = '—'; $('#aPiCands').textContent = ''; });
 $('#aPiOp').addEventListener('change', e => { const v = e.target.value.trim(); cfg.piOpLimpa = v === '' ? null : +v; salvar(); });
 $('#aPiLer').addEventListener('click', async () => {
   if (!piTracos().length) { $('#aPiRes').textContent = 'nada escrito'; return; }
   $('#aPiRes').textContent = 'lendo…'; const t0 = performance.now();
   const r = await lerPostit(c => { $('#aPiCands').textContent = c.join(' · '); });
-  $('#aPiRes').textContent = (r.nome ? r.nome + ' ✓ (leu "' + r.lido + '"' + (r.ang ? ', inclinação ' + r.ang + '°' : '') + ')' : 'não leu (mostraria "Atualizando…")') + ' · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
+  const nota = r.nota != null ? ' · nota ' + r.nota.toFixed(2) + (r.folga != null ? ', folga ' + r.folga.toFixed(2) : '') : '';
+  $('#aPiRes').textContent = (r.nome ? r.nome + ' ✓ (leu "' + r.lido + '")' : 'não leu (mostraria "Atualizando…")' + (r.quase ? ' — mais perto: ' + r.quase : '')) + nota + ' · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
   $('#aPiCands').textContent = r.cands.join(' · ') || '(nenhum texto)';
 });
 
