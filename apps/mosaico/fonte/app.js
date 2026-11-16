@@ -458,7 +458,8 @@ async function prepararMosaico() {
   const meu = ++prepararMosaico.vez;
   const n = atual.tipo === 'texto' ? colsTexto(atual.nome) : (+cfg.colsM || 60), t = W / n;
   const rowsVis = Math.ceil(H / t) + 1;
-  const k00 = +cfg.n0 || 3, G = Math.max(Math.ceil(H / (W / k00)) + 1, k00 === 3 ? 12 : 0);   // embaixo do rosto: as 2 telas de fotos pessoais (12 fileiras)   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
+  const k00 = +cfg.n0 || 3, G = 0;   // a imagem do famoso enche a última tela inteira; as fotos pessoais ficam DENTRO dela, no meio, lá embaixo (igual ao original)
+  const fReais = k00 === 3 ? 12 : Math.ceil(H / (W / k00)) + 1;   // fileiras da faixa com as fotos de verdade (Tela 1 + Tela 2)   // o rosto fica ACIMA da primeira tela (puxa para baixo e pinça)
   let sN = seqNormal.slice();
   const precisa = (rowsVis + G + 2) * n;
   if (sN.length < precisa) sN = new Array(precisa - sN.length).fill('').concat(sN);   // galeria pequena: lugares a mais (preenchidos abaixo)
@@ -507,11 +508,12 @@ async function prepararMosaico() {
   // faixa da esquerda (3 colunas): as MESMAS fotos, no mesmo lugar, da Fototeca normal que o público já viu
   const k0 = +cfg.n0 || 3, M = seqNormal.length, uN = Math.floor((M - 1) / k0);
   const cS = Math.floor((n - k0) / 2);   // a Fototeca de perto fica no MEIO da grade grande, embaixo do rosto (igual ao Mozaic)
-  const fL = ultima + 1;
+  const fL = fReais;   // só a faixa de baixo é a Fototeca de verdade (o resto é o rosto)
   const faixa = (r, c) => { const j = (uN - (ultima - r)) * k0 + (c - cS); return j >= 0 && j < M ? seqNormal[j] : ''; };
   const nova = sN.slice(), mz = new Array(N).fill(''), ids = [], tinta = [];
   for (let r = 0; r <= ultima; r++) for (let c = cS; c < cS + k0; c++) { const f = faixa(r, c); if (f) nova[r * n + c] = f; }   // camada 1: a Fototeca normal (sem buraco no alto)
-  { const vf = vaziosFim(); if (vf) for (let c = cS + k0 - vf; c < n; c++) nova[ultima * n + c] = ''; }   // última fileira incompleta: vazia até a borda direita
+  { const vf = vaziosFim(); if (vf) for (let c = cS + k0 - vf; c < cS + k0; c++) nova[ultima * n + c] = ''; }   // última fileira incompleta (só na faixa: em volta é o rosto)
+  const real = (r, c) => c >= cS && c < cS + k0 && r > ultima - fReais;   // a faixa do meio: as fotos de verdade, nunca trocadas
   const cima = stPx() + 96, topo = Math.max(0, cima + (ultimaF + 1) * t - H);
   const janela = texto ? Math.max(2, Math.round(NP * 0.06)) : Math.max(2, Math.round(NP * 0.015));   // nome escrito: só as mais claras e as mais escuras
   for (let r = primeira; r <= ultimaF; r++) {
@@ -533,7 +535,8 @@ async function prepararMosaico() {
       const kk = texto ? 1 : (NP ? porLuz[Math.min(NP - 1, Math.round(v * (NP - 1)))].l : v * 255) / l0;
       const cr = Math.min(255, Math.round(base[0] * kk)), cgc = Math.min(255, Math.round(base[1] * kk)), cb = Math.min(255, Math.round(base[2] * kk));
       let id = '';
-      if (idx < N) {
+      if (idx < N && real(r, c)) { id = nova[idx]; mz[idx] = id; }
+      else if (idx < N) {
         if (!NP) id = sN[idx];
         else {
           const esq = c > 0 ? mz[idx - 1] : '', cimaId = idx - n >= 0 ? mz[idx - n] : '';
