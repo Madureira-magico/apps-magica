@@ -2127,7 +2127,7 @@ function escritaLimpa(lista) {
   const passos = []; tr.forEach(t => { for (let i = 1; i < t.length; i++) { const d = Math.hypot(t[i].x - t[i - 1].x, t[i].y - t[i - 1].y); if (d > 0) passos.push(d); } });
   const passo = medianaArr(passos) || 1;
   const alt0 = medianaArr(tr.map(t => bboxT(t).h).filter(h => h > 0)) || 1000;
-  const pulo = Math.max(passo * 5, alt0 * 0.4);
+  const pulo = Math.max(passo * 12, alt0 * 1.5);   // só um salto bem maior que uma letra (traço reto e rápido tem poucos pontos: não pode virar pontinhos)
   const cortados = [];
   tr.forEach(t => { let cur = [t[0]]; for (let i = 1; i < t.length; i++) { const d = Math.hypot(t[i].x - t[i - 1].x, t[i].y - t[i - 1].y); if (d > pulo) { cortados.push(cur); cur = [t[i]]; } else cur.push(t[i]); } cortados.push(cur); });
   tr = cortados;
