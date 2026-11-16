@@ -243,19 +243,18 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             }
         }
         capaInicio.image = img
-        capaInicio.frame = B
+        capaInicio.frame = visivel   // dentro da grade: anda junto com o dedo (nada some no primeiro deslize)
         capaInicio.alpha = 1
         capaInicio.isUserInteractionEnabled = false
-        if capaInicio.superview !== vista { vista.addSubview(capaInicio) }
-        vista.bringSubviewToFront(capaInicio)
+        if capaInicio.superview !== plano { capaInicio.removeFromSuperview(); plano.insertSubview(capaInicio, aboveSubview: tilesB) }
         capaVez += 1; let v = capaVez
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in if self?.capaVez == v { self?.tirarCapaInicio() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in if self?.capaVez == v { self?.tirarCapaInicio() } }
     }
     private var capaVez = 0
-    private func tirarCapaInicio() {
-        guard capaInicio.superview != nil, capaInicio.alpha > 0 else { return }
+    private func tirarCapaInicio() {   // sai sem fade: está no mesmo lugar da grade de verdade
+        guard capaInicio.superview != nil else { return }
         capaVez += 1
-        UIView.animate(withDuration: 0.2, animations: { self.capaInicio.alpha = 0 }) { _ in if self.capaInicio.alpha == 0 { self.capaInicio.removeFromSuperview() } }
+        capaInicio.removeFromSuperview()
     }
     private func ligar(_ on: Bool) {
         if !on { capaInicio.removeFromSuperview(); capaVez += 1 }
@@ -348,6 +347,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
                 travado = false
                 let ins = zoomer.contentInset, cs = zoomer.contentSize
                 let y = min(max(-ins.top, cs.height - doFim), cs.height - H + ins.bottom)
+                xTravado = nil
                 zoomer.contentOffset = CGPoint(x: CGFloat(cS) * t0 * sc, y: y)
             } else { zerar = true }
         } else {
@@ -363,6 +363,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     private var mudouFechada = false
     private func montarPlano() {
         if !ligada { mudouFechada = true }
+        tirarCapaInicio()   // a capa é da grade antiga
         // segura a imagem antiga na tela enquanto a nova se desenha (sem piscar branco)
         if ligada, !vista.isHidden, plano.bounds.width > 0, let foto = vista.snapshotView(afterScreenUpdates: false) {
             vista.addSubview(foto)
@@ -449,6 +450,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
         let cs = zoomer.contentSize, ins = zoomer.contentInset
         let y = max(-ins.top, cs.height - H + ins.bottom)
         let x = CGFloat(cS) * t0 * zoomer.zoomScale
+        xTravado = nil
         zoomer.contentOffset = CGPoint(x: x, y: y)
     }
 
@@ -477,22 +479,21 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     /// ao aproximar (voltando do rosto), vai levando aos poucos até as fotos do começo
     private var escalaAnt: CGFloat = 0
     private var ajuda: CGFloat = 3   // 0 = sem ajuda, 3 = como era, 10 = bem forte
+    private func xFaixa(_ sc: CGFloat) -> CGFloat {   // offset de lado com a faixa das fotos de verdade no meio da tela
+        let x = (CGFloat(cS) + n0 / 2) * t0 * sc - W / 2
+        let ins = zoomer.contentInset, maxX = zoomer.contentSize.width - W + ins.right
+        return min(max(x, -ins.left), max(-ins.left, maxX))
+    }
     private func guiarVolta(_ s: UIScrollView) {
         let sc = s.zoomScale
         defer { escalaAnt = sc }
-        guard temMos, sc >= 1, escalaAnt > 0, sc > escalaAnt * 1.0005 else { return }
-        let smax = s.maximumZoomScale, ins = zoomer.contentInset
-        let oi = offsetInicio(smax), of = offsetRosto()
-        let q = CGPoint(x: W / 2, y: (ins.top + H - ins.bottom) / 2)
-        let p = CGPoint(x: (oi.x + q.x) / smax, y: (oi.y + q.y) / smax)
-        let sf = CGPoint(x: p.x - of.x, y: p.y - of.y)
-        let u = min(1, max(0, log(sc) / log(max(1.0001, smax))))
-        let alvo = CGPoint(x: p.x * sc - (sf.x + (q.x - sf.x) * u), y: p.y * sc - (sf.y + (q.y - sf.y) * u))
-        guard ajuda > 0 else { return }
-        let k: CGFloat = min(0.9, (0.10 + 0.25 * u) * ajuda / 3)   // mais firme perto do fim; a força vem do menu
-        let o = s.contentOffset
+        guard ajuda > 0, temMos, sc >= 1, escalaAnt > 0, sc > escalaAnt * 1.0005 else { return }
+        // só de lado: a cada pinça abrindo, vai centralizando na faixa; para cima e para baixo fica livre
+        let u = min(1, max(0, log(sc) / log(max(1.0001, s.maximumZoomScale))))
+        let k: CGFloat = min(1, 0.06 + 0.5 * u * u)
+        let o = s.contentOffset, alvo = xFaixa(sc)
         ajustando = true
-        s.contentOffset = CGPoint(x: o.x + (alvo.x - o.x) * k, y: o.y + (alvo.y - o.y) * k)
+        s.contentOffset = CGPoint(x: o.x + (alvo - o.x) * k, y: o.y)
         ajustando = false
     }
     func scrollViewDidZoom(_ s: UIScrollView) {
@@ -549,13 +550,18 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
             UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetInicio(s.maximumZoomScale) }
             return
         }
+        if ajuda > 0, temMos, e >= s.maximumZoomScale * 0.98 {   // chegou às fotos grandes: encaixa a faixa certinho no meio
+            xTravado = nil
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset.x = self.xFaixa(s.zoomScale) }
+            return
+        }
         guard temMos, e <= s.minimumZoomScale * 1.01 else { return }
         travado = true
         zoomer.isScrollEnabled = false
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) { s.contentOffset = self.offsetRosto() }
     }
     /// arrastar só para cima e para baixo (como no app Fotos); de lado só a pinça mexe
-    func scrollViewWillBeginDragging(_ s: UIScrollView) { tirarCapaInicio(); if !s.isZooming { xTravado = s.contentOffset.x } }
+    func scrollViewWillBeginDragging(_ s: UIScrollView) { if !s.isZooming { xTravado = s.contentOffset.x } }
     func scrollViewDidScroll(_ s: UIScrollView) {
         if let x = xTravado, !s.isZooming, !ajustando, s.contentOffset.x != x {
             ajustando = true; s.contentOffset.x = x; ajustando = false

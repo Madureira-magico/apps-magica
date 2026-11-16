@@ -956,7 +956,7 @@ function enviarGaleria(zerar) {
     const ap = arqPiada();
     const s = seq.map(it => it === '#piada' ? (ap ? 'arq:' + ap : '') : (it || ''));
     const m = mos && mos.img && mos.seq === seq ? { ids: mos.ids, tinta: mos.tinta, cols: mos.cols, primeira: mos.primeira, linhas: mos.linhas, ultima: mos.ultima, ini: mos.ini, faixaL: mos.fL || 0, cS: mos.cS || 0, img: 'mosaico.jpg', v: String(mos.versao), real: mos.real || '', realRow: mos.realRow || 0, realRows: mos.realRows || 0 } : null;
-    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.ajuda == null ? 3 : +cfg.ajuda, momento: cfg.momento == null ? 5 : +cfg.momento };
+    const c = { reforco: +cfg.reforco, cor: cfg.cor, escuro: corFundo === '#000', n0: +cfg.n0 || 3, st: stPx(), sb: sbPx(), zonas: zonasGal(), selecao: emSelecao, sel: [...selecionados], ativa: !$('#busca').classList.contains('on'), ajuda: cfg.centrar === false ? 0 : 1, momento: cfg.momento == null ? 5 : +cfg.momento };
     nat.call('galeriaDados', { seq: s, mos: m, cfg: c, zerar: zerarGal }).catch(() => {});
     zerarGal = false;
   }, 0);
@@ -1635,7 +1635,7 @@ async function encherAjustes() {
   mostrarAtual(); mostrarTirados();
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
-if (cfg.ajuda == null) cfg.ajuda = 3; $('#aAjuda').value = cfg.ajuda; $('#aAjudaV').textContent = cfg.ajuda; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
+$('#aCentrar').checked = cfg.centrar !== false; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
   $('#aEnq').value = cfg.enq; $('#aAviso').checked = !!cfg.aviso; desenharSlots();
   $('#aReal').checked = !!cfg.fotoReal; $('#aVib').checked = !!cfg.vibrar; $('#aLimite').value = String(cfg.limite);
   $('#aAbrir').value = cfg.abrir; $('#aTema').value = cfg.tema; $('#aN0').value = String(cfg.n0); 
@@ -1784,7 +1784,7 @@ $('#aRef').addEventListener('input', e => { cfg.reforco = +e.target.value; $('#a
 $('#aRef').addEventListener('change', () => { refazer(); enviarGaleria(); });
 $('#aAviso').addEventListener('change', e => { cfg.aviso = e.target.checked; salvar(); mostrarAtual(); });
 $('#aReal').addEventListener('change', e => { cfg.fotoReal = e.target.checked; salvar(); });
-$('#aAjuda').addEventListener('input', e => { cfg.ajuda = +e.target.value; $('#aAjudaV').textContent = cfg.ajuda; salvar(); enviarGaleria(); });
+$('#aCentrar').addEventListener('change', e => { cfg.centrar = e.target.checked; salvar(); enviarGaleria(); });
 $('#aMomento').addEventListener('input', e => { cfg.momento = +e.target.value; $('#aMomentoV').textContent = cfg.momento; salvar(); enviarGaleria(); });
 $('#aVib').addEventListener('change', e => { cfg.vibrar = e.target.checked; salvar(); });
 $('#aAbrir').addEventListener('change', e => { cfg.abrir = e.target.value; salvar(); });
