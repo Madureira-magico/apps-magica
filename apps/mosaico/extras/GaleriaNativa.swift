@@ -643,7 +643,7 @@ final class GaleriaNativa: NSObject, UIScrollViewDelegate, UIGestureRecognizerDe
     /// quanto do caminho entre o rosto inteiro (0) e as fotos grandes (1)
     private func fracao(_ sc: CGFloat) -> CGFloat {
         let mn = max(0.0001, zoomer.minimumZoomScale), mx = zoomer.maximumZoomScale
-        guard mx > mn * 1.0001 else { return 1 }
+        guard temMos, mx > mn * 1.0001 else { return 1 }   // sem artista: sempre a grade normal (última fileira acima da barra)
         return min(1, max(0, log(sc / mn) / log(mx / mn)))
     }
     /// força da cortina que esconde as fotos acima da cabeça (a mesma conta de atualizar)
