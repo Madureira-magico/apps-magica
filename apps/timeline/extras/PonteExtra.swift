@@ -10,6 +10,7 @@ import MediaPlayer
 ///   armar {gatilho: "volume" | "chacoalhar" | "virar" | "toque"} -> fica esperando o gatilho
 ///   desarmar                -> para de esperar
 ///   som                     -> toca o som de travar/destravar do iPhone
+///   glitch {longo: bool}    -> toca o som de glitch
 ///   icones                  -> manda a lanterna e a câmera do próprio iPhone (desenhos oficiais)
 /// O iPhone responde:
 ///   window.tlGatilho()                  -> o gatilho aconteceu
@@ -35,6 +36,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
 
     // som
     private var somID: SystemSoundID = 0
+    private var silencio: AVAudioPlayer?
+    private var glitchLongo: AVAudioPlayer?
+    private var glitchCurto: AVAudioPlayer?
 
     func instalar(_ config: WKWebViewConfiguration) {
         config.userContentController.add(self, name: "tl")
@@ -45,6 +49,49 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         self.tela = tela
         let url = URL(fileURLWithPath: "/System/Library/Audio/UISounds/lock.caf")
         if AudioServicesCreateSystemSoundID(url as CFURL, &somID) != noErr { somID = 0 }
+        prepararSom()
+        // o controle de volume fica sempre na tela (escondido): assim o aviso de volume nunca aparece
+        let mv = MPVolumeView(frame: CGRect(x: -2000, y: -2000, width: 100, height: 40))
+        mv.alpha = 0.01
+        mv.isUserInteractionEnabled = false
+        tela.view.addSubview(mv)
+        volumeView = mv
+        NotificationCenter.default.addObserver(self, selector: #selector(voltouProApp),
+                                               name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(voltouProApp),
+                                               name: AVAudioSession.interruptionNotification, object: nil)
+    }
+
+    /// Toca "silêncio" sem parar. Enquanto o app toca som, os botões de volume mexem no volume do app
+    /// (e não na campainha, que mostrava o aviso "Toque" e não avisava o app).
+    private func prepararSom() {
+        let s = AVAudioSession.sharedInstance()
+        try? s.setCategory(.playback, mode: .default, options: [])
+        try? s.setActive(true)
+        func player(_ nome: String) -> AVAudioPlayer? {
+            guard let u = Bundle.main.url(forResource: nome, withExtension: "wav", subdirectory: "www")
+                    ?? Bundle.main.url(forResource: nome, withExtension: "wav") else { return nil }
+            let p = try? AVAudioPlayer(contentsOf: u); p?.prepareToPlay(); return p
+        }
+        silencio = player("silencio")
+        silencio?.numberOfLoops = -1
+        silencio?.volume = 0.01
+        silencio?.play()
+        glitchLongo = player("glitch_longo")
+        glitchCurto = player("glitch_curto")
+    }
+
+    @objc private func voltouProApp() {
+        try? AVAudioSession.sharedInstance().setActive(true)
+        if silencio?.isPlaying == false { silencio?.play() }
+        if gatilho == "volume" && armado { garantirEspacoVolume() }
+    }
+
+    private func tocarGlitch(_ longo: Bool) {
+        guard let p = longo ? glitchLongo : glitchCurto else { return }
+        if p.isPlaying { p.stop() }
+        p.currentTime = 0
+        p.play()
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -54,6 +101,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         case "desarmar": desarmar()
         case "som": AudioServicesPlaySystemSound(somID != 0 ? somID : 1100)
         case "icones": mandarIcones()
+        case "glitch": tocarGlitch((corpo["longo"] as? Bool) ?? false)
         default: break
         }
     }
@@ -111,26 +159,14 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
 
     // MARK: botão de volume +
     private func ligarVolume() {
-        let s = AVAudioSession.sharedInstance()
-        try? s.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-        try? s.setActive(true)
-        if volumeView == nil, let v = tela?.view {
-            // fica fora da tela: com ele presente, o iPhone não mostra o aviso de volume
-            let mv = MPVolumeView(frame: CGRect(x: -2000, y: -2000, width: 100, height: 40))
-            mv.alpha = 0.01
-            mv.isUserInteractionEnabled = false
-            v.addSubview(mv)
-            volumeView = mv
-        }
-        volumeOriginal = s.outputVolume
-        // no máximo não dá para subir: deixa um pouco abaixo
-        if volumeOriginal > 0.9 { mudarVolume(0.85) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            guard let self = self, self.armado, self.gatilho == "volume" else { return }
-            self.observador = s.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, m in
-                guard let self = self, !self.ajustando, let n = m.newValue, let o = m.oldValue else { return }
-                if n > o + 0.001 {
-                    DispatchQueue.main.async {
+        voltouProApp()
+        garantirEspacoVolume()
+        if observador == nil {
+            observador = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.old, .new]) { [weak self] _, m in
+                guard let n = m.newValue, let o = m.oldValue else { return }
+                DispatchQueue.main.async {
+                    guard let self = self, self.armado, self.gatilho == "volume", !self.ajustando else { return }
+                    if n > o + 0.001 {
                         self.avisar()
                         self.mudarVolume(self.volumeOriginal)   // devolve o volume como estava
                     }
@@ -139,16 +175,21 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         }
     }
 
-    private func desligarVolume() {
-        observador?.invalidate()
-        observador = nil
+    /// No máximo não dá para subir: deixa um pouco abaixo (sem aviso na tela)
+    private func garantirEspacoVolume() {
+        let v = AVAudioSession.sharedInstance().outputVolume
+        volumeOriginal = min(v, 0.85)
+        if v > 0.9 { mudarVolume(0.85) }
     }
+
+    private func desligarVolume() { }
 
     private func mudarVolume(_ v: Float) {
         guard let slider = volumeView?.subviews.compactMap({ $0 as? UISlider }).first else { return }
         ajustando = true
-        slider.value = v
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.ajustando = false }
+        slider.setValue(v, animated: false)
+        slider.sendActions(for: .valueChanged)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.ajustando = false }
     }
 
     // MARK: ícones oficiais do iPhone (SF Symbols)

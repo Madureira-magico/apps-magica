@@ -54,7 +54,7 @@ input[type=file]{display:none}
 <body>
 
 <!-- ================= MENU ================= -->
-<div id="menu" class="tela on">
+<div id="menu" class="tela">
   <h1>Timeline</h1>
   <div id="comecar">Começar</div>
 
@@ -78,6 +78,7 @@ input[type=file]{display:none}
       <div class="seg" data-k="gatilho"><div data-v="volume">Volume +</div><div data-v="toque">Toque</div><div data-v="chacoalhar">Chacoalhar</div><div data-v="virar">Virar</div></div>
     </div>
     <div class="lin" id="linGlitch">Glitch<div class="sw" data-k="glitch"></div></div>
+    <div class="lin" id="linSomGlitch">Som do glitch<div class="sw" data-k="somGlitch"></div></div>
     <div class="lin col">Começa depois do gatilho
       <div class="seg" data-k="atraso"><div data-v="1">1 s</div><div data-v="2">2 s</div><div data-v="3">3 s</div><div data-v="4">4 s</div><div data-v="5">5 s</div></div>
     </div>
@@ -96,12 +97,12 @@ input[type=file]{display:none}
     </div>
     <div class="lin">Zero antes da hora (09:41)<div class="sw" data-k="zeroHora"></div></div>
   </div>
-  <div class="dica">Para voltar a este menu: segure o dedo parado na tela por 2 segundos (na tela preta ou na tela de bloqueio).</div>
+  <div class="dica">Dois dedos deslizando para baixo: abre este menu (de qualquer tela).<br>Dois dedos deslizando para cima na tela de bloqueio: volta para a tela preta, zerado, pronto para a próxima mesa.</div>
   <input type="file" id="arquivo" accept="image/*">
 </div>
 
 <!-- ================= GRADE ================= -->
-<div id="grade" class="tela"></div>
+<div id="grade" class="tela on"></div>
 
 <!-- ================= BLOQUEIO ================= -->
 <div id="lock" class="tela">
@@ -122,7 +123,7 @@ function mandar(o){ if(NATIVO) window.webkit.messageHandlers.tl.postMessage(o); 
 try{ window.webkit.messageHandlers.barra.postMessage(true); }catch(e){}
 
 /* ---------- ajustes ---------- */
-const PADRAO = {zero:false, dois:false, extra:0, som:true, gatilho:'toque', glitch:true, atraso:'3', vel:'normal', letra:'normal', peso:'500', zeroHora:true};
+const PADRAO = {zero:false, dois:false, extra:0, som:true, gatilho:'toque', glitch:true, somGlitch:true, atraso:'3', vel:'normal', letra:'normal', peso:'500', zeroHora:true};
 let A = Object.assign({}, PADRAO);
 try{ Object.assign(A, JSON.parse(localStorage.getItem('tl-ajustes') || '{}')); }catch(e){}
 function salvar(){ try{ localStorage.setItem('tl-ajustes', JSON.stringify(A)); }catch(e){} }
@@ -132,6 +133,7 @@ function pintarMenu(){
   document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.classList.toggle('on', d.dataset.v === String(A[g.dataset.k]))));
   $('extra').textContent = A.extra;
   $('linGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar');
+  $('linSomGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar' || !A.glitch);
 }
 document.querySelectorAll('.sw').forEach(s => s.onclick = () => { A[s.dataset.k] = !A[s.dataset.k]; salvar(); pintarMenu(); });
 document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.onclick = () => { A[g.dataset.k] = d.dataset.v; salvar(); pintarMenu(); medir(); }));
@@ -168,13 +170,24 @@ $('arquivo').onchange = () => {
 function mostrar(id){ document.querySelectorAll('.tela').forEach(t => t.classList.toggle('on', t.id === id)); }
 function irMenu(){ mandar({cmd:'desarmar'}); parar(); mostrar('menu'); pintarMenu(); }
 
-/* segurar 2 s parado = volta ao menu */
-let segurar = null, ini = null;
-function prenderSegurar(el){
-  el.addEventListener('touchstart', e => { ini = {x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now()}; clearTimeout(segurar); segurar = setTimeout(irMenu, 2000); }, {passive:true});
-  el.addEventListener('touchmove', e => { if(ini && Math.hypot(e.touches[0].clientX - ini.x, e.touches[0].clientY - ini.y) > 15) clearTimeout(segurar); }, {passive:true});
-  el.addEventListener('touchend', () => clearTimeout(segurar));
-}
+/* gestos com dois dedos: para baixo = menu; para cima (na tela de bloqueio) = tela preta zerada */
+let ini = null, doisDedos = false, g2 = null;
+function mediaY(t){ let y = 0; for(const x of t) y += x.clientY; return y / t.length; }
+document.addEventListener('touchstart', e => {
+  if(e.touches.length === 1){ doisDedos = false; ini = {x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now()}; }
+  if(e.touches.length >= 2){ doisDedos = true; g2 = {y:mediaY(e.touches), dy:0}; }
+}, {passive:true});
+document.addEventListener('touchmove', e => {
+  if(e.touches.length >= 2 && g2) g2.dy = mediaY(e.touches) - g2.y;
+  if(!$('menu').classList.contains('on')) e.preventDefault();
+}, {passive:false});
+document.addEventListener('touchend', e => {
+  if(!g2 || e.touches.length > 0) return;
+  const dy = g2.dy; g2 = null;
+  if(dy > 70 && !$('menu').classList.contains('on')) irMenu();
+  else if(dy < -70 && $('lock').classList.contains('on')) irTelaPreta();
+});
+function irTelaPreta(){ mandar({cmd:'desarmar'}); parar(); digitos = ''; montarGrade(); mostrar('grade'); }
 
 /* ---------- grade ---------- */
 let digitos = '', esperaDig = null;
@@ -185,7 +198,7 @@ function montarGrade(){
   ordem.forEach(n => {
     const d = document.createElement('div');
     if(n !== null){
-      d.addEventListener('touchend', e => { e.preventDefault(); if(Date.now() - (ini ? ini.t : 0) < 600) digito(n); });
+      d.addEventListener('touchend', e => { e.preventDefault(); if(!doisDedos && e.touches.length === 0 && Date.now() - (ini ? ini.t : 0) < 600) digito(n); });
       if(!('ontouchstart' in window)) d.addEventListener('click', () => digito(n));
     }
     g.appendChild(d);
@@ -197,8 +210,7 @@ function digito(n){
   if(!A.dois || digitos.length >= 2) return entrar();
   esperaDig = setTimeout(entrar, 1200);
 }
-$('comecar').onclick = () => { digitos = ''; montarGrade(); mostrar('grade'); };
-prenderSegurar($('grade'));
+$('comecar').onclick = () => irTelaPreta();
 
 /* ---------- tela de bloqueio ---------- */
 let K = 1, cv = $('rel'), cx = cv.getContext('2d');
@@ -369,7 +381,9 @@ function voltar(){
   const fator = A.vel === 'lenta' ? 1.6 : A.vel === 'rapida' ? 0.6 : 1;
   const n = offset;
   if(n <= 0){ estado = 'fim'; return; }
+  const somG = comGlitch && A.somGlitch;
   if(comGlitch) glitch(650);
+  if(somG) mandar({cmd:'glitch', longo:true});
   // como no original: começa devagar, acelera e freia no final
   let t = comGlitch ? 500 : 0;
   for(let i = 0; i < n; i++){
@@ -381,6 +395,7 @@ function voltar(){
     timers.push(setTimeout(() => {
       offset--; desenhar();
       if(comGlitch) glitch(fim ? 450 : 110);
+      if(somG) mandar({cmd:'glitch', longo:fim});
       if(fim) estado = 'fim';
     }, t));
   }
@@ -388,9 +403,8 @@ function voltar(){
 
 /* toque na tela de bloqueio */
 const lock = $('lock');
-prenderSegurar(lock);
 lock.addEventListener('touchend', e => {
-  if(A.gatilho === 'toque' && estado === 'esperando' && ini && Date.now() - ini.t < 500) gatilho();
+  if(A.gatilho === 'toque' && estado === 'esperando' && !doisDedos && e.touches.length === 0 && ini && Date.now() - ini.t < 500) gatilho();
 });
 // no computador (teste): clique faz o papel do toque e da grade
 if(!('ontouchstart' in window)){
@@ -399,6 +413,6 @@ if(!('ontouchstart' in window)){
 
 document.addEventListener('gesturestart', e => e.preventDefault());
 addEventListener('resize', () => { if($('lock').classList.contains('on')) medir(); });
-carregarFundo(); pintarMenu(); medir();
+carregarFundo(); pintarMenu(); medir(); montarGrade();
 </script>
 </body></html>
