@@ -1,0 +1,38 @@
+name: Montar apps Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'apps/detector/www/**'
+      - '.github/workflows/android.yml'
+
+jobs:
+  detector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Montar o Detector (.apk)
+        run: gradle -p android/detector assembleRelease --no-daemon
+
+      - name: Guardar o .apk
+        run: |
+          mkdir -p saida
+          cp android/detector/app/build/outputs/apk/release/app-release.apk saida/Detector.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Detector-android
+          path: saida/Detector.apk

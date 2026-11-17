@@ -191,7 +191,7 @@ const vm = document.getElementById('vm');
 const LEDS = 16;
 for (let i = 0; i < LEDS; i++) vm.appendChild(document.createElement('div'));
 function led(v){ return v <= 1 ? 0 : Math.min(LEDS, Math.log(v) / Math.log(150) * LEDS); }   // 1 µT a 150 µT
-const TEXTOS = {0:'Sinal ao vivo', 1:'Aprendendo a sala…', 2:'Sinal ao vivo', 3:'Ímã perto!', 4:'Dormindo · encoste o ímã para acordar',
+const TEXTOS = {'-1':'Este celular não tem sensor magnético', 0:'Sinal ao vivo', 1:'Aprendendo a sala…', 2:'Sinal ao vivo', 3:'Ímã perto!', 4:'Dormindo · encoste o ímã para acordar',
   5:'Acordou · afaste o ímã'};
 window.imaSinal = function(v, lim, est){
   const n = Math.round(led(v)), lt = Math.max(1, Math.round(led(lim)));

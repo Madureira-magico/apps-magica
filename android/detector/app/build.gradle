@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'br.com.ricardomadureira.detector'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "br.com.ricardomadureira.detector"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        apps {
+            storeFile file('../../assinatura-android.jks')
+            storePassword 'appsmagica'
+            keyAlias 'apps'
+            keyPassword 'appsmagica'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.apps
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // a tela é a mesma do iPhone
+    sourceSets {
+        main.assets.srcDirs = ['src/main/assets', '../../../apps/detector']
+    }
+    androidResources {
+        ignoreAssetsPattern '!app.conf:!extras:!icone.png:!.*'
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
