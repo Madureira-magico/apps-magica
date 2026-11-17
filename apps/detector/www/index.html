@@ -15,7 +15,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#071a44;font-family:-a
 #pw.on{background:#e53935;border-color:#ff8a80;box-shadow:0 0 14px rgba(255,60,50,.6)}
 #pw svg{width:24px;height:24px}
 .pn{background:rgba(5,18,50,.55);border:0.5px solid rgba(160,200,255,.25);border-radius:16px;padding:10px 12px}
-.fdpn{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+.fdpn{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;position:relative}
+#trava{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;z-index:2}
+#trava.on{background:#e53935}
+#trava svg{width:17px;height:17px}
+.fdpn.travado .faders{opacity:.35;pointer-events:none}
+.faders{padding-right:22px}
 .faders{display:flex;gap:4px;flex:1;min-height:0}
 .fd{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
 .vl{font-size:15px;font-weight:600}
@@ -47,7 +52,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#071a44;font-family:-a
     <div id="pw"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></div>
   </div>
 
-  <div class="pn fdpn">
+  <div class="pn fdpn" id="fdpn">
+    <div id="trava"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path id="arco" d="M8 11V7a4 4 0 0 1 8 0"/></svg></div>
     <div class="faders">
       <div class="fd"><span class="vl" id="v-sens">60</span><div class="tr" data-k="sens"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sensibi-<br>lidade</span></div>
       <div class="fd"><span class="vl" id="v-adapt">70</span><div class="tr" data-k="adapt"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sens.<br>adaptativa</span></div>
@@ -78,7 +84,7 @@ function mandar(o){ if(NATIVO) window.webkit.messageHandlers.ima.postMessage(o);
 function barra(esconder){ try{ window.webkit.messageHandlers.barra.postMessage(esconder); }catch(e){} }
 try{ window.webkit.messageHandlers.estilo.postMessage('claro'); }catch(e){}
 
-const PADRAO = {sens:60, adapt:70, forca:100, dupla:true, saidaLonga:false, disfarce:true, bolso:true, dormir:true, dormirMin:5};
+const PADRAO = {sens:60, adapt:70, forca:100, dupla:true, saidaLonga:false, disfarce:true, bolso:true, dormir:true, dormirMin:5, travado:false};
 let aj = Object.assign({}, PADRAO);
 try{ Object.assign(aj, JSON.parse(localStorage.getItem('detector-ajustes-21')||'{}')); }catch(e){}
 function guardar(){ try{ localStorage.setItem('detector-ajustes-21', JSON.stringify(aj)); }catch(e){} }
@@ -106,6 +112,22 @@ document.querySelectorAll('.tr').forEach(tr=>{
   tr.addEventListener('pointercancel', ()=>{ tr.onpointermove = null; });
   por(aj[k], false);
 });
+
+// trava dos faders: um toque fecha; para abrir, segurar 1 s
+const trava = document.getElementById('trava'), fdpn = document.getElementById('fdpn'), arco = document.getElementById('arco');
+function pintarTrava(){
+  trava.classList.toggle('on', aj.travado);
+  fdpn.classList.toggle('travado', aj.travado);
+  arco.setAttribute('d', aj.travado ? 'M8 11V7a4 4 0 0 1 8 0v4' : 'M8 11V7a4 4 0 0 1 8 0');
+}
+let seguraT = null;
+trava.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  if (!aj.travado) { aj.travado = true; guardar(); pintarTrava(); return; }
+  seguraT = setTimeout(()=>{ seguraT = null; aj.travado = false; guardar(); pintarTrava(); }, 1000);
+});
+['pointerup','pointercancel','pointerleave'].forEach(ev=> trava.addEventListener(ev, ()=>{ if (seguraT) { clearTimeout(seguraT); seguraT = null; } }));
+pintarTrava();
 
 // chaves
 document.querySelectorAll('.sw').forEach(s=>{
