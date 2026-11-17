@@ -47,6 +47,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     private var ultimaAtividade: TimeInterval = 0
     private var ultimoEnvio: TimeInterval = 0
     private var contAcordar = 0
+    // saída: pico da chegada e espera o "restinho" do ímã se acalmar
+    private var pico = 0.0
+    private var recuperando = false
+    private var recDesde: TimeInterval = 0
+    private var refRec = SIMD3<Double>(0, 0, 0)
+    private var refT: TimeInterval = 0
+    private var calmos = 0
     private var limpoDesde: TimeInterval = 0
     private var autoFase = 0
 
@@ -146,6 +153,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         // enquanto o próprio celular vibra (e logo depois), o sensor não conta: o motor de vibração tem ímã
         if t < silencioAte && (modo == .pronto || modo == .dormindo || modo == .acordando) {
             contAcordar = 0
+            if modo == .pronto && perto { pico = max(pico, valor) }   // continua medindo o pico enquanto vibra
             enviar(t)
             return
         }
@@ -181,9 +189,21 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         let limEf = limite * (1 + k * giroS)
         limAtual = limEf
         if giroS > 1.0 + 2.0 * a {                         // girando muito: não vibra e reaprende rápido
-            base += dif * 0.08
+            if !perto { base += dif * 0.08 }
             silencioAte = max(silencioAte, t + 0.35)
-            perto = false; acima = 0
+            acima = 0
+            return
+        }
+        // depois da saída: espera o "restinho" do ímã no celular se acalmar e aceita como o novo normal
+        if recuperando {
+            if t - refT >= 0.25 {
+                let d = suave - refRec
+                calmos = (d.x * d.x + d.y * d.y + d.z * d.z).squareRoot() < limEf * 0.3 ? calmos + 1 : 0
+                refRec = suave; refT = t
+            }
+            if calmos >= 2 || t - recDesde > 5 {
+                base = suave; recuperando = false; acima = 0; congeladoDesde = 0
+            }
             return
         }
         // a base acompanha a sala (mais rápido quando o celular se mexe), mas congela quando algo forte aparece
@@ -192,7 +212,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             congeladoDesde = 0
         } else {
             if congeladoDesde == 0 { congeladoDesde = t }
-            if t - congeladoDesde > 5 {                    // mudado muito tempo: é a sala, não o ímã
+            if t - congeladoDesde > (perto ? 15 : 5) {     // mudado muito tempo: é a sala, não o ímã
                 base = suave; congeladoDesde = 0; perto = false; acima = 0
             }
         }
@@ -201,13 +221,18 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
                 acima = valor > limEf ? acima + 1 : 0
                 if acima >= 2 {
                     perto = true
+                    pico = valor
                     ultimaAtividade = t
                     tocar(3, 0.37, gap: 0.28)                         // chegou: vum vum vum
                 }
-            } else if valor < limEf * 0.6 {
+            } else {
+                pico = max(pico, valor)
+            }
+            if perto && valor < max(limEf * 0.6, pico * 0.35) {   // saída: o sinal caiu bem, mesmo sobrando um restinho
                 perto = false
                 acima = 0
                 ultimaAtividade = t
+                recuperando = true; recDesde = t; refRec = suave; refT = t; calmos = 0
                 if dupla {
                     if saidaLonga { tocar(1, 1.0) } else { tocar(3, 0.37, gap: 0.28) }   // saiu
                 }
