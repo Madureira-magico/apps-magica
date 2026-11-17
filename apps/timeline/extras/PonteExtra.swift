@@ -9,8 +9,8 @@ import MediaPlayer
 /// Recados da página: window.webkit.messageHandlers.tl.postMessage({cmd: ...})
 ///   armar {gatilho: "volume" | "chacoalhar" | "virar" | "toque"} -> fica esperando o gatilho
 ///   desarmar                -> para de esperar
-///   som                     -> toca o som de travar/destravar do iPhone
-///   glitch {longo: bool}    -> toca o som de glitch
+///   som {vol: 0...1}        -> toca o som de bloqueio do iPhone
+///   glitch {seg: n}         -> toca o som de glitch por n segundos
 ///   icones                  -> manda a lanterna e a câmera do próprio iPhone (desenhos oficiais)
 /// O iPhone responde:
 ///   window.tlGatilho()                  -> o gatilho aconteceu
@@ -37,8 +37,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     // som
     private var somID: SystemSoundID = 0
     private var silencio: AVAudioPlayer?
-    private var glitchLongo: AVAudioPlayer?
-    private var glitchCurto: AVAudioPlayer?
+    private var somGlitch: AVAudioPlayer?
+    private var somBloqueio: AVAudioPlayer?
+    private var paraGlitch: DispatchWorkItem?
 
     func instalar(_ config: WKWebViewConfiguration) {
         config.userContentController.add(self, name: "tl")
@@ -77,8 +78,10 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         silencio?.numberOfLoops = -1
         silencio?.volume = 0.01
         silencio?.play()
-        glitchLongo = player("glitch_longo")
-        glitchCurto = player("glitch_curto")
+        somGlitch = player("glitch")
+        // o som de bloqueio do próprio iPhone, tocado de um jeito que deixa controlar o volume
+        somBloqueio = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: "/System/Library/Audio/UISounds/lock.caf"))
+        somBloqueio?.prepareToPlay()
     }
 
     @objc private func voltouProApp() {
@@ -87,11 +90,26 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         if gatilho == "volume" && armado { garantirEspacoVolume() }
     }
 
-    private func tocarGlitch(_ longo: Bool) {
-        guard let p = longo ? glitchLongo : glitchCurto else { return }
-        if p.isPlaying { p.stop() }
-        p.currentTime = 0
+    /// Toca o glitch por "segundos" e para na hora certa
+    private func tocarGlitch(_ segundos: Double) {
+        guard let p = somGlitch else { return }
+        paraGlitch?.cancel()
+        p.stop(); p.currentTime = 0; p.volume = 1
+        p.numberOfLoops = -1
         p.play()
+        let item = DispatchWorkItem { p.stop() }
+        paraGlitch = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + segundos, execute: item)
+    }
+
+    private func tocarBloqueio(_ vol: Float) {
+        if let p = somBloqueio {
+            p.stop(); p.currentTime = 0
+            p.volume = max(0, min(1, vol))
+            p.play()
+        } else {
+            AudioServicesPlaySystemSound(somID != 0 ? somID : 1100)
+        }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -99,9 +117,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         switch cmd {
         case "armar": armar((corpo["gatilho"] as? String) ?? "toque")
         case "desarmar": desarmar()
-        case "som": AudioServicesPlaySystemSound(somID != 0 ? somID : 1100)
+        case "som": tocarBloqueio((corpo["vol"] as? NSNumber)?.floatValue ?? 0.4)
         case "icones": mandarIcones()
-        case "glitch": tocarGlitch((corpo["longo"] as? Bool) ?? false)
+        case "glitch": tocarGlitch((corpo["seg"] as? NSNumber)?.doubleValue ?? 3)
         default: break
         }
     }
