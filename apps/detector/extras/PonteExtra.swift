@@ -22,6 +22,8 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     private let fila: OperationQueue = { let f = OperationQueue(); f.maxConcurrentOperationCount = 1; return f }()
     private var motor: CHHapticEngine?
     private var ocupadoAte: TimeInterval = 0      // só na fila principal
+    private var geracao = 0                        // muda ao desligar: corta vibrações que ainda iam tocar
+    private var tocando: CHHapticPatternPlayer?
 
     // ajustes (só na fila do sensor)
     private var sens = 60.0, adapt = 70.0, forca = 70.0
@@ -66,6 +68,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             iniciarSensor()
             fila.addOperation { if self.modo != .auto { self.comecarAprender() } }
         case "desligar":
+            cortarVibracao()
             fila.addOperation {
                 guard self.modo != .auto else { return }
                 self.modo = .parado
@@ -140,6 +143,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         valor = (dif.x * dif.x + dif.y * dif.y + dif.z * dif.z).squareRoot()
         limAtual = limite
 
+        // enquanto o próprio celular vibra (e logo depois), o sensor não conta: o motor de vibração tem ímã
+        if t < silencioAte && (modo == .pronto || modo == .dormindo || modo == .acordando) {
+            contAcordar = 0
+            enviar(t)
+            return
+        }
+
         switch modo {
         case .aprendendo: aprender(t)
         case .pronto: detectar(t, dif)
@@ -159,7 +169,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             modo = .pronto
             perto = false; acima = 0
             congeladoDesde = 0
-            silencioAte = t + 0.3
+            silencioAte = max(silencioAte, t + 0.3)
             ultimaAtividade = t
             tocar(3, 0.37, gap: 0.28)                                 // pronto: vum vum vum
         }
@@ -172,7 +182,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         limAtual = limEf
         if giroS > 1.0 + 2.0 * a {                         // girando muito: não vibra e reaprende rápido
             base += dif * 0.08
-            silencioAte = t + 0.35
+            silencioAte = max(silencioAte, t + 0.35)
             perto = false; acima = 0
             return
         }
@@ -271,16 +281,26 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     }
 
     /// Chamado na fila do sensor. Toca depois que a vibração anterior terminar (não se misturam).
+    /// Chamado na fila do sensor. Um aviso de cada vez: se já está vibrando, não acumula outro.
     private func tocar(_ pulsos: Int, _ dur: Double, gap: Double = 0.1, forcaMin: Double = 0) {
         let f = max(forca, forcaMin)
+        let total = Double(pulsos) * dur + Double(pulsos - 1) * gap
+        let agoraFila = ProcessInfo.processInfo.systemUptime
+        silencioAte = max(silencioAte, agoraFila + total + 0.6)    // fica "surdo" já, antes de começar a vibrar
         DispatchQueue.main.async {
             let agora = ProcessInfo.processInfo.systemUptime
-            let inicio = max(agora, self.ocupadoAte + 0.15)
-            self.ocupadoAte = inicio + Double(pulsos) * dur + Double(pulsos - 1) * gap
-            DispatchQueue.main.asyncAfter(deadline: .now() + (inicio - agora)) {
-                self.vibrar(pulsos, dur, gap, f)
-            }
+            guard self.ocupadoAte <= agora else { return }
+            self.ocupadoAte = agora + total
+            self.vibrar(pulsos, dur, gap, f)
         }
+    }
+
+    /// Desligou: para a vibração que está tocando e as que ainda iam tocar.
+    private func cortarVibracao() {
+        geracao += 1
+        ocupadoAte = 0
+        try? tocando?.stop(atTime: CHHapticTimeImmediate)
+        tocando = nil
     }
 
     private func vibrar(_ pulsos: Int, _ dur: Double, _ gap: Double, _ forca: Double) {
@@ -298,14 +318,17 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             try m.start()
             let p = try m.makePlayer(with: CHHapticPattern(events: eventos, parameters: []))
             try p.start(atTime: CHHapticTimeImmediate)
+            tocando = p
         } catch {
             vibrarSistema(pulsos, dur + gap)
         }
     }
 
     private func vibrarSistema(_ pulsos: Int, _ passo: Double) {
+        let g = geracao
         for i in 0..<pulsos {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * max(passo, 0.5)) {
+                guard g == self.geracao else { return }
                 AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
             }
         }
