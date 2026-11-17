@@ -22,5 +22,3 @@ App do assistente da Lousa (o link com o código sai em Opções › Assistente)
 https://madureira-magico.github.io/apps-magica/lousa/assistente.html
   detector/www/     o app Detector (detector de ímã: faders, medidor, disfarce)
   detector/extras/  parte do iPhone só do Detector (sensor magnético e vibração)
-  sensor/www/       o app Sensor (teste do sensor de proximidade e da câmera para o Timeline)
-  sensor/extras/    parte do iPhone só do Sensor
