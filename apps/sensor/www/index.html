@@ -9,7 +9,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#fff;font-family:-appl
 #tela{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
   padding:calc(env(safe-area-inset-top) + 18px) 20px calc(env(safe-area-inset-bottom) + 20px)}
 .seg{display:flex;background:#eee;border-radius:12px;padding:3px;width:100%;max-width:340px}
-.seg div{flex:1;text-align:center;padding:11px 0;font-size:17px;font-weight:600;border-radius:9px;color:#666}
+.seg div{flex:1;text-align:center;padding:11px 0;font-size:15px;font-weight:600;border-radius:9px;color:#666}
 .seg div.on{background:#fff;color:#111;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .dica{margin-top:14px;font-size:14px;color:#888;text-align:center;line-height:1.35;min-height:40px}
 #bola{margin:auto 0;width:180px;height:180px;border-radius:50%;
@@ -30,12 +30,12 @@ input[type=range]{width:100%;margin:4px 0}
 </style></head>
 <body>
 <div id="tela">
-  <div class="seg"><div id="m-prox" class="on">Sensor</div><div id="m-camera">Câmera</div></div>
+  <div class="seg"><div id="m-prox" class="on">Sensor</div><div id="m-camera">Câmera</div><div id="m-mov">Movimento</div></div>
   <div class="dica" id="dica"></div>
   <div id="bola"></div>
   <div id="cont">Detecções: <b id="n">0</b></div>
   <div id="cam">
-    <div class="lb"><span>Luz que a câmera vê</span><span id="pct">–</span></div>
+    <div class="lb"><span id="tit">Luz que a câmera vê</span><span id="pct">–</span></div>
     <div class="barra"><div id="luz"></div><div id="lim"></div></div>
     <div class="lb"><span>Sensibilidade</span><span id="vs">50</span></div>
     <input type="range" id="sens" min="0" max="100" value="50">
@@ -51,6 +51,7 @@ const $ = id => document.getElementById(id);
 let modo = 'prox', n = 0, coberto = 0, tVerde = null;
 const DICAS = {
   prox: 'Passe a mão bem perto do topo do celular (perto da câmera da frente). A tela apaga e vibra. Ao tirar a mão, a bolinha fica verde.',
+  mov: 'Passe a mão rápido por cima, de longe (30 a 50 cm). Só conta passada rápida: se algo fica parado na frente (seu rosto), é ignorado.',
   camera: 'Passe a mão por cima da câmera da frente, de mais longe. A bolinha fica verde enquanto a mão faz sombra.'
 };
 
@@ -61,11 +62,16 @@ function escolher(m){
   modo = m; coberto = 0; verde(false);
   $('m-prox').classList.toggle('on', m === 'prox');
   $('m-camera').classList.toggle('on', m === 'camera');
-  $('cam').style.display = m === 'camera' ? 'block' : 'none';
-  $('recal').style.display = m === 'camera' ? 'block' : 'none';
+  $('m-mov').classList.toggle('on', m === 'mov');
+  const cam = m !== 'prox';
+  $('cam').style.display = cam ? 'block' : 'none';
+  $('recal').style.display = cam ? 'block' : 'none';
+  $('tit').textContent = m === 'mov' ? 'Movimento que a câmera vê' : 'Luz que a câmera vê';
+  $('recal').textContent = m === 'mov' ? 'Recalibrar' : 'Recalibrar luz';
+  $('pct').textContent = '–';
   $('dica').textContent = DICAS[m] + (NATIVO ? '' : ' (Abra pelo app instalado para funcionar.)');
   mandar({cmd:'modo', modo:m});
-  if(m === 'camera') mandar({cmd:'sens', valor:+$('sens').value});
+  if(cam) mandar({cmd:'sens', valor:+$('sens').value});
 }
 
 window.sensorSinal = function(c, nivel, lim){
@@ -81,12 +87,25 @@ window.sensorSinal = function(c, nivel, lim){
   }
   coberto = c;
 };
+window.sensorMov = function(dif, lim, e){
+  if(modo !== 'mov') return;
+  const top = Math.max(lim * 2, 1);
+  $('luz').style.width = Math.min(100, dif / top * 100) + '%';
+  $('luz').style.background = e === 2 ? '#aaa' : '#f5b800';
+  $('lim').style.left = Math.min(100, lim / top * 100) + '%';
+  $('pct').textContent = e === 2 ? 'parado (ignorado)' : (e === 1 ? 'passando…' : 'calmo');
+};
+window.sensorPassada = function(){
+  if(modo !== 'mov') return;
+  contar(); verde(true); clearTimeout(tVerde); tVerde = setTimeout(() => verde(false), 1500);
+};
 window.semCamera = function(){
   $('dica').textContent = 'O app não tem permissão da câmera. Vá em Ajustes › Sensor › Câmera e ative.';
 };
 
 $('m-prox').onclick = () => escolher('prox');
 $('m-camera').onclick = () => escolher('camera');
+$('m-mov').onclick = () => escolher('mov');
 $('sens').oninput = e => { $('vs').textContent = e.target.value; mandar({cmd:'sens', valor:+e.target.value}); };
 $('recal').onclick = () => mandar({cmd:'recalibrar'});
 $('zero').onclick = () => { n = 0; $('n').textContent = 0; };
