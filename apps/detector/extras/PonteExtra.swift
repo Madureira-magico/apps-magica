@@ -9,13 +9,10 @@ import AudioToolbox
 ///   ligar {ajustes}   -> liga o sensor e aprende a sala (2 s); pronto = vum vum vum
 ///   desligar          -> desliga o sensor
 ///   ajustes {sens, adapt, forca, dupla, saidaLonga, dormir, dormirMin}
-///   auto              -> ajuste automático: 3 s para guardar, 5 s parado, 5 s se mexendo
 ///   bolso {ligar}     -> sensor de proximidade (tela apaga no bolso)
 /// O iPhone responde:
 ///   window.imaSinal(valor µT, limite µT, estado)
 ///     0 desligado, 1 aprendendo, 2 pronto, 3 ímã perto, 4 dormindo, 5 acordando,
-///     6 ajuste: guarde no bolso, 7 ajuste: fique parado, 8 ajuste: se mexa
-///   window.imaAjustado(sens, adapt) quando o ajuste automático termina
 @objc(PonteExtra)
 final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     private enum Modo { case parado, aprendendo, pronto, dormindo, acordando, auto }
@@ -49,12 +46,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     private var ultimoEnvio: TimeInterval = 0
     private var contAcordar = 0
     private var limpoDesde: TimeInterval = 0
-    // ajuste automático
     private var autoFase = 0
-    private var autoMax = 0.0
-    private var autoBaseFeita = false
-    private var autoAmostras: [(Double, Double)] = []
-    private var autoEraLigado = false
 
     func instalar(_ config: WKWebViewConfiguration) {
         config.userContentController.add(self, name: "ima")
@@ -82,16 +74,6 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             }
         case "ajustes":
             lerAjustes(corpo)
-        case "auto":
-            iniciarSensor()
-            fila.addOperation {
-                guard self.modo != .auto else { return }
-                self.autoEraLigado = self.modo != .parado
-                self.modo = .auto
-                self.autoFase = 0
-                self.t0 = 0
-                self.enviar(0, forcar: true)
-            }
         case "bolso":
             UIDevice.current.isProximityMonitoringEnabled = (corpo["ligar"] as? Bool) ?? false
         default:
@@ -163,7 +145,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         case .pronto: detectar(t, dif)
         case .dormindo: dormindo(t, dif)
         case .acordando: acordando(t)
-        case .auto: autoPasso(t, dif)
+        case .auto: break
         case .parado: break
         }
         enviar(t)
@@ -179,7 +161,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             congeladoDesde = 0
             silencioAte = t + 0.3
             ultimaAtividade = t
-            tocar(3, 0.13)                                 // pronto: vum vum vum
+            tocar(3, 0.37, gap: 0.28)                                 // pronto: vum vum vum
         }
     }
 
@@ -210,14 +192,14 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
                 if acima >= 2 {
                     perto = true
                     ultimaAtividade = t
-                    tocar(3, 0.13)                         // chegou: vum vum vum
+                    tocar(3, 0.37, gap: 0.28)                         // chegou: vum vum vum
                 }
             } else if valor < limEf * 0.6 {
                 perto = false
                 acima = 0
                 ultimaAtividade = t
                 if dupla {
-                    if saidaLonga { tocar(1, 0.7) } else { tocar(3, 0.13) }   // saiu
+                    if saidaLonga { tocar(1, 1.0) } else { tocar(3, 0.37, gap: 0.28) }   // saiu
                 }
             }
         }
@@ -238,7 +220,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
                 modo = .acordando
                 t0 = t
                 limpoDesde = 0
-                tocar(1, 0.3)                              // acordei: um vum
+                tocar(1, 0.4)                              // acordei: um vum
             }
         } else {
             contAcordar = max(0, contAcordar - 2)
@@ -255,60 +237,6 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             limpoDesde = 0
         }
         if t - t0 > 8 { comecarAprender() }
-    }
-
-    // MARK: ajuste automático
-    private func autoPasso(_ t: TimeInterval, _ dif: SIMD3<Double>) {
-        if t0 == 0 { t0 = t; autoFase = 0 }
-        let dt = t - t0
-        switch autoFase {
-        case 0:                                            // 3 s para guardar no bolso
-            if dt >= 3 {
-                autoFase = 1; t0 = t
-                soma = .zero; nSoma = 0; autoMax = 0; autoBaseFeita = false
-                tocar(1, 0.15, forcaMin: 60)
-            }
-        case 1:                                            // 5 s parado: mede o tremor
-            if dt > 0.5 && dt < 1.5 { soma += suave; nSoma += 1 }
-            else if dt >= 1.5 {
-                if !autoBaseFeita && nSoma > 0 { base = soma / Double(nSoma); autoBaseFeita = true }
-                else if giroS < 0.5 { autoMax = max(autoMax, valor) }
-            }
-            if dt >= 5.5 {
-                let lim = max(2.5, autoMax * 1.8 + 1.0)
-                sens = min(100, max(0, 100 * log(lim / 80) / log(0.04)))
-                autoFase = 2; t0 = t
-                autoAmostras = []
-                tocar(2, 0.15, forcaMin: 60)
-            }
-        case 2:                                            // 5 s se mexendo: mede o balanço
-            base += dif * (0.004 + 0.07 * min(giroS, 2))
-            if dt > 0.8 { autoAmostras.append((valor, giroS)) }
-            if dt >= 5.8 {
-                let lim = limite
-                var escolhido = 0.0
-                for aa in stride(from: 100.0, through: 0.0, by: -5.0) {
-                    let k = 0.3 + 6 * (1 - aa / 100), gate = 1.0 + 2.0 * aa / 100
-                    if autoAmostras.allSatisfy({ $0.1 > gate || $0.0 < lim * (1 + k * $0.1) * 0.85 }) {
-                        escolhido = aa; break
-                    }
-                }
-                adapt = escolhido
-                tocar(3, 0.15, forcaMin: 60)
-                let js = String(format: "window.imaAjustado&&imaAjustado(%.0f,%.0f)", sens, adapt)
-                DispatchQueue.main.async { self.web?.evaluateJavaScript(js, completionHandler: nil) }
-                if autoEraLigado {
-                    base = suave
-                    comecarAprender()
-                } else {
-                    modo = .parado
-                    enviar(0, forcar: true)
-                    DispatchQueue.main.async { self.pararSensor() }
-                }
-            }
-        default:
-            break
-        }
     }
 
     private func enviar(_ t: TimeInterval, forcar: Bool = false) {
@@ -357,12 +285,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
 
     private func vibrar(_ pulsos: Int, _ dur: Double, _ gap: Double, _ forca: Double) {
         let intensidade = Float(0.15 + 0.85 * forca / 100)
-        guard let m = motor else { return vibrarSistema(pulsos) }
+        // força no máximo: usa a vibração clássica do iPhone (a de chamada), a mais forte
+        guard forca < 99, let m = motor else { return vibrarSistema(pulsos, dur + gap) }
         var eventos: [CHHapticEvent] = []
         for i in 0..<pulsos {
             eventos.append(CHHapticEvent(eventType: .hapticContinuous,
                                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensidade),
-                                                      CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.35)],
+                                                      CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)],
                                          relativeTime: Double(i) * (dur + gap), duration: dur))
         }
         do {
@@ -370,13 +299,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
             let p = try m.makePlayer(with: CHHapticPattern(events: eventos, parameters: []))
             try p.start(atTime: CHHapticTimeImmediate)
         } catch {
-            vibrarSistema(pulsos)
+            vibrarSistema(pulsos, dur + gap)
         }
     }
 
-    private func vibrarSistema(_ pulsos: Int) {
+    private func vibrarSistema(_ pulsos: Int, _ passo: Double) {
         for i in 0..<pulsos {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * max(passo, 0.5)) {
                 AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
             }
         }

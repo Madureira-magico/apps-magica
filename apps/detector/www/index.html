@@ -25,8 +25,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:#071a44;font-family:-a
 .kn{position:absolute;left:50%;width:46px;height:24px;margin-left:-23px;border-radius:6px;background:#e53935;border:2px solid #ff8a80;transform:translateY(50%)}
 .kn::after{content:'';position:absolute;left:8px;right:8px;top:9px;height:2px;background:#fff}
 .lbx{font-size:12px;color:#cfe3ff;text-align:center;line-height:1.25}
-#auto{text-align:center;padding:10px 0;border-radius:11px;background:#e53935;border:1.5px solid #ff8a80;font-size:14px;font-weight:600}
-#auto.ocupado{background:#7a1414;border-color:#a33}
 .cab{display:flex;justify-content:space-between;font-size:12px;color:#cfe3ff}
 .vm{display:flex;gap:3px;margin-top:7px}.vm div{flex:1;height:13px;border-radius:2px;background:#0a1a40}
 .rw{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:15px;gap:8px}
@@ -53,9 +51,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#071a44;font-family:-a
     <div class="faders">
       <div class="fd"><span class="vl" id="v-sens">60</span><div class="tr" data-k="sens"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sensibi-<br>lidade</span></div>
       <div class="fd"><span class="vl" id="v-adapt">70</span><div class="tr" data-k="adapt"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sens.<br>adaptativa</span></div>
-      <div class="fd"><span class="vl" id="v-forca">70</span><div class="tr" data-k="forca"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Força da<br>vibração</span></div>
+      <div class="fd"><span class="vl" id="v-forca">100</span><div class="tr" data-k="forca"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Força da<br>vibração</span></div>
     </div>
-    <div id="auto">Ajuste automático</div>
   </div>
 
   <div class="pn">
@@ -81,14 +78,14 @@ function mandar(o){ if(NATIVO) window.webkit.messageHandlers.ima.postMessage(o);
 function barra(esconder){ try{ window.webkit.messageHandlers.barra.postMessage(esconder); }catch(e){} }
 try{ window.webkit.messageHandlers.estilo.postMessage('claro'); }catch(e){}
 
-const PADRAO = {sens:60, adapt:70, forca:70, dupla:true, saidaLonga:false, disfarce:true, bolso:true, dormir:true, dormirMin:5};
+const PADRAO = {sens:60, adapt:70, forca:100, dupla:true, saidaLonga:false, disfarce:true, bolso:true, dormir:true, dormirMin:5};
 let aj = Object.assign({}, PADRAO);
-try{ Object.assign(aj, JSON.parse(localStorage.getItem('detector-ajustes')||'{}')); }catch(e){}
-function guardar(){ try{ localStorage.setItem('detector-ajustes', JSON.stringify(aj)); }catch(e){} }
+try{ Object.assign(aj, JSON.parse(localStorage.getItem('detector-ajustes-21')||'{}')); }catch(e){}
+function guardar(){ try{ localStorage.setItem('detector-ajustes-21', JSON.stringify(aj)); }catch(e){} }
 function ajustesNativo(){ return {sens:aj.sens, adapt:aj.adapt, forca:aj.forca, dupla:aj.dupla, saidaLonga:aj.saidaLonga, dormir:aj.dormir, dormirMin:aj.dormirMin}; }
 function avisarAjustes(){ guardar(); mandar(Object.assign({cmd:'ajustes'}, ajustesNativo())); }
 
-let ligado = false, ajustando = false;
+let ligado = false;
 
 // faders
 const porFader = {};
@@ -133,7 +130,6 @@ pintarMin();
 // liga / desliga: liga, aprende a sala, vibra vum vum vum e entra no disfarce
 const pw = document.getElementById('pw');
 pw.addEventListener('click', ()=>{
-  if (ajustando) return;
   ligado = !ligado;
   pw.classList.toggle('on', ligado);
   if (ligado) {
@@ -146,26 +142,6 @@ pw.addEventListener('click', ()=>{
   }
 });
 
-// ajuste automático
-const autoBt = document.getElementById('auto');
-autoBt.addEventListener('click', ()=>{
-  if (ajustando) return;
-  ajustando = true;
-  autoBt.classList.add('ocupado');
-  autoBt.textContent = 'Guarde no bolso…';
-  if (aj.bolso) mandar({cmd:'bolso', ligar:true});
-  mandar({cmd:'auto'});
-});
-window.imaAjustado = function(s, a){
-  porFader.sens(s, false);
-  porFader.adapt(a, false);
-  avisarAjustes();
-  ajustando = false;
-  autoBt.classList.remove('ocupado');
-  autoBt.textContent = 'Ajuste automático';
-  if (disf.style.display !== 'block') mandar({cmd:'bolso', ligar:false});
-};
-
 // disfarce: tela toda preta; dois toques na parte de cima voltam ao menu (o detector continua ligado)
 const disf = document.getElementById('disf');
 let ultimoToque = 0;
@@ -177,7 +153,7 @@ function entrarDisfarce(){
 function sairDisfarce(){
   disf.style.display = 'none';
   barra(false);
-  if (!ajustando) mandar({cmd:'bolso', ligar:false});
+  mandar({cmd:'bolso', ligar:false});
 }
 disf.addEventListener('touchstart', e=>{
   e.preventDefault();
@@ -194,17 +170,15 @@ const LEDS = 16;
 for (let i = 0; i < LEDS; i++) vm.appendChild(document.createElement('div'));
 function led(v){ return v <= 1 ? 0 : Math.min(LEDS, Math.log(v) / Math.log(150) * LEDS); }   // 1 µT a 150 µT
 const TEXTOS = {0:'Sinal ao vivo', 1:'Aprendendo a sala…', 2:'Sinal ao vivo', 3:'Ímã perto!', 4:'Dormindo · encoste o ímã para acordar',
-  5:'Acordou · afaste o ímã', 6:'Ajuste: guarde no bolso…', 7:'Ajuste: fique parado…', 8:'Ajuste: ande e se mexa…'};
+  5:'Acordou · afaste o ímã'};
 window.imaSinal = function(v, lim, est){
   const n = Math.round(led(v)), lt = Math.max(1, Math.round(led(lim)));
   [...vm.children].forEach((d, i)=>{
     const marca = i === lt - 1;
     d.style.background = i < n ? (i >= lt ? '#ff3b30' : '#7fb8ff') : (marca ? '#5a2030' : '#0a1a40');
   });
-  document.getElementById('ut').textContent = (est === 0 || est === 1 || est === 6) ? '—' : Math.round(v) + ' µT';
+  document.getElementById('ut').textContent = (est === 0 || est === 1) ? '—' : Math.round(v) + ' µT';
   document.getElementById('sinal-txt').textContent = TEXTOS[est] || 'Sinal ao vivo';
-  if (est === 7) autoBt.textContent = 'Fique parado…';
-  if (est === 8) autoBt.textContent = 'Ande e se mexa…';
 };
 imaSinal(0, 10, 0);
 
