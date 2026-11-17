@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Timeline</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;margin:0}
+html,body{height:100%;overflow:hidden;background:#000;font-family:-apple-system,system-ui,sans-serif;color:#fff}
+.tela{position:fixed;inset:0;display:none}
+.tela.on{display:block}
+
+/* ---------- MENU ---------- */
+#menu{background:#000;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 30px)}
+#menu h1{font-size:34px;font-weight:700;margin:6px 4px 14px}
+#comecar{display:block;width:100%;padding:16px;border-radius:14px;background:#0a84ff;color:#fff;font-size:19px;font-weight:600;text-align:center;margin-bottom:22px}
+.sec{font-size:13px;color:#8e8e93;text-transform:uppercase;margin:0 16px 7px}
+.grupo{background:#1c1c1e;border-radius:12px;margin-bottom:24px;overflow:hidden}
+.lin{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:8px 16px;font-size:17px;border-bottom:0.5px solid #38383a}
+.lin:last-child{border-bottom:0}
+.lin.col{flex-direction:column;align-items:stretch}
+.lin small{color:#8e8e93;font-size:13px}
+.sw{width:51px;height:31px;border-radius:16px;background:#39393d;position:relative;flex-shrink:0;transition:background .2s}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+.sw.on{background:#30d158}.sw.on::after{left:22px}
+.seg{display:flex;background:#2c2c2e;border-radius:9px;padding:2px;margin-top:8px}
+.seg div{flex:1;text-align:center;padding:7px 2px;font-size:14px;border-radius:7px;color:#ddd}
+.seg div.on{background:#636366;color:#fff;font-weight:600}
+.passo{display:flex;align-items:center;gap:14px}
+.passo b{min-width:24px;text-align:center;font-size:17px}
+.passo div{width:34px;height:30px;border-radius:8px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;font-size:20px}
+#mini{width:46px;height:100px;border-radius:7px;background:#333 center/cover no-repeat;border:0.5px solid #555}
+.bt{color:#0a84ff}
+.oculto{display:none!important}
+.dica{font-size:13px;color:#8e8e93;margin:-16px 16px 24px;line-height:1.35}
+input[type=file]{display:none}
+
+/* ---------- GRADE (tela preta) ---------- */
+#grade{background:#000;display:none;grid-template-columns:repeat(3,1fr)}
+#grade.on{display:grid}
+#grade div{width:100%;height:100%}
+
+/* ---------- TELA DE BLOQUEIO ---------- */
+#lock{background:#000}
+#fundo{position:absolute;inset:0;background:#222 center/cover no-repeat}
+.faixa{position:absolute;inset:0;background:#222 center/cover no-repeat;display:none}
+#rel{position:absolute;inset:0;width:100%;height:100%}
+.bot{position:absolute;border-radius:50%;background:rgba(255,255,255,.09);
+  -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);
+  box-shadow:inset 0 1px 0.6px rgba(255,255,255,.55),inset 0 -0.8px 0.6px rgba(255,255,255,.28),0 0 0 0.45px rgba(0,0,0,.35)}
+.bot canvas,.bot svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+#barra{position:absolute;left:50%;background:#fff;border-radius:3px;transform:translateX(-50%)}
+#acordar{position:absolute;inset:0;background:#000;opacity:1;pointer-events:none}
+</style></head>
+<body>
+
+<!-- ================= MENU ================= -->
+<div id="menu" class="tela on">
+  <h1>Timeline</h1>
+  <div id="comecar">Começar</div>
+
+  <div class="sec">Tela de bloqueio</div>
+  <div class="grupo">
+    <div class="lin"><div><div>Papel de parede</div><small id="fundoTxt">Nenhum escolhido</small></div><div id="mini"></div></div>
+    <div class="lin bt" id="escolher">Escolher foto da Galeria</div>
+  </div>
+
+  <div class="sec">Grade escondida</div>
+  <div class="grupo">
+    <div class="lin">Grade com o zero<div class="sw" data-k="zero"></div></div>
+    <div class="lin"><div>Aceitar dois dígitos<br><small>Ex.: toque 1 e 5 para 15 minutos</small></div><div class="sw" data-k="dois"></div></div>
+    <div class="lin">Minutos extras<div class="passo"><div data-p="-1">−</div><b id="extra">0</b><div data-p="1">+</div></div></div>
+    <div class="lin">Som de destravar<div class="sw" data-k="som"></div></div>
+  </div>
+
+  <div class="sec">Volta no tempo</div>
+  <div class="grupo">
+    <div class="lin col">Gatilho
+      <div class="seg" data-k="gatilho"><div data-v="volume">Volume +</div><div data-v="toque">Toque</div><div data-v="chacoalhar">Chacoalhar</div><div data-v="virar">Virar</div></div>
+    </div>
+    <div class="lin" id="linGlitch">Glitch<div class="sw" data-k="glitch"></div></div>
+    <div class="lin col">Começa depois do gatilho
+      <div class="seg" data-k="atraso"><div data-v="1">1 s</div><div data-v="2">2 s</div><div data-v="3">3 s</div><div data-v="4">4 s</div><div data-v="5">5 s</div></div>
+    </div>
+    <div class="lin col">Velocidade da volta
+      <div class="seg" data-k="vel"><div data-v="lenta">Lenta</div><div data-v="normal">Normal</div><div data-v="rapida">Rápida</div></div>
+    </div>
+  </div>
+
+  <div class="sec">Relógio</div>
+  <div class="grupo">
+    <div class="lin col">Letra
+      <div class="seg" data-k="letra"><div data-v="normal">Normal</div><div data-v="redonda">Arredondada</div></div>
+    </div>
+    <div class="lin col">Grossura
+      <div class="seg" data-k="peso"><div data-v="400">Fina</div><div data-v="500">Média</div><div data-v="600">Grossa</div></div>
+    </div>
+    <div class="lin">Zero antes da hora (09:41)<div class="sw" data-k="zeroHora"></div></div>
+  </div>
+  <div class="dica">Para voltar a este menu: segure o dedo parado na tela por 2 segundos (na tela preta ou na tela de bloqueio).</div>
+  <input type="file" id="arquivo" accept="image/*">
+</div>
+
+<!-- ================= GRADE ================= -->
+<div id="grade" class="tela"></div>
+
+<!-- ================= BLOQUEIO ================= -->
+<div id="lock" class="tela">
+  <div id="fundo"></div>
+  <div class="faixa"></div><div class="faixa"></div><div class="faixa"></div>
+  <canvas id="rel"></canvas>
+  <div class="bot" id="bLan"></div>
+  <div class="bot" id="bCam"></div>
+  <div id="barra"></div>
+  <div id="acordar"></div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const NATIVO = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.tl);
+function mandar(o){ if(NATIVO) window.webkit.messageHandlers.tl.postMessage(o); }
+try{ window.webkit.messageHandlers.barra.postMessage(true); }catch(e){}
+
+/* ---------- ajustes ---------- */
+const PADRAO = {zero:false, dois:false, extra:0, som:true, gatilho:'toque', glitch:true, atraso:'3', vel:'normal', letra:'normal', peso:'500', zeroHora:true};
+let A = Object.assign({}, PADRAO);
+try{ Object.assign(A, JSON.parse(localStorage.getItem('tl-ajustes') || '{}')); }catch(e){}
+function salvar(){ try{ localStorage.setItem('tl-ajustes', JSON.stringify(A)); }catch(e){} }
+
+function pintarMenu(){
+  document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', !!A[s.dataset.k]));
+  document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.classList.toggle('on', d.dataset.v === String(A[g.dataset.k]))));
+  $('extra').textContent = A.extra;
+  $('linGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar');
+}
+document.querySelectorAll('.sw').forEach(s => s.onclick = () => { A[s.dataset.k] = !A[s.dataset.k]; salvar(); pintarMenu(); });
+document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.onclick = () => { A[g.dataset.k] = d.dataset.v; salvar(); pintarMenu(); medir(); }));
+document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { A.extra = Math.max(0, Math.min(30, A.extra + +b.dataset.p)); salvar(); pintarMenu(); });
+
+/* ---------- papel de parede ---------- */
+function carregarFundo(){
+  let f = null; try{ f = localStorage.getItem('tl-fundo'); }catch(e){}
+  $('fundo').style.backgroundImage = f ? 'url(' + f + ')' : '';
+  document.querySelectorAll('.faixa').forEach(x => x.style.backgroundImage = f ? 'url(' + f + ')' : '');
+  $('mini').style.backgroundImage = f ? 'url(' + f + ')' : '';
+  $('fundoTxt').textContent = f ? 'Escolhido' : 'Nenhum escolhido';
+}
+$('escolher').onclick = () => $('arquivo').click();
+$('arquivo').onchange = () => {
+  const arq = $('arquivo').files[0]; if(!arq) return;
+  const img = new Image();
+  img.onload = () => {
+    // guarda no tamanho da tela do iPhone (3x), cortando como "preencher"
+    const W = Math.round(innerWidth * 3), H = Math.round(innerHeight * 3);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const s = Math.max(W / img.width, H / img.height);
+    const w = img.width * s, h = img.height * s;
+    c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    let q = 0.9, url = c.toDataURL('image/jpeg', q);
+    while(url.length > 3500000 && q > 0.5){ q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+    try{ localStorage.setItem('tl-fundo', url); }catch(e){ alert('Não consegui guardar essa foto. Tente outra.'); }
+    carregarFundo(); URL.revokeObjectURL(img.src); $('arquivo').value = '';
+  };
+  img.src = URL.createObjectURL(arq);
+};
+
+/* ---------- telas ---------- */
+function mostrar(id){ document.querySelectorAll('.tela').forEach(t => t.classList.toggle('on', t.id === id)); }
+function irMenu(){ mandar({cmd:'desarmar'}); parar(); mostrar('menu'); pintarMenu(); }
+
+/* segurar 2 s parado = volta ao menu */
+let segurar = null, ini = null;
+function prenderSegurar(el){
+  el.addEventListener('touchstart', e => { ini = {x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now()}; clearTimeout(segurar); segurar = setTimeout(irMenu, 2000); }, {passive:true});
+  el.addEventListener('touchmove', e => { if(ini && Math.hypot(e.touches[0].clientX - ini.x, e.touches[0].clientY - ini.y) > 15) clearTimeout(segurar); }, {passive:true});
+  el.addEventListener('touchend', () => clearTimeout(segurar));
+}
+
+/* ---------- grade ---------- */
+let digitos = '', esperaDig = null;
+function montarGrade(){
+  const g = $('grade'); g.innerHTML = '';
+  const ordem = A.zero ? [1,2,3,4,5,6,7,8,9,null,0,null] : [1,2,3,4,5,6,7,8,9];
+  g.style.gridTemplateRows = 'repeat(' + (ordem.length / 3) + ',1fr)';
+  ordem.forEach(n => {
+    const d = document.createElement('div');
+    if(n !== null){
+      d.addEventListener('touchend', e => { e.preventDefault(); if(Date.now() - (ini ? ini.t : 0) < 600) digito(n); });
+      if(!('ontouchstart' in window)) d.addEventListener('click', () => digito(n));
+    }
+    g.appendChild(d);
+  });
+}
+function digito(n){
+  digitos += n;
+  clearTimeout(esperaDig);
+  if(!A.dois || digitos.length >= 2) return entrar();
+  esperaDig = setTimeout(entrar, 1200);
+}
+$('comecar').onclick = () => { digitos = ''; montarGrade(); mostrar('grade'); };
+prenderSegurar($('grade'));
+
+/* ---------- tela de bloqueio ---------- */
+let K = 1, cv = $('rel'), cx = cv.getContext('2d');
+let fonteRel = '', escRel = 1, baseRel = 0, fonteData = '', baseData = 0;
+let offset = 0;             // minutos a mais mostrados
+let estado = 'parado';      // parado | esperando | atraso | voltando | fim
+let tick = null, timers = [], glitchAte = 0, raf = null;
+
+// medidas tiradas do print do iPhone (tela de 402 pontos de largura)
+const M = {dataTopo:87.3, dataLarg:135.5, relTopo:119.2, relLarg:242.1, relAlt:85.2,
+           botDiam:58.5, botX:74.9, botBaixo:79.6, lanW:12.6, lanH:31.2, camW:27.5, camH:21.4,
+           barraLarg:143.6, barraAlt:4.75, barraBaixo:8.5};
+
+function familia(){ return A.letra === 'redonda' ? 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif' : 'system-ui, -apple-system, "Inter", sans-serif'; }
+
+function medir(){
+  K = innerWidth / 402;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // relógio: tamanho para a altura dos números bater com o print, depois estica na largura
+  cx.font = A.peso + ' 100px ' + familia();
+  let m = cx.measureText('11:57');
+  const altura = m.actualBoundingBoxAscent;
+  const tam = 100 * (M.relAlt * K) / altura;
+  fonteRel = A.peso + ' ' + tam + 'px ' + familia();
+  cx.font = fonteRel; m = cx.measureText('11:57');
+  escRel = (M.relLarg * K) / (m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+  baseRel = M.relTopo * K + m.actualBoundingBoxAscent;
+  // data: tamanho para a largura de "Ter. 17 de nov." bater com o print
+  cx.font = '600 100px system-ui, -apple-system, "Inter", sans-serif';
+  m = cx.measureText('Ter. 17 de nov.');
+  const td = 100 * (M.dataLarg * K) / (m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+  fonteData = '600 ' + td + 'px system-ui, -apple-system, "Inter", sans-serif';
+  cx.font = fonteData; m = cx.measureText('Ter. 17 de nov.');
+  baseData = M.dataTopo * K + m.actualBoundingBoxAscent;
+  // botões e barrinha
+  [['bLan', M.botX], ['bCam', 402 - M.botX]].forEach(([id, x]) => {
+    const b = $(id), d = M.botDiam * K;
+    Object.assign(b.style, {width:d + 'px', height:d + 'px', left:(x * K - d / 2) + 'px', bottom:(M.botBaixo * K - d / 2) + 'px'});
+  });
+  Object.assign($('barra').style, {width:M.barraLarg * K + 'px', height:M.barraAlt * K + 'px', bottom:M.barraBaixo * K + 'px', borderRadius:M.barraAlt * K / 2 + 'px'});
+  icones();
+  desenhar();
+}
+
+/* ícones: os do próprio iPhone (vem da parte nativa); sem ela, um desenho parecido */
+let iconeLan = null, iconeCam = null;
+function colocarIcone(id, img, w, h){
+  const b = $(id); b.innerHTML = '';
+  const dpr = window.devicePixelRatio || 1;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * K * dpr); c.height = Math.round(h * K * dpr);
+  c.style.width = w * K + 'px'; c.style.height = h * K + 'px';
+  b.appendChild(c);
+  if(!img) return;
+  const g = c.getContext('2d');
+  // corta as sobras transparentes do desenho e estica na caixa medida no print
+  const t = document.createElement('canvas'); t.width = img.width; t.height = img.height;
+  const tg = t.getContext('2d'); tg.drawImage(img, 0, 0);
+  const px = tg.getImageData(0, 0, t.width, t.height).data;
+  let x0 = t.width, y0 = t.height, x1 = 0, y1 = 0;
+  for(let y = 0; y < t.height; y++) for(let x = 0; x < t.width; x++) if(px[(y * t.width + x) * 4 + 3] > 40){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+  if(x1 <= x0) return;
+  g.drawImage(img, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0, 0, c.width, c.height);
+}
+const SVG_LAN = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 100"><path fill="#fff" fill-rule="evenodd" d="M4 0h32a4 4 0 0 1 4 4v8H0V4a4 4 0 0 1 4-4zM0 17h40v4c0 6-8 12-8 18v54a7 7 0 0 1-7 7H15a7 7 0 0 1-7-7V39c0-6-8-12-8-18zm20 30a5 5 0 0 0-5 5v14a5 5 0 0 0 10 0V52a5 5 0 0 0-5-5zm0 12.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>');
+const SVG_CAM = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 78"><path fill="#fff" fill-rule="evenodd" d="M36 0h28c4 0 6 2 8 5l4 7h12a12 12 0 0 1 12 12v42a12 12 0 0 1-12 12H12A12 12 0 0 1 0 66V24a12 12 0 0 1 12-12h12l4-7c2-3 4-5 8-5zm14 24a20 20 0 1 0 0 40 20 20 0 0 0 0-40zm0 8a12 12 0 1 1 0 24 12 12 0 0 1 0-24zm34-8a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>');
+function carregarImg(src, cb){ const i = new Image(); i.onload = () => cb(i); i.src = src; }
+function icones(){
+  colocarIcone('bLan', iconeLan, M.lanW, M.lanH);
+  colocarIcone('bCam', iconeCam, M.camW, M.camH);
+}
+window.tlIcones = (l, c) => {
+  if(l) carregarImg(l, i => { iconeLan = i; icones(); });
+  if(c) carregarImg(c, i => { iconeCam = i; icones(); });
+};
+if(NATIVO) mandar({cmd:'icones'});
+else { carregarImg(SVG_LAN, i => { iconeLan = i; icones(); }); carregarImg(SVG_CAM, i => { iconeCam = i; icones(); }); }
+
+/* ---------- data e hora ---------- */
+const DIAS = ['Dom.', 'Seg.', 'Ter.', 'Qua.', 'Qui.', 'Sex.', 'Sáb.'];
+const MESES = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+function textoData(d){ return DIAS[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES[d.getMonth()]; }
+function textoHora(d){ const h = d.getHours(); return (A.zeroHora && h < 10 ? '0' : '') + h + ':' + String(d.getMinutes()).padStart(2, '0'); }
+
+function desenhar(){
+  const W = innerWidth, H = innerHeight;
+  cx.clearRect(0, 0, W, H);
+  const d = new Date(Date.now() + offset * 60000);
+  const g = Date.now() < glitchAte;
+  // data
+  cx.save(); cx.font = fonteData; cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
+  cx.fillText(textoData(d), W / 2 + (g ? (Math.random() - .5) * 6 * K : 0), baseData); cx.restore();
+  // hora
+  const txt = textoHora(d);
+  cx.save(); cx.font = fonteRel; cx.textBaseline = 'alphabetic';
+  const m = cx.measureText(txt);
+  const larg = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * escRel;
+  const x = W / 2 - larg / 2;
+  const desenhaHora = (dx, cor) => { cx.save(); cx.translate(x + dx, baseRel); cx.scale(escRel, 1); cx.fillStyle = cor; cx.fillText(txt, m.actualBoundingBoxLeft, 0); cx.restore(); };
+  if(g){
+    // glitch: cores separadas e faixas deslocadas
+    const s = (4 + Math.random() * 10) * K;
+    cx.globalCompositeOperation = 'lighter';
+    desenhaHora(-s, 'rgba(255,0,60,.9)'); desenhaHora(s, 'rgba(0,255,255,.9)'); desenhaHora(0, 'rgba(255,255,255,.7)');
+    cx.globalCompositeOperation = 'source-over';
+    const dpr = window.devicePixelRatio || 1;
+    for(let i = 0; i < 4; i++){
+      const y = baseRel - M.relAlt * K * Math.random(), h = (3 + Math.random() * 14) * K, dx = (Math.random() - .5) * 40 * K;
+      try{ const img = cx.getImageData(0, y * dpr, cv.width, h * dpr); cx.clearRect(0, y, W, h); cx.putImageData(img, dx * dpr, y * dpr); }catch(e){}
+    }
+  } else desenhaHora(0, '#fff');
+  cx.restore();
+}
+
+/* glitch no papel de parede */
+function glitchFundo(on){
+  const f = $('fundo'), fx = document.querySelectorAll('.faixa');
+  if(!on){ f.style.transform = ''; f.style.filter = ''; fx.forEach(x => x.style.display = 'none'); return; }
+  f.style.transform = 'translate(' + (Math.random() - .5) * 10 * K + 'px,' + (Math.random() - .5) * 4 * K + 'px)';
+  f.style.filter = Math.random() < .5 ? 'hue-rotate(' + Math.round(Math.random() * 90 - 45) + 'deg) saturate(1.6)' : 'contrast(1.4)';
+  fx.forEach(x => {
+    if(Math.random() < .35){ x.style.display = 'none'; return; }
+    const top = Math.random() * 100, h = 1 + Math.random() * 7;
+    x.style.display = 'block';
+    x.style.clipPath = 'inset(' + top + '% 0 ' + Math.max(0, 100 - top - h) + '% 0)';
+    x.style.transform = 'translateX(' + (Math.random() - .5) * 60 * K + 'px)';
+  });
+}
+function glitch(ms){
+  glitchAte = Math.max(glitchAte, Date.now() + ms);
+  if(raf) return;
+  const loop = () => {
+    if(Date.now() < glitchAte){ glitchFundo(true); desenhar(); raf = setTimeout(loop, 45); }
+    else { raf = null; glitchFundo(false); desenhar(); }
+  };
+  loop();
+}
+
+/* ---------- o efeito ---------- */
+function entrar(){
+  clearTimeout(esperaDig);
+  const n = parseInt(digitos || '0', 10); digitos = '';
+  offset = n + (+A.extra || 0);
+  if(A.som) mandar({cmd:'som'});
+  mostrar('lock'); medir();
+  const ac = $('acordar'); ac.style.transition = 'none'; ac.style.opacity = 1;
+  requestAnimationFrame(() => requestAnimationFrame(() => { ac.style.transition = 'opacity .45s ease-out'; ac.style.opacity = 0; }));
+  clearInterval(tick); tick = setInterval(desenhar, 500);
+  estado = 'esperando';
+  setTimeout(() => { if(estado === 'esperando') mandar({cmd:'armar', gatilho:A.gatilho}); }, 600);
+}
+function parar(){
+  estado = 'parado'; clearInterval(tick); timers.forEach(clearTimeout); timers = [];
+  glitchAte = 0; glitchFundo(false); offset = 0;
+}
+function gatilho(){
+  if(estado !== 'esperando') return;
+  estado = 'atraso';
+  timers.push(setTimeout(voltar, (+A.atraso || 3) * 1000));
+}
+window.tlGatilho = gatilho;
+
+function voltar(){
+  estado = 'voltando';
+  const comGlitch = A.gatilho === 'chacoalhar' && A.glitch;
+  const fator = A.vel === 'lenta' ? 1.6 : A.vel === 'rapida' ? 0.6 : 1;
+  const n = offset;
+  if(n <= 0){ estado = 'fim'; return; }
+  if(comGlitch) glitch(650);
+  // como no original: começa devagar, acelera e freia no final
+  let t = comGlitch ? 500 : 0;
+  for(let i = 0; i < n; i++){
+    const borda = Math.min(i, n - 1 - i);               // 0 = primeiro/último
+    let dur = borda === 0 ? (i === 0 ? 0.8 : 0.75) : borda === 1 ? 0.62 : 0.55;
+    if(n === 1) dur = 0.8;
+    t += dur * 1000 * fator;
+    const fim = i === n - 1;
+    timers.push(setTimeout(() => {
+      offset--; desenhar();
+      if(comGlitch) glitch(fim ? 450 : 110);
+      if(fim) estado = 'fim';
+    }, t));
+  }
+}
+
+/* toque na tela de bloqueio */
+const lock = $('lock');
+prenderSegurar(lock);
+lock.addEventListener('touchend', e => {
+  if(A.gatilho === 'toque' && estado === 'esperando' && ini && Date.now() - ini.t < 500) gatilho();
+});
+// no computador (teste): clique faz o papel do toque e da grade
+if(!('ontouchstart' in window)){
+  lock.addEventListener('click', () => gatilho());
+}
+
+document.addEventListener('gesturestart', e => e.preventDefault());
+addEventListener('resize', () => { if($('lock').classList.contains('on')) medir(); });
+carregarFundo(); pintarMenu(); medir();
+</script>
+</body></html>
