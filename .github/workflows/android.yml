@@ -9,6 +9,9 @@ on:
       - 'apps/detector/www/**'
       - '.github/workflows/android.yml'
 
+permissions:
+  contents: write
+
 jobs:
   detector:
     runs-on: ubuntu-latest
@@ -36,3 +39,21 @@ jobs:
         with:
           name: Detector-android
           path: saida/Detector.apk
+
+      - name: Publicar o .apk (ramo "apk" e página de downloads)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git fetch --depth 1 origin apk || true
+          git worktree add --force /tmp/apk || git worktree add --force --orphan -b apk /tmp/apk
+          cd /tmp/apk
+          (git checkout apk 2>/dev/null || true)
+          cp "$GITHUB_WORKSPACE/saida/Detector.apk" Detector.apk
+          git add Detector.apk
+          git commit -m "Detector.apk" || true
+          git push origin HEAD:apk --force
+          cd "$GITHUB_WORKSPACE"
+          gh release view android -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create android -R "$GITHUB_REPOSITORY" --title "Apps Android" --notes "Instale no celular Android baixando o arquivo .apk abaixo."
+          gh release upload android saida/Detector.apk -R "$GITHUB_REPOSITORY" --clobber
