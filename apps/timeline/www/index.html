@@ -48,6 +48,8 @@ input[type=file]{display:none}
   -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);
   box-shadow:inset 0 1px 0.6px rgba(255,255,255,.55),inset 0 -0.8px 0.6px rgba(255,255,255,.28),0 0 0 0.45px rgba(0,0,0,.35)}
 .bot canvas,.bot svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+#aviso{position:absolute;left:50%;transform:translateX(-50%);border-radius:50%;opacity:0;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,255,255,.62),rgba(255,255,255,.28) 45%,rgba(255,255,255,0));transition:opacity .25s linear}
 #barra{position:absolute;left:50%;background:#fff;border-radius:3px;transform:translateX(-50%)}
 #acordar{position:absolute;inset:0;background:#000;opacity:1;pointer-events:none}
 </style></head>
@@ -82,6 +84,10 @@ input[type=file]{display:none}
     </div>
     <div class="lin" id="linGlitch">Glitch<div class="sw" data-k="glitch"></div></div>
     <div class="lin" id="linSomGlitch">Som do glitch<div class="sw" data-k="somGlitch"></div></div>
+    <div class="lin col" id="linQualGlitch">Qual som
+      <div class="seg" data-k="somQual"><div data-v="1">Glitch 1</div><div data-v="2">Glitch 2</div></div>
+      <div class="passo" style="margin-top:10px"><span style="font-size:15px">Volume</span><input type="range" id="volGlitch" min="0" max="100" style="flex:1"><b id="volGTxt"></b><div id="volGTeste" style="width:auto;padding:0 10px;font-size:14px">Ouvir</div></div>
+    </div>
     <div class="lin col" id="linDurGlitch">Duração do glitch
       <div class="seg" data-k="durGlitch"><div data-v="2">2 s</div><div data-v="3">3 s</div><div data-v="4">4 s</div><div data-v="5">5 s</div></div>
     </div>
@@ -91,6 +97,12 @@ input[type=file]{display:none}
     <div class="lin col">Velocidade da volta
       <div class="seg" data-k="vel"><div data-v="lenta">Lenta</div><div data-v="normal">Normal</div><div data-v="rapida">Rápida</div></div>
     </div>
+  </div>
+
+  <div class="sec">Virada do minuto</div>
+  <div class="grupo">
+    <div class="lin"><div>Aviso do minuto<br><small>Bolinha de luz embaixo: acesa = espere; apagada = pode acionar</small></div><div class="sw" data-k="aviso"></div></div>
+    <div class="lin"><div>Correção automática<br><small>Se acionar com a bolinha acesa, a volta estica até passar a virada</small></div><div class="sw" data-k="correcao"></div></div>
   </div>
 
   <div class="sec">Relógio</div>
@@ -116,6 +128,7 @@ input[type=file]{display:none}
   <canvas id="rel"></canvas>
   <div class="bot" id="bLan"></div>
   <div class="bot" id="bCam"></div>
+  <div id="aviso"></div>
   <div id="barra"></div>
   <div id="acordar"></div>
 </div>
@@ -128,7 +141,7 @@ function mandar(o){ if(NATIVO) window.webkit.messageHandlers.tl.postMessage(o); 
 try{ window.webkit.messageHandlers.barra.postMessage(true); }catch(e){}
 
 /* ---------- ajustes ---------- */
-const PADRAO = {zero:false, dois:false, extra:0, som:true, volBloq:35, durGlitch:'4', gatilho:'toque', glitch:true, somGlitch:true, atraso:'3', vel:'normal', letra:'normal', peso:'500', zeroHora:true};
+const PADRAO = {zero:false, dois:false, extra:0, som:true, volBloq:35, durGlitch:'4', somQual:'1', volGlitch:80, aviso:true, correcao:true, gatilho:'toque', glitch:true, somGlitch:true, atraso:'3', vel:'normal', letra:'normal', peso:'500', zeroHora:true};
 let A = Object.assign({}, PADRAO);
 try{ Object.assign(A, JSON.parse(localStorage.getItem('tl-ajustes') || '{}')); }catch(e){}
 function salvar(){ try{ localStorage.setItem('tl-ajustes', JSON.stringify(A)); }catch(e){} }
@@ -139,6 +152,8 @@ function pintarMenu(){
   $('extra').textContent = A.extra;
   $('linGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar');
   $('linSomGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar' || !A.glitch);
+  $('linQualGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar' || !A.glitch || !A.somGlitch);
+  $('volGlitch').value = A.volGlitch; $('volGTxt').textContent = A.volGlitch;
   $('linDurGlitch').classList.toggle('oculto', A.gatilho !== 'chacoalhar' || !A.glitch);
   $('linVol').classList.toggle('oculto', !A.som);
   $('volBloq').value = A.volBloq; $('volTxt').textContent = A.volBloq;
@@ -146,6 +161,8 @@ function pintarMenu(){
 document.querySelectorAll('.sw').forEach(s => s.onclick = () => { A[s.dataset.k] = !A[s.dataset.k]; salvar(); pintarMenu(); });
 document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.onclick = () => { A[g.dataset.k] = d.dataset.v; salvar(); pintarMenu(); medir(); }));
 $('volBloq').oninput = e => { A.volBloq = +e.target.value; $('volTxt').textContent = A.volBloq; salvar(); };
+$('volGlitch').oninput = e => { A.volGlitch = +e.target.value; $('volGTxt').textContent = A.volGlitch; salvar(); };
+$('volGTeste').onclick = () => mandar({cmd:'glitch', seg:2, qual:+A.somQual, vol:A.volGlitch / 100});
 $('volTeste').onclick = () => mandar({cmd:'som', vol:A.volBloq / 100});
 document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { A.extra = Math.max(0, Math.min(30, A.extra + +b.dataset.p)); salvar(); pintarMenu(); });
 
@@ -261,6 +278,7 @@ function medir(){
     const b = $(id), d = M.botDiam * K;
     Object.assign(b.style, {width:d + 'px', height:d + 'px', left:(x * K - d / 2) + 'px', bottom:(M.botBaixo * K - d / 2) + 'px'});
   });
+  Object.assign($('aviso').style, {width:204 * K + 'px', height:102 * K + 'px', bottom:-51 * K + 'px'});
   Object.assign($('barra').style, {width:M.barraLarg * K + 'px', height:M.barraAlt * K + 'px', bottom:M.barraBaixo * K + 'px', borderRadius:M.barraAlt * K / 2 + 'px'});
   icones();
   desenhar();
@@ -369,43 +387,78 @@ function entrar(){
   const ac = $('acordar'); ac.style.transition = 'none'; ac.style.opacity = 1;
   requestAnimationFrame(() => requestAnimationFrame(() => { ac.style.transition = 'opacity .45s ease-out'; ac.style.opacity = 0; }));
   clearInterval(tick); tick = setInterval(desenhar, 500);
+  clearInterval(avisoTimer); avisoTimer = setInterval(atualizarAviso, 150);
   estado = 'esperando';
   setTimeout(() => { if(estado === 'esperando') mandar({cmd:'armar', gatilho:A.gatilho}); }, 600);
 }
 function parar(){
   estado = 'parado'; clearInterval(tick); timers.forEach(clearTimeout); timers = [];
-  pararGlitch(); offset = 0;
+  pararGlitch(); offset = 0; clearInterval(avisoTimer); $('aviso').style.opacity = 0;
 }
+
+
+/* duração de cada passo da contagem (como no original: devagar, rápido, devagar) */
+function passos(n){
+  const fator = A.vel === 'lenta' ? 1.6 : A.vel === 'rapida' ? 0.6 : 1;
+  const r = [];
+  for(let i = 0; i < n; i++){
+    const borda = Math.min(i, n - 1 - i);
+    let dur = borda === 0 ? (i === 0 ? 0.8 : 0.75) : borda === 1 ? 0.62 : 0.55;
+    if(n === 1) dur = 0.8;
+    r.push(dur * 1000 * fator);
+  }
+  return r;
+}
+function comGlitch(){ return A.gatilho === 'chacoalhar' && A.glitch; }
+function duracaoVolta(){ return comGlitch() ? (+A.durGlitch || 4) * 1000 : passos(offset).reduce((a, b) => a + b, 0); }
+/* se acionar agora, quantos ms faltariam para o minuto real virar depois que a hora parar? */
+function folgaSeAcionarAgora(){
+  const para = Date.now() + (+A.atraso || 3) * 1000 + duracaoVolta();
+  return 60000 - (para % 60000);      // ms até a próxima virada depois de parar
+}
+const JANELA = 10000;                 // 10 s de aviso
+let avisoTimer = null;
+function atualizarAviso(){
+  const el = $('aviso');
+  if(!A.aviso || estado !== 'esperando' || offset <= 0){ el.style.opacity = 0; return; }
+  const f = folgaSeAcionarAgora();
+  // acende fraquinha e vai ficando mais forte até a virada
+  el.style.opacity = f < JANELA ? (0.25 + 0.75 * (1 - f / JANELA)).toFixed(2) : 0;
+}
+
+let extraMs = 0;   // quanto a correção esticou
 function gatilho(){
   if(estado !== 'esperando') return;
+  extraMs = 0;
+  if(A.correcao && offset > 0){
+    const f = folgaSeAcionarAgora();
+    if(f < JANELA) extraMs = f + 500;  // termina meio segundo depois da virada
+  }
   estado = 'atraso';
+  $('aviso').style.opacity = 0;
   timers.push(setTimeout(voltar, (+A.atraso || 3) * 1000));
 }
 window.tlGatilho = gatilho;
 
 function voltar(){
   estado = 'voltando';
-  const comGlitch = A.gatilho === 'chacoalhar' && A.glitch;
   const n = offset;
   if(n <= 0){ estado = 'fim'; return; }
-  if(comGlitch){
+  if(comGlitch()){
     // a hora enlouquece e para direto na hora real
-    const seg = +A.durGlitch || 4;
-    if(A.somGlitch) mandar({cmd:'glitch', seg:seg});
-    embaralhar(seg * 1000, () => { offset = 0; estado = 'fim'; });
+    const ms = (+A.durGlitch || 4) * 1000 + extraMs;
+    if(A.somGlitch) mandar({cmd:'glitch', seg:ms / 1000, qual:+A.somQual, vol:A.volGlitch / 100});
+    embaralhar(ms, () => { offset = 0; estado = 'fim'; });
     return;
   }
-  // como no original: começa devagar, acelera e freia no final
-  const fator = A.vel === 'lenta' ? 1.6 : A.vel === 'rapida' ? 0.6 : 1;
+  const ps = passos(n), total = ps.reduce((a, b) => a + b, 0);
+  const esticar = (total + extraMs) / total;   // a correção deixa cada passo um pouco mais lento
   let t = 0;
-  for(let i = 0; i < n; i++){
-    const borda = Math.min(i, n - 1 - i);               // 0 = primeiro/último
-    let dur = borda === 0 ? (i === 0 ? 0.8 : 0.75) : borda === 1 ? 0.62 : 0.55;
-    if(n === 1) dur = 0.8;
-    t += dur * 1000 * fator;
+  ps.forEach((d, i) => {
+    t += d * esticar;
     const fim = i === n - 1;
     timers.push(setTimeout(() => { offset--; desenhar(); if(fim) estado = 'fim'; }, t));
-  }
+  });
 }
 
 /* toque na tela de bloqueio */

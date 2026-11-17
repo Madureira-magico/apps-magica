@@ -10,7 +10,7 @@ import MediaPlayer
 ///   armar {gatilho: "volume" | "chacoalhar" | "virar" | "toque"} -> fica esperando o gatilho
 ///   desarmar                -> para de esperar
 ///   som {vol: 0...1}        -> toca o som de bloqueio do iPhone
-///   glitch {seg: n}         -> toca o som de glitch por n segundos
+///   glitch {seg, qual, vol} -> toca o som de glitch 1 ou 2 por "seg" segundos
 ///   icones                  -> manda a lanterna e a câmera do próprio iPhone (desenhos oficiais)
 /// O iPhone responde:
 ///   window.tlGatilho()                  -> o gatilho aconteceu
@@ -38,6 +38,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     private var somID: SystemSoundID = 0
     private var silencio: AVAudioPlayer?
     private var somGlitch: AVAudioPlayer?
+    private var somGlitch2: AVAudioPlayer?
     private var somBloqueio: AVAudioPlayer?
     private var paraGlitch: DispatchWorkItem?
 
@@ -79,6 +80,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         silencio?.volume = 0.01
         silencio?.play()
         somGlitch = player("glitch")
+        somGlitch2 = player("glitch2")
         // o som de bloqueio do próprio iPhone, tocado de um jeito que deixa controlar o volume
         somBloqueio = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: "/System/Library/Audio/UISounds/lock.caf"))
         somBloqueio?.prepareToPlay()
@@ -91,10 +93,11 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     }
 
     /// Toca o glitch por "segundos" e para na hora certa
-    private func tocarGlitch(_ segundos: Double) {
-        guard let p = somGlitch else { return }
+    private func tocarGlitch(_ segundos: Double, qual: Int, vol: Float) {
+        guard let p = (qual == 2 ? somGlitch2 : somGlitch) ?? somGlitch else { return }
         paraGlitch?.cancel()
-        p.stop(); p.currentTime = 0; p.volume = 1
+        somGlitch?.stop(); somGlitch2?.stop()
+        p.currentTime = 0; p.volume = max(0, min(1, vol))
         p.numberOfLoops = -1
         p.play()
         let item = DispatchWorkItem { p.stop() }
@@ -119,7 +122,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         case "desarmar": desarmar()
         case "som": tocarBloqueio((corpo["vol"] as? NSNumber)?.floatValue ?? 0.4)
         case "icones": mandarIcones()
-        case "glitch": tocarGlitch((corpo["seg"] as? NSNumber)?.doubleValue ?? 3)
+        case "glitch": tocarGlitch((corpo["seg"] as? NSNumber)?.doubleValue ?? 3,
+                                   qual: (corpo["qual"] as? NSNumber)?.intValue ?? 1,
+                                   vol: (corpo["vol"] as? NSNumber)?.floatValue ?? 0.8)
         default: break
         }
     }
