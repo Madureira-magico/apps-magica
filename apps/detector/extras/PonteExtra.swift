@@ -6,41 +6,55 @@ import AudioToolbox
 
 /// Parte do iPhone só do app Detector (detector de ímã).
 /// Recados da página: window.webkit.messageHandlers.ima.postMessage({cmd: ...})
-///   ligar {sens, forca, tempo, dupla} -> liga o sensor e aprende a sala (2 s)
-///   desligar                          -> desliga o sensor
-///   ajustes {sens, forca, tempo, dupla}
-///   recalibrar                        -> aprende a sala de novo
-///   vibrar                            -> vibração de teste com a força e o tempo atuais
-///   bolso {ligar}                     -> sensor de proximidade (tela apaga no bolso)
-/// O iPhone responde chamando window.imaSinal(valor µT, limite µT, estado)
-///   estado: 0 desligado, 1 aprendendo, 2 pronto, 3 ímã perto
+///   ligar {ajustes}   -> liga o sensor e aprende a sala (2 s); pronto = vum vum vum
+///   desligar          -> desliga o sensor
+///   ajustes {sens, adapt, forca, dupla, saidaLonga, dormir, dormirMin}
+///   auto              -> ajuste automático: 3 s para guardar, 5 s parado, 5 s se mexendo
+///   bolso {ligar}     -> sensor de proximidade (tela apaga no bolso)
+/// O iPhone responde:
+///   window.imaSinal(valor µT, limite µT, estado)
+///     0 desligado, 1 aprendendo, 2 pronto, 3 ímã perto, 4 dormindo, 5 acordando,
+///     6 ajuste: guarde no bolso, 7 ajuste: fique parado, 8 ajuste: se mexa
+///   window.imaAjustado(sens, adapt) quando o ajuste automático termina
 @objc(PonteExtra)
 final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
+    private enum Modo { case parado, aprendendo, pronto, dormindo, acordando, auto }
+
     private weak var web: WKWebView?
     private let mm = CMMotionManager()
     private let fila: OperationQueue = { let f = OperationQueue(); f.maxConcurrentOperationCount = 1; return f }()
     private var motor: CHHapticEngine?
+    private var ocupadoAte: TimeInterval = 0      // só na fila principal
 
-    // ajustes (lidos e escritos só na fila do sensor)
-    private var sens = 60.0, forca = 70.0, tempo = 40.0
-    private var dupla = true
+    // ajustes (só na fila do sensor)
+    private var sens = 60.0, adapt = 70.0, forca = 70.0
+    private var dupla = true, saidaLonga = false, dormir = true, dormirMin = 5.0
 
-    // estado do detector
-    private var ligado = false
-    private var aprendendo = false
-    private var inicioAprender: TimeInterval = 0
+    // estado (só na fila do sensor)
+    private var modo = Modo.parado
+    private var t0: TimeInterval = 0
     private var soma = SIMD3<Double>(0, 0, 0)
     private var nSoma = 0
     private var base = SIMD3<Double>(0, 0, 0)
     private var suave = SIMD3<Double>(0, 0, 0)
     private var temSuave = false
+    private var giroS = 0.0
+    private var valor = 0.0
+    private var limAtual = 10.0
     private var perto = false
     private var acima = 0
     private var congeladoDesde: TimeInterval = 0
     private var silencioAte: TimeInterval = 0
-    private var ultimaVib: TimeInterval = 0
+    private var ultimaAtividade: TimeInterval = 0
     private var ultimoEnvio: TimeInterval = 0
-    private var valor = 0.0
+    private var contAcordar = 0
+    private var limpoDesde: TimeInterval = 0
+    // ajuste automático
+    private var autoFase = 0
+    private var autoMax = 0.0
+    private var autoBaseFeita = false
+    private var autoAmostras: [(Double, Double)] = []
+    private var autoEraLigado = false
 
     func instalar(_ config: WKWebViewConfiguration) {
         config.userContentController.add(self, name: "ima")
@@ -57,17 +71,27 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         switch cmd {
         case "ligar":
             lerAjustes(corpo)
-            fila.addOperation { self.ligado = true; self.comecarAprender() }
             iniciarSensor()
+            fila.addOperation { if self.modo != .auto { self.comecarAprender() } }
         case "desligar":
-            pararSensor()
-            fila.addOperation { self.ligado = false; self.aprendendo = false; self.perto = false; self.enviar(0, forcar: true) }
+            fila.addOperation {
+                guard self.modo != .auto else { return }
+                self.modo = .parado
+                self.enviar(0, forcar: true)
+                DispatchQueue.main.async { self.pararSensor() }
+            }
         case "ajustes":
             lerAjustes(corpo)
-        case "recalibrar":
-            fila.addOperation { if self.ligado { self.comecarAprender() } }
-        case "vibrar":
-            fila.addOperation { let f = self.forca, t = self.tempo; DispatchQueue.main.async { self.vibrar(forca: f, tempo: t) } }
+        case "auto":
+            iniciarSensor()
+            fila.addOperation {
+                guard self.modo != .auto else { return }
+                self.autoEraLigado = self.modo != .parado
+                self.modo = .auto
+                self.autoFase = 0
+                self.t0 = 0
+                self.enviar(0, forcar: true)
+            }
         case "bolso":
             UIDevice.current.isProximityMonitoringEnabled = (corpo["ligar"] as? Bool) ?? false
         default:
@@ -76,13 +100,17 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
     }
 
     private func lerAjustes(_ c: [String: Any]) {
-        let s = (c["sens"] as? NSNumber)?.doubleValue, f = (c["forca"] as? NSNumber)?.doubleValue
-        let t = (c["tempo"] as? NSNumber)?.doubleValue, d = c["dupla"] as? Bool
+        func num(_ k: String) -> Double? { (c[k] as? NSNumber)?.doubleValue }
+        let s = num("sens"), a = num("adapt"), f = num("forca"), dm = num("dormirMin")
+        let d = c["dupla"] as? Bool, sl = c["saidaLonga"] as? Bool, dr = c["dormir"] as? Bool
         fila.addOperation {
             if let s = s { self.sens = s }
+            if let a = a { self.adapt = a }
             if let f = f { self.forca = f }
-            if let t = t { self.tempo = t }
+            if let dm = dm { self.dormirMin = dm }
             if let d = d { self.dupla = d }
+            if let sl = sl { self.saidaLonga = sl }
+            if let dr = dr { self.dormir = dr }
         }
     }
 
@@ -91,7 +119,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         guard mm.isMagnetometerAvailable else { return }
         if mm.isDeviceMotionAvailable && !mm.isDeviceMotionActive {
             mm.deviceMotionUpdateInterval = 1.0 / 50
-            mm.startDeviceMotionUpdates(using: .xArbitraryZVertical)   // só o giroscópio, o ímã não atrapalha
+            mm.startDeviceMotionUpdates(using: .xArbitraryZVertical)   // só o giroscópio: o ímã não atrapalha
         }
         if !mm.isMagnetometerActive {
             mm.magnetometerUpdateInterval = 1.0 / 100
@@ -107,94 +135,196 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         mm.stopDeviceMotionUpdates()
     }
 
+    /// Limite em µT: barra 0 = 80 µT (só bem perto), barra 100 = 3,2 µT (bem sensível)
+    private func limitePara(_ s: Double) -> Double { 80 * pow(0.04, s / 100) }
+    private var limite: Double { limitePara(sens) }
+
     private func comecarAprender() {
-        aprendendo = true
-        inicioAprender = 0
+        modo = .aprendendo
+        t0 = 0
         soma = .zero; nSoma = 0
         perto = false; acima = 0
-        temSuave = false
         enviar(0, forcar: true)
     }
 
-    /// Limite em µT: barra 0 = 80 µT (só bem perto), barra 100 = 3,2 µT (bem sensível)
-    private var limite: Double { 80 * pow(0.04, sens / 100) }
-
     private func processar(_ cru: SIMD3<Double>, _ t: TimeInterval) {
-        guard ligado else { return }
-        // alisa o tremor do sensor
-        if !temSuave { suave = cru; temSuave = true } else { suave += (cru - suave) * 0.35 }
-
-        if aprendendo {
-            if inicioAprender == 0 { inicioAprender = t }
-            if t - inicioAprender > 0.3 { soma += suave; nSoma += 1 }       // descarta o começo
-            if t - inicioAprender >= 2.0 && nSoma > 20 {
-                base = soma / Double(nSoma)
-                aprendendo = false
-                congeladoDesde = 0
-                silencioAte = t + 0.3
-                DispatchQueue.main.async { self.vibrar(forca: 25, tempo: 0, pronto: true) }   // toquinho de "pronto"
-            }
-            enviar(t)
-            return
-        }
-
-        // celular girando ou balançando: não vibra e reaprende rápido
+        guard modo != .parado else { return }
+        if !temSuave { suave = cru; temSuave = true } else { suave += (cru - suave) * 0.35 }   // alisa o tremor
         let giro = mm.deviceMotion.map { r -> Double in
             let g = r.rotationRate; return (g.x * g.x + g.y * g.y + g.z * g.z).squareRoot()
         } ?? 0
-        let lim = limite
+        giroS += (giro - giroS) * 0.1
         let dif = suave - base
         valor = (dif.x * dif.x + dif.y * dif.y + dif.z * dif.z).squareRoot()
+        limAtual = limite
 
-        if giro > 0.7 {
-            base += dif * 0.08
-            silencioAte = t + 0.35
-            if perto { perto = false }
-            acima = 0
-            enviar(t)
-            return
-        }
-
-        // a base acompanha devagar as mudanças da sala, mas congela quando algo forte aparece
-        if valor < lim * 0.5 {
-            base += dif * 0.004
-            congeladoDesde = 0
-        } else {
-            if congeladoDesde == 0 { congeladoDesde = t }
-            if t - congeladoDesde > 5 {           // ficou mudado muito tempo: é a sala, não o ímã
-                base = suave; congeladoDesde = 0; perto = false; acima = 0
-            }
-        }
-
-        if t >= silencioAte {
-            if !perto {
-                acima = valor > lim ? acima + 1 : 0
-                if acima >= 2 {
-                    perto = true
-                    avisar(t)
-                }
-            } else if valor < lim * 0.6 {
-                perto = false
-                acima = 0
-                if dupla { avisar(t) }
-            }
+        switch modo {
+        case .aprendendo: aprender(t)
+        case .pronto: detectar(t, dif)
+        case .dormindo: dormindo(t, dif)
+        case .acordando: acordando(t)
+        case .auto: autoPasso(t, dif)
+        case .parado: break
         }
         enviar(t)
     }
 
-    private func avisar(_ t: TimeInterval) {
-        guard t - ultimaVib > 0.25 else { return }
-        ultimaVib = t
-        let f = forca, d = tempo
-        DispatchQueue.main.async { self.vibrar(forca: f, tempo: d) }
+    private func aprender(_ t: TimeInterval) {
+        if t0 == 0 { t0 = t }
+        if t - t0 > 0.3 { soma += suave; nSoma += 1 }     // descarta o começo
+        if t - t0 >= 2.0 && nSoma > 20 {
+            base = soma / Double(nSoma)
+            modo = .pronto
+            perto = false; acima = 0
+            congeladoDesde = 0
+            silencioAte = t + 0.3
+            ultimaAtividade = t
+            tocar(3, 0.13)                                 // pronto: vum vum vum
+        }
+    }
+
+    private func detectar(_ t: TimeInterval, _ dif: SIMD3<Double>) {
+        let a = adapt / 100
+        let k = 0.3 + 6 * (1 - a)                          // quanto o movimento "esconde" o sinal
+        let limEf = limite * (1 + k * giroS)
+        limAtual = limEf
+        if giroS > 1.0 + 2.0 * a {                         // girando muito: não vibra e reaprende rápido
+            base += dif * 0.08
+            silencioAte = t + 0.35
+            perto = false; acima = 0
+            return
+        }
+        // a base acompanha a sala (mais rápido quando o celular se mexe), mas congela quando algo forte aparece
+        if valor < limEf * 0.5 {
+            base += dif * (0.004 + (0.02 + 0.1 * (1 - a)) * min(giroS, 2))
+            congeladoDesde = 0
+        } else {
+            if congeladoDesde == 0 { congeladoDesde = t }
+            if t - congeladoDesde > 5 {                    // mudado muito tempo: é a sala, não o ímã
+                base = suave; congeladoDesde = 0; perto = false; acima = 0
+            }
+        }
+        if t >= silencioAte {
+            if !perto {
+                acima = valor > limEf ? acima + 1 : 0
+                if acima >= 2 {
+                    perto = true
+                    ultimaAtividade = t
+                    tocar(3, 0.13)                         // chegou: vum vum vum
+                }
+            } else if valor < limEf * 0.6 {
+                perto = false
+                acima = 0
+                ultimaAtividade = t
+                if dupla {
+                    if saidaLonga { tocar(1, 0.7) } else { tocar(3, 0.13) }   // saiu
+                }
+            }
+        }
+        if dormir && !perto && t - ultimaAtividade > dormirMin * 60 {
+            modo = .dormindo
+            contAcordar = 0
+        }
+    }
+
+    /// Dormindo: não vibra. Acorda com o ímã bem encostado por ~1 s.
+    private var forteAcordar: Double { max(60, limite * 4) }
+
+    private func dormindo(_ t: TimeInterval, _ dif: SIMD3<Double>) {
+        if giroS > 0.3 { base = suave; contAcordar = 0; return }
+        if valor > forteAcordar {
+            contAcordar += 1
+            if contAcordar >= 80 {
+                modo = .acordando
+                t0 = t
+                limpoDesde = 0
+                tocar(1, 0.3)                              // acordei: um vum
+            }
+        } else {
+            contAcordar = max(0, contAcordar - 2)
+            if valor < forteAcordar * 0.3 { base += dif * 0.01 }
+        }
+    }
+
+    /// Acordou: espera tirar o ímã de perto e reaprende a sala.
+    private func acordando(_ t: TimeInterval) {
+        if valor < forteAcordar * 0.25 && giroS < 0.5 {
+            if limpoDesde == 0 { limpoDesde = t }
+            if t - limpoDesde > 0.6 { comecarAprender(); return }
+        } else {
+            limpoDesde = 0
+        }
+        if t - t0 > 8 { comecarAprender() }
+    }
+
+    // MARK: ajuste automático
+    private func autoPasso(_ t: TimeInterval, _ dif: SIMD3<Double>) {
+        if t0 == 0 { t0 = t; autoFase = 0 }
+        let dt = t - t0
+        switch autoFase {
+        case 0:                                            // 3 s para guardar no bolso
+            if dt >= 3 {
+                autoFase = 1; t0 = t
+                soma = .zero; nSoma = 0; autoMax = 0; autoBaseFeita = false
+                tocar(1, 0.15, forcaMin: 60)
+            }
+        case 1:                                            // 5 s parado: mede o tremor
+            if dt > 0.5 && dt < 1.5 { soma += suave; nSoma += 1 }
+            else if dt >= 1.5 {
+                if !autoBaseFeita && nSoma > 0 { base = soma / Double(nSoma); autoBaseFeita = true }
+                else if giroS < 0.5 { autoMax = max(autoMax, valor) }
+            }
+            if dt >= 5.5 {
+                let lim = max(2.5, autoMax * 1.8 + 1.0)
+                sens = min(100, max(0, 100 * log(lim / 80) / log(0.04)))
+                autoFase = 2; t0 = t
+                autoAmostras = []
+                tocar(2, 0.15, forcaMin: 60)
+            }
+        case 2:                                            // 5 s se mexendo: mede o balanço
+            base += dif * (0.004 + 0.07 * min(giroS, 2))
+            if dt > 0.8 { autoAmostras.append((valor, giroS)) }
+            if dt >= 5.8 {
+                let lim = limite
+                var escolhido = 0.0
+                for aa in stride(from: 100.0, through: 0.0, by: -5.0) {
+                    let k = 0.3 + 6 * (1 - aa / 100), gate = 1.0 + 2.0 * aa / 100
+                    if autoAmostras.allSatisfy({ $0.1 > gate || $0.0 < lim * (1 + k * $0.1) * 0.85 }) {
+                        escolhido = aa; break
+                    }
+                }
+                adapt = escolhido
+                tocar(3, 0.15, forcaMin: 60)
+                let js = String(format: "window.imaAjustado&&imaAjustado(%.0f,%.0f)", sens, adapt)
+                DispatchQueue.main.async { self.web?.evaluateJavaScript(js, completionHandler: nil) }
+                if autoEraLigado {
+                    base = suave
+                    comecarAprender()
+                } else {
+                    modo = .parado
+                    enviar(0, forcar: true)
+                    DispatchQueue.main.async { self.pararSensor() }
+                }
+            }
+        default:
+            break
+        }
     }
 
     private func enviar(_ t: TimeInterval, forcar: Bool = false) {
         guard forcar || t - ultimoEnvio > 0.05 else { return }
         ultimoEnvio = t
-        let estado = !ligado ? 0 : (aprendendo ? 1 : (perto ? 3 : 2))
-        let v = ligado && !aprendendo ? valor : 0
-        let js = String(format: "window.imaSinal&&imaSinal(%.2f,%.2f,%ld)", v, limite, estado)
+        var estado = 0
+        switch modo {
+        case .parado: estado = 0
+        case .aprendendo: estado = 1
+        case .pronto: estado = perto ? 3 : 2
+        case .dormindo: estado = 4
+        case .acordando: estado = 5
+        case .auto: estado = autoFase == 0 ? 6 : (autoFase == 1 ? 7 : 8)
+        }
+        let v = (modo == .pronto || modo == .dormindo || (modo == .auto && autoFase > 0)) ? valor : 0
+        let js = String(format: "window.imaSinal&&imaSinal(%.2f,%.2f,%ld)", v, limAtual, estado)
         DispatchQueue.main.async { self.web?.evaluateJavaScript(js, completionHandler: nil) }
     }
 
@@ -212,24 +342,43 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandler {
         } catch { motor = nil }
     }
 
-    /// forca 0–100, tempo 0–100 (toque curto até 0,6 s)
-    private func vibrar(forca: Double, tempo: Double, pronto: Bool = false) {
-        let intensidade = Float(0.15 + 0.85 * forca / 100)
-        let duracao = pronto ? 0.04 : 0.04 + 0.56 * tempo / 100
-        guard let m = motor else {
-            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-            return
+    /// Chamado na fila do sensor. Toca depois que a vibração anterior terminar (não se misturam).
+    private func tocar(_ pulsos: Int, _ dur: Double, gap: Double = 0.1, forcaMin: Double = 0) {
+        let f = max(forca, forcaMin)
+        DispatchQueue.main.async {
+            let agora = ProcessInfo.processInfo.systemUptime
+            let inicio = max(agora, self.ocupadoAte + 0.15)
+            self.ocupadoAte = inicio + Double(pulsos) * dur + Double(pulsos - 1) * gap
+            DispatchQueue.main.asyncAfter(deadline: .now() + (inicio - agora)) {
+                self.vibrar(pulsos, dur, gap, f)
+            }
         }
-        let ev = CHHapticEvent(eventType: .hapticContinuous,
-                               parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensidade),
-                                            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)],
-                               relativeTime: 0, duration: duracao)
+    }
+
+    private func vibrar(_ pulsos: Int, _ dur: Double, _ gap: Double, _ forca: Double) {
+        let intensidade = Float(0.15 + 0.85 * forca / 100)
+        guard let m = motor else { return vibrarSistema(pulsos) }
+        var eventos: [CHHapticEvent] = []
+        for i in 0..<pulsos {
+            eventos.append(CHHapticEvent(eventType: .hapticContinuous,
+                                         parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensidade),
+                                                      CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.35)],
+                                         relativeTime: Double(i) * (dur + gap), duration: dur))
+        }
         do {
             try m.start()
-            let p = try m.makePlayer(with: CHHapticPattern(events: [ev], parameters: []))
+            let p = try m.makePlayer(with: CHHapticPattern(events: eventos, parameters: []))
             try p.start(atTime: CHHapticTimeImmediate)
         } catch {
-            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            vibrarSistema(pulsos)
+        }
+    }
+
+    private func vibrarSistema(_ pulsos: Int) {
+        for i in 0..<pulsos {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.5) {
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            }
         }
     }
 }

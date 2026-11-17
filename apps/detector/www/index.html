@@ -6,46 +6,56 @@
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 html,body{margin:0;height:100%;overflow:hidden;background:#071a44;font-family:-apple-system,system-ui,sans-serif;color:#fff}
-#menu{position:fixed;inset:0;padding:calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 16px);
-  background:linear-gradient(180deg,#071a44 0%,#0d3a9a 45%,#3f86e8 80%,#cfe6ff 100%);display:flex;flex-direction:column;gap:12px}
-.topo{display:flex;align-items:center;justify-content:space-between;padding:0 14px}
-.logo{width:76px;height:76px;border-radius:18px}
-#pw{width:76px;height:76px;border-radius:50%;background:#3a3f55;border:3px solid #667;display:flex;align-items:center;justify-content:center;transition:background .2s}
-#pw.on{background:#e53935;border-color:#ff8a80;box-shadow:0 0 18px rgba(255,60,50,.6)}
-#pw svg{width:36px;height:36px}
-.pn{background:rgba(5,18,50,.55);border:0.5px solid rgba(160,200,255,.25);border-radius:16px;padding:12px}
+#menu{position:fixed;inset:0;padding:calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 12px);
+  background:linear-gradient(180deg,#071a44 0%,#0d3a9a 45%,#3f86e8 82%,#cfe6ff 100%);display:flex;flex-direction:column;gap:10px}
+.topo{position:relative;text-align:center}
+.logo{width:72px;height:72px;border-radius:16px;display:block;margin:0 auto}
+.nome{font-size:22px;font-weight:600;letter-spacing:5px;margin-top:4px}
+#pw{position:absolute;top:2px;right:2px;width:46px;height:46px;border-radius:50%;background:#3a3f55;border:2px solid #667;display:flex;align-items:center;justify-content:center;transition:background .2s}
+#pw.on{background:#e53935;border-color:#ff8a80;box-shadow:0 0 14px rgba(255,60,50,.6)}
+#pw svg{width:24px;height:24px}
+.pn{background:rgba(5,18,50,.55);border:0.5px solid rgba(160,200,255,.25);border-radius:16px;padding:10px 12px}
+.fdpn{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
 .faders{display:flex;gap:4px;flex:1;min-height:0}
-.fd{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1}
+.fd{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
 .vl{font-size:15px;font-weight:600}
-.tr{position:relative;width:10px;flex:1;min-height:90px;background:#03102e;border-radius:5px;border:0.5px solid rgba(160,200,255,.3);touch-action:none}
+.tr{position:relative;width:10px;flex:1;min-height:70px;background:#03102e;border-radius:5px;border:0.5px solid rgba(160,200,255,.3);touch-action:none}
 .tr::before{content:'';position:absolute;left:-26px;right:-26px;top:-12px;bottom:-12px}
 .lv{position:absolute;bottom:0;left:0;right:0;background:#e53935;border-radius:5px;opacity:.55}
 .kn{position:absolute;left:50%;width:46px;height:24px;margin-left:-23px;border-radius:6px;background:#e53935;border:2px solid #ff8a80;transform:translateY(50%)}
 .kn::after{content:'';position:absolute;left:8px;right:8px;top:9px;height:2px;background:#fff}
 .lbx{font-size:12px;color:#cfe3ff;text-align:center;line-height:1.25}
+#auto{text-align:center;padding:10px 0;border-radius:11px;background:#e53935;border:1.5px solid #ff8a80;font-size:14px;font-weight:600}
+#auto.ocupado{background:#7a1414;border-color:#a33}
 .cab{display:flex;justify-content:space-between;font-size:12px;color:#cfe3ff}
-.vm{display:flex;gap:3px;margin-top:8px}.vm div{flex:1;height:14px;border-radius:2px;background:#0a1a40}
-.rw{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-size:15px}
+.vm{display:flex;gap:3px;margin-top:7px}.vm div{flex:1;height:13px;border-radius:2px;background:#0a1a40}
+.rw{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:15px;gap:8px}
 .rw+.rw{border-top:0.5px solid rgba(160,200,255,.2)}
 .sw{width:50px;height:28px;border-radius:7px;background:#2a2f45;position:relative;border:0.5px solid rgba(255,255,255,.25);flex-shrink:0}
 .sw::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:5px;background:#99a;transition:left .15s}
 .sw.on{background:#7a1414}.sw.on::after{left:25px;background:#ff5252}
-.bts{display:flex;gap:8px}
-.bt{flex:1;text-align:center;padding:12px 0;border-radius:12px;font-size:14px;background:rgba(255,255,255,.85);color:#0d3a9a;font-weight:500}
-.bt:active{opacity:.7}
+.dr{display:flex;align-items:center;gap:8px}
+.min{display:flex;background:#03102e;border-radius:7px;padding:2px}
+.min div{padding:4px 7px;font-size:12px;border-radius:5px;color:#9fb6d8}
+.min div.on{background:#e53935;color:#fff}
+.min.off{opacity:.35}
 #disf{position:fixed;inset:0;background:#000;display:none}
 </style></head>
 <body>
 <div id="menu">
   <div class="topo">
     <img class="logo" src="logo.png" alt="">
-    <div id="pw"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></div>
+    <div class="nome">DETECTOR</div>
+    <div id="pw"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></div>
   </div>
 
-  <div class="pn faders">
-    <div class="fd"><span class="vl" id="v-sens">60</span><div class="tr" data-k="sens"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sensibi-<br>lidade</span></div>
-    <div class="fd"><span class="vl" id="v-forca">70</span><div class="tr" data-k="forca"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Força da<br>vibração</span></div>
-    <div class="fd"><span class="vl" id="v-tempo">40</span><div class="tr" data-k="tempo"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Tempo da<br>vibração</span></div>
+  <div class="pn fdpn">
+    <div class="faders">
+      <div class="fd"><span class="vl" id="v-sens">60</span><div class="tr" data-k="sens"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sensibi-<br>lidade</span></div>
+      <div class="fd"><span class="vl" id="v-adapt">70</span><div class="tr" data-k="adapt"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Sens.<br>adaptativa</span></div>
+      <div class="fd"><span class="vl" id="v-forca">70</span><div class="tr" data-k="forca"><div class="lv"></div><div class="kn"></div></div><span class="lbx">Força da<br>vibração</span></div>
+    </div>
+    <div id="auto">Ajuste automático</div>
   </div>
 
   <div class="pn">
@@ -53,15 +63,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:#071a44;font-family:-a
     <div class="vm" id="vm"></div>
   </div>
 
-  <div class="pn" style="padding:2px 12px">
+  <div class="pn" style="padding:0 12px">
     <div class="rw"><span>Confirmação dupla</span><div class="sw" data-k="dupla"></div></div>
+    <div class="rw"><span>Saída: vibração longa</span><div class="sw" data-k="saidaLonga"></div></div>
     <div class="rw"><span>Disfarce: tela preta</span><div class="sw" data-k="disfarce"></div></div>
     <div class="rw"><span>Apagar no bolso</span><div class="sw" data-k="bolso"></div></div>
-  </div>
-
-  <div class="bts">
-    <div class="bt" id="testar">Testar vibração</div>
-    <div class="bt" id="recal">Recalibrar</div>
+    <div class="rw"><div class="dr"><span>Dormir</span>
+      <div class="min" id="min"><div data-m="2">2</div><div data-m="5">5</div><div data-m="10">10</div><div data-m="15">15 min</div></div></div>
+      <div class="sw" data-k="dormir"></div></div>
   </div>
 </div>
 <div id="disf"></div>
@@ -72,15 +81,17 @@ function mandar(o){ if(NATIVO) window.webkit.messageHandlers.ima.postMessage(o);
 function barra(esconder){ try{ window.webkit.messageHandlers.barra.postMessage(esconder); }catch(e){} }
 try{ window.webkit.messageHandlers.estilo.postMessage('claro'); }catch(e){}
 
-const PADRAO = {sens:60, forca:70, tempo:40, dupla:true, disfarce:true, bolso:true};
+const PADRAO = {sens:60, adapt:70, forca:70, dupla:true, saidaLonga:false, disfarce:true, bolso:true, dormir:true, dormirMin:5};
 let aj = Object.assign({}, PADRAO);
 try{ Object.assign(aj, JSON.parse(localStorage.getItem('detector-ajustes')||'{}')); }catch(e){}
 function guardar(){ try{ localStorage.setItem('detector-ajustes', JSON.stringify(aj)); }catch(e){} }
-function ajustesNativo(){ return {sens:aj.sens, forca:aj.forca, tempo:aj.tempo, dupla:aj.dupla}; }
+function ajustesNativo(){ return {sens:aj.sens, adapt:aj.adapt, forca:aj.forca, dupla:aj.dupla, saidaLonga:aj.saidaLonga, dormir:aj.dormir, dormirMin:aj.dormirMin}; }
+function avisarAjustes(){ guardar(); mandar(Object.assign({cmd:'ajustes'}, ajustesNativo())); }
 
-let ligado = false, estado = 0, limite = 10;
+let ligado = false, ajustando = false;
 
 // faders
+const porFader = {};
 document.querySelectorAll('.tr').forEach(tr=>{
   const k = tr.dataset.k;
   function por(v, avisar){
@@ -89,8 +100,9 @@ document.querySelectorAll('.tr').forEach(tr=>{
     tr.querySelector('.kn').style.bottom = v + '%';
     tr.querySelector('.lv').style.height = v + '%';
     document.getElementById('v-' + k).textContent = v;
-    if (avisar) { guardar(); mandar(Object.assign({cmd:'ajustes'}, ajustesNativo())); }
+    if (avisar) avisarAjustes();
   }
+  porFader[k] = por;
   function mexer(e){ const r = tr.getBoundingClientRect(); por((r.bottom - e.clientY) / r.height * 100, true); }
   tr.addEventListener('pointerdown', e=>{ tr.setPointerCapture(e.pointerId); mexer(e); tr.onpointermove = mexer; });
   tr.addEventListener('pointerup', ()=>{ tr.onpointermove = null; });
@@ -103,14 +115,25 @@ document.querySelectorAll('.sw').forEach(s=>{
   const k = s.dataset.k;
   s.classList.toggle('on', !!aj[k]);
   s.addEventListener('click', ()=>{
-    aj[k] = !aj[k]; s.classList.toggle('on', aj[k]); guardar();
-    if (k === 'dupla') mandar(Object.assign({cmd:'ajustes'}, ajustesNativo()));
+    aj[k] = !aj[k]; s.classList.toggle('on', aj[k]);
+    if (k === 'dormir') pintarMin();
+    avisarAjustes();
   });
 });
 
-// liga / desliga: liga, aprende a sala e entra no disfarce
+// tempo para dormir
+const minEl = document.getElementById('min');
+function pintarMin(){
+  minEl.classList.toggle('off', !aj.dormir);
+  [...minEl.children].forEach(d=> d.classList.toggle('on', +d.dataset.m === aj.dormirMin));
+}
+[...minEl.children].forEach(d=> d.addEventListener('click', ()=>{ aj.dormirMin = +d.dataset.m; pintarMin(); avisarAjustes(); }));
+pintarMin();
+
+// liga / desliga: liga, aprende a sala, vibra vum vum vum e entra no disfarce
 const pw = document.getElementById('pw');
 pw.addEventListener('click', ()=>{
+  if (ajustando) return;
   ligado = !ligado;
   pw.classList.toggle('on', ligado);
   if (ligado) {
@@ -119,12 +142,29 @@ pw.addEventListener('click', ()=>{
     if (aj.disfarce) entrarDisfarce();
   } else {
     mandar({cmd:'desligar'});
-    imaSinal(0, limite, 0);
+    imaSinal(0, 10, 0);
   }
 });
 
-document.getElementById('testar').addEventListener('click', ()=> mandar({cmd:'vibrar'}));
-document.getElementById('recal').addEventListener('click', ()=>{ if (ligado) mandar({cmd:'recalibrar'}); });
+// ajuste automático
+const autoBt = document.getElementById('auto');
+autoBt.addEventListener('click', ()=>{
+  if (ajustando) return;
+  ajustando = true;
+  autoBt.classList.add('ocupado');
+  autoBt.textContent = 'Guarde no bolso…';
+  if (aj.bolso) mandar({cmd:'bolso', ligar:true});
+  mandar({cmd:'auto'});
+});
+window.imaAjustado = function(s, a){
+  porFader.sens(s, false);
+  porFader.adapt(a, false);
+  avisarAjustes();
+  ajustando = false;
+  autoBt.classList.remove('ocupado');
+  autoBt.textContent = 'Ajuste automático';
+  if (disf.style.display !== 'block') mandar({cmd:'bolso', ligar:false});
+};
 
 // disfarce: tela toda preta; dois toques na parte de cima voltam ao menu (o detector continua ligado)
 const disf = document.getElementById('disf');
@@ -137,7 +177,7 @@ function entrarDisfarce(){
 function sairDisfarce(){
   disf.style.display = 'none';
   barra(false);
-  mandar({cmd:'bolso', ligar:false});
+  if (!ajustando) mandar({cmd:'bolso', ligar:false});
 }
 disf.addEventListener('touchstart', e=>{
   e.preventDefault();
@@ -153,15 +193,18 @@ const vm = document.getElementById('vm');
 const LEDS = 16;
 for (let i = 0; i < LEDS; i++) vm.appendChild(document.createElement('div'));
 function led(v){ return v <= 1 ? 0 : Math.min(LEDS, Math.log(v) / Math.log(150) * LEDS); }   // 1 µT a 150 µT
+const TEXTOS = {0:'Sinal ao vivo', 1:'Aprendendo a sala…', 2:'Sinal ao vivo', 3:'Ímã perto!', 4:'Dormindo · encoste o ímã para acordar',
+  5:'Acordou · afaste o ímã', 6:'Ajuste: guarde no bolso…', 7:'Ajuste: fique parado…', 8:'Ajuste: ande e se mexa…'};
 window.imaSinal = function(v, lim, est){
-  estado = est; limite = lim;
   const n = Math.round(led(v)), lt = Math.max(1, Math.round(led(lim)));
   [...vm.children].forEach((d, i)=>{
     const marca = i === lt - 1;
     d.style.background = i < n ? (i >= lt ? '#ff3b30' : '#7fb8ff') : (marca ? '#5a2030' : '#0a1a40');
   });
-  document.getElementById('ut').textContent = est === 0 ? '—' : (est === 1 ? '…' : Math.round(v) + ' µT');
-  document.getElementById('sinal-txt').textContent = est === 1 ? 'Aprendendo a sala…' : 'Sinal ao vivo';
+  document.getElementById('ut').textContent = (est === 0 || est === 1 || est === 6) ? '—' : Math.round(v) + ' µT';
+  document.getElementById('sinal-txt').textContent = TEXTOS[est] || 'Sinal ao vivo';
+  if (est === 7) autoBt.textContent = 'Fique parado…';
+  if (est === 8) autoBt.textContent = 'Ande e se mexa…';
 };
 imaSinal(0, 10, 0);
 
