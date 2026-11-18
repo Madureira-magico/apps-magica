@@ -1,0 +1,77 @@
+Total: 1444 fotos, pacote 70.0 MB
+
+pele-clara: 214
+pele-morena: 252
+branco-dentes-olhos: 192
+escuro-cabelo-sombra: 178
+dourado-loiro: 152
+vermelho-rosado: 156
+fundo-azul-verde-cinza: 156
+dia-a-dia-celular: 144
+
+Detalhe:
+pele-clara               beach sand                30/30
+pele-clara               bread loaf                24/24
+pele-clara               croissant                 24/24
+pele-clara               pasta dish                24/24
+pele-clara               latte coffee              24/24
+pele-clara               soft sunset sky           24/24
+pele-clara               beige wall old house      20/20
+pele-clara               light brown dog           24/24
+pele-clara               peach fruit               20/20
+pele-morena              coffee beans              24/24
+pele-morena              chocolate cake            24/24
+pele-morena              barbecue meat             24/24
+pele-morena              wooden table              24/24
+pele-morena              wooden furniture          20/20
+pele-morena              leather sofa              20/20
+pele-morena              brown horse               24/24
+pele-morena              brown dog                 24/24
+pele-morena              autumn leaves             24/24
+pele-morena              desert dunes              24/24
+pele-morena              old church brick          20/20
+branco-dentes-olhos      snow landscape            24/24
+branco-dentes-olhos      white clouds sky          24/24
+branco-dentes-olhos      wedding cake              20/20
+branco-dentes-olhos      rice bowl                 20/20
+branco-dentes-olhos      white plate food          20/20
+branco-dentes-olhos      white sailboat            20/20
+branco-dentes-olhos      white building            20/20
+branco-dentes-olhos      white dog                 24/24
+branco-dentes-olhos      eggs                      20/20
+escuro-cabelo-sombra     city at night             30/30
+escuro-cabelo-sombra     concert stage lights      24/24
+escuro-cabelo-sombra     restaurant dim light      16/24
+escuro-cabelo-sombra     black car                 20/20
+escuro-cabelo-sombra     black cat                 24/24
+escuro-cabelo-sombra     night sky stars           24/24
+escuro-cabelo-sombra     dark forest               20/20
+escuro-cabelo-sombra     candle light              20/20
+dourado-loiro            wheat field               24/24
+dourado-loiro            golden hour beach         24/24
+dourado-loiro            beer glass                20/20
+dourado-loiro            french fries              20/20
+dourado-loiro            christmas lights          24/24
+dourado-loiro            golden retriever          24/24
+dourado-loiro            honey                     16/16
+vermelho-rosado          strawberries              24/24
+vermelho-rosado          red wine glass            20/20
+vermelho-rosado          pink flowers              24/24
+vermelho-rosado          red sunset                24/24
+vermelho-rosado          pizza                     24/24
+vermelho-rosado          tomatoes market           20/20
+vermelho-rosado          red car                   20/20
+fundo-azul-verde-cinza   ocean waves               24/24
+fundo-azul-verde-cinza   blue sky                  20/20
+fundo-azul-verde-cinza   swimming pool             20/20
+fundo-azul-verde-cinza   green forest              24/24
+fundo-azul-verde-cinza   city street               24/24
+fundo-azul-verde-cinza   airport                   20/20
+fundo-azul-verde-cinza   mountain lake             24/24
+dia-a-dia-celular        hotel room interior       20/20
+dia-a-dia-celular        travel bridge city        20/20
+dia-a-dia-celular        street food               24/24
+dia-a-dia-celular        birthday cake candles     20/20
+dia-a-dia-celular        road trip car             20/20
+dia-a-dia-celular        park walk                 20/20
+dia-a-dia-celular        museum hall interior      20/20
