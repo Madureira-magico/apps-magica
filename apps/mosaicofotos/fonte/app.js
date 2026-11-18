@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   MOSAIC FOTOS 1.0 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida) — Fototeca falsa em que as fotos formam o rosto do famoso
+   MOSAIC FOTOS 1.1 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
    ===================================================================== */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const DPR = Math.min(3, window.devicePixelRatio || 1);
@@ -642,11 +642,13 @@ async function prepararMosaico() {
               for (let k = 0; k < 10; k++) { id = cand[k < 6 ? Math.floor(Math.random() * Math.min(6, cand.length)) : Math.min(cand.length - 1, k - 4)][1].id; if (id !== esq && id !== cimaId) break; }
             } else {
               // rosto: TODAS as fotos de cor parecida o bastante entram no sorteio; ganha a menos usada até agora
-              const d0 = cand.length ? cand[0][0] : 0, tol = Math.max(d0 * 1.8, d0 + (alvoQ ? 15000 : 4500));
+              // partes bem claras (brilho, dentes, fundo): quase não há fotos brancas, então a tolerância abre mais e entram as quase brancas
+              const claro = lum([cr, cgc, cb]) > 195, minimo = claro ? 5 : 2;
+              const d0 = cand.length ? cand[0][0] : 0, tol = claro ? Math.max(d0 * 2.6, d0 + (alvoQ ? 40000 : 12000)) : Math.max(d0 * 1.8, d0 + (alvoQ ? 15000 : 4500));
               let melhor = null, mu = Infinity;
               for (let k = 0; k < cand.length; k++) {
                 const [d, p] = cand[k];
-                if (k >= 2 && d > tol) break;
+                if (k >= minimo && d > tol) break;
                 if (p.id === esq || p.id === cimaId) continue;
                 const u = (usos.get(p.id) || 0) + Math.random() * 0.9;
                 if (u < mu) { mu = u; melhor = p.id; }
