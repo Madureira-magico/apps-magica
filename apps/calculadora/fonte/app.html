@@ -412,7 +412,7 @@ input[type=file]{display:none}
 const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
 const isStandalone=window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 if(isStandalone)document.documentElement.classList.add('sa');
-const VER='Versão 1.5';
+const VER='Versão 1.6';
 const NAT=!!window.__NATIVE_APP__; /* dentro do app de iPhone (apps magicas) */
 function natMsg(n,v){try{webkit.messageHandlers[n].postMessage(v);}catch(_){}}
 function natCalc(cmd,args){try{return webkit.messageHandlers.calc.postMessage(Object.assign({cmd:cmd},args||{}));}catch(_){return Promise.reject();}}
@@ -781,9 +781,10 @@ function helpHTML(){
 const UP={A:'8',B:'8',C:'0',D:'0',E:'3',F:'1',G:'9',H:'4',I:'1',J:'1',K:'71',L:'7',M:'41',N:'4',O:'0',P:'01',Q:'0',R:'21',S:'5',T:'1',U:'0',V:'1',W:'14',X:'7',Y:'7',Z:'2'};
 const LO={a:'0',b:'9',c:'0',d:'10',e:'2',f:'8',g:'6',h:'4',i:'1',j:'1',k:'71',l:'1',m:'41',n:'4',o:'0',p:'0',q:'6',r:'1',s:'5',t:'7',u:'0',v:'1',w:'14',x:'7',y:'5',z:'2'};
 const FINAL_A='/*FINAL_A*/';
-function cleanName(n){return (n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z]/g,'');}
+function cleanName(n){return (n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]/g,'');} /* letras e números (os números do nome também entram no número) */
+const DIG_VIRADO={'6':'9','9':'6'}; /* papel de ponta-cabeça: 6 e 9 trocam; os outros números entram iguais */
 function cryptNum(name){const L=cleanName(name);if(!L)return null;let out='',zero=false,special=false;
-  for(let i=L.length-1;i>=0;i--){const ch=L[i];let d=UP[ch]||LO[ch]||'';
+  for(let i=L.length-1;i>=0;i--){const ch=L[i];let d=/[0-9]/.test(ch)?(DIG_VIRADO[ch]||ch):(UP[ch]||LO[ch]||'');
     if(i===L.length-1){if(ch==='a'||ch==='o'){d='6';special=true;}else if(d[0]==='0'){zero=true;d=(cfg.zeroSub||'6')+d.slice(1);}}
     out+=d;}
   return {num:out,zero,special,letters:L};}
@@ -798,7 +799,7 @@ function nameRes(){const r=cryptNum(cfg.name);const el=$('#sNameRes');$('#rZero'
 async function prevNome(){const box=$('#aPrevTxt'),r=cryptNum(cfg.name);
   if(!r){box.innerHTML='<span style="font-family:-apple-system,system-ui;font-size:15px;color:#8e8e93">digite um nome</span>';box.style.fontSize='';return;}
   const n=(cfg.name||'').normalize('NFC').trim();let txt=n,last='';
-  if(r.special){const m=n.match(/[ao]([^A-Za-z]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
+  if(r.special){const m=n.match(/[ao]([^A-Za-z0-9]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
   box.innerHTML=esc(txt)+(r.special?'<img src="'+FINAL_A+'" alt="">':'')+esc(last);
   try{await document.fonts.load('60px "Cryptext"');}catch(_){}
   box.style.fontSize='60px';const w=box.scrollWidth,cw=box.parentNode.clientWidth-32;
@@ -819,7 +820,7 @@ function layoutShow(){const box=$('#showIn'),W=innerWidth,H=innerHeight;
 async function openShow(){const r=cryptNum(cfg.name);if(!r)return;
   try{await document.fonts.load('100px "Cryptext"');}catch(_){}
   const n=(cfg.name||'').normalize('NFC').trim();let txt=n,last='';
-  if(r.special){const m=n.match(/[ao]([^A-Za-z]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
+  if(r.special){const m=n.match(/[ao]([^A-Za-z0-9]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
   $('#showIn').innerHTML=esc(txt)+(r.special?'<img src="'+FINAL_A+'" alt="">':'')+esc(last);
   $('#showCap').textContent='';showStep=0;$('#show').classList.add('on');barra();requestAnimationFrame(layoutShow);}
 $('#bShow').addEventListener('click',openShow);
@@ -827,7 +828,7 @@ $('#bShow').addEventListener('click',openShow);
 async function nameCanvas(){const r=cryptNum(cfg.name);if(!r)return null;
   try{await document.fonts.load('100px "Cryptext"');}catch(_){}
   const n=(cfg.name||'').normalize('NFC').trim();let txt=n,last='';
-  if(r.special){const m=n.match(/[ao]([^A-Za-z]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
+  if(r.special){const m=n.match(/[ao]([^A-Za-z0-9]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
   let fin=null;if(r.special){fin=new Image();fin.src=FINAL_A;try{await fin.decode();}catch(_){}}
   const W=1654,H=2339,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
   x.fillStyle='#fff';x.fillRect(0,0,W,H);
