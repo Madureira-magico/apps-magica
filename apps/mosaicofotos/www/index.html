@@ -717,7 +717,7 @@ Arthur Aguiar|Arthur Aguiar|artur aguiar
 <script>
 'use strict';
 /* =====================================================================
-   MOSAIC FOTOS 1.1 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
+   MOSAIC FOTOS 1.2 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
    ===================================================================== */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const DPR = Math.min(3, window.devicePixelRatio || 1);
@@ -1925,9 +1925,23 @@ function pcGuardar(it) {
   while (preCarga.size > 40) preCarga.delete(preCarga.keys().next().value);
   return g;
 }
+/* Mosaic Fotos: versão MÉDIA (chega bem mais rápido que a grande e já é quase nítida) */
+const ehArq = it => it === '#piada' || String(it).startsWith('arq:');
+const srcMedia = it => ehArq(it) ? srcGrande(it) : URLS.foto(it, 560, true);
+const mdCarga = new Map();
+function mdGuardar(it) {
+  const u = srcMedia(it); let g = mdCarga.get(u);
+  if (!g) { g = new Image(); g.decoding = 'async'; g.src = u; mdCarga.set(u, g); }
+  while (mdCarga.size > 60) mdCarga.delete(mdCarga.keys().next().value);
+  return g;
+}
+const pronta = g => !!(g && g.complete && g.naturalWidth);
 function preCarregar(i) {   // foto grande das vizinhas, antes de deslizar
   if (i < 0 || i >= vSeq.length || !vSeq[i]) return;
   pcGuardar(vSeq[i]);
+}
+function mediasVizinhas(i) {   // as 3 de cada lado: primeiro a média (rápida), a grande vem depois
+  for (const d of [1, -1, 2, -2, 3, -3]) { const j = i + d; if (j >= 0 && j < vSeq.length && vSeq[j] && !ehArq(vSeq[j])) mdGuardar(vSeq[j]); }
 }
 /* as 18 fotos da primeira tela (com o bebê) já ficam prontas em tamanho grande: abrem nítidas, sem troca */
 let pc18 = '';
@@ -1946,8 +1960,10 @@ function slideDe(i) {
     if (pc && pc.complete && pc.naturalWidth) im.src = pc.src;
     else {
       // na hora: a miniatura (já está no aparelho) no tamanho e lugar exatos da foto; a nítida entra por cima
-      const c = grandeEmCache(it);
+      const md = ehArq(it) ? null : mdCarga.get(srcMedia(it));
+      const c = grandeEmCache(it) || (pronta(md) ? md.src : null);
       im.src = c || srcMini(it);
+      if (!c && md && !ehArq(it)) md.addEventListener('load', () => { if (!im.dataset.grande) { im.src = md.src; im.style.objectFit = 'contain'; } });
       if (!c && tams.has(it)) { const e = encaixe(...tams.get(it)); Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover' }); }
       else if (!c) {
         im.style.visibility = 'hidden';
@@ -1957,7 +1973,7 @@ function slideDe(i) {
         });
       }
       const g = pc || new Image();
-      g.addEventListener('load', () => { im.src = g.src; im.style.objectFit = 'contain'; });
+      g.addEventListener('load', () => { im.dataset.grande = '1'; im.src = g.src; im.style.objectFit = 'contain'; });
       if (!pc) { g.src = srcGrande(it); preCarga.set(srcGrande(it), g); }
     }
     el.appendChild(im);
@@ -1970,7 +1986,8 @@ function povoar() {
   for (const [i, el] of slides) if (Math.abs(i - verI) > 6) { el.remove(); slides.delete(i); }
   const velho = $('#imgAtual'); if (velho) velho.removeAttribute('id');
   const at = slides.get(verI); const im = at && at.querySelector('img'); if (im) im.id = 'imgAtual';
-  for (const d of [1, -1, 2, -2, 3, -3]) preCarregar(verI + d);
+  mediasVizinhas(verI);
+  const v0 = verI; setTimeout(() => { if (verI === v0) for (const d of [1, -1, 2, -2, 3, -3]) preCarregar(v0 + d); }, 350);
 }
 function montarPalco() {
   const p = $('#palco');
@@ -2055,10 +2072,12 @@ async function abrirFoto(i, jFixo) {
   verI = i; const it = vSeq[i];
   const de = nativo ? await rectNat(cel) : rectDoItem(cel), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
   let src = grandeEmCache(it) || srcMini(it);
-  if (!grandeEmCache(it) && !String(it).startsWith('arq:') && it !== '#piada') {   // espera a foto nítida (no máx. 1/4 s): já chega nítida
-    const g = pcGuardar(it);
-    if (!(g.complete && g.naturalWidth)) await Promise.race([new Promise(r => { g.addEventListener('load', r); g.addEventListener('error', r); }), new Promise(r => setTimeout(r, 260))]);
-    if (g.complete && g.naturalWidth) src = g.src;
+  if (!grandeEmCache(it) && !ehArq(it)) {   // Mosaic Fotos: pede a média (rápida) e a grande juntas; abre com a que chegar (no máx. 0,4 s)
+    const md = mdGuardar(it), g = pcGuardar(it);
+    const chegou = x => new Promise(r => { if (x.complete) r(); else { x.addEventListener('load', r); x.addEventListener('error', r); } });
+    if (!pronta(g) && !pronta(md)) await Promise.race([chegou(md), new Promise(r => setTimeout(r, 400))]);
+    src = pronta(g) ? g.src : pronta(md) ? md.src : src;
+    mediasVizinhas(i);
   }
   $('#ver').classList.remove('limpo');
   if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
