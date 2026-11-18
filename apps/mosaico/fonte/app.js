@@ -232,6 +232,11 @@ function mostrarAtual() {
 }
 
 let buscando = false;
+/* o mágico já começou a diminuir o zoom com as letras na tela? (aí não troca mais nada na frente do público) */
+async function vendoLetras() {
+  if (telaAtual !== 'fototeca' || !nativo || !atual || atual.tipo !== 'texto') return false;
+  try { const e = await nat.call('galeriaEstado'); return !!(e && e.mos && e.zoom > 4.5); } catch (_) { return false; }
+}
 async function definirNome(txt, origem) {
   txt = String(txt || '').replace(/\s+/g, ' ').trim();
   if (txt.length < 2 || txt.length > 60) return;
@@ -283,15 +288,19 @@ async function definirNome(txt, origem) {
         }
         if (g) {                         // aprende: da próxima vez já sai da lista
           if (!(g.a || []).some(x => semAcento(x) === semAcento(limpo))) { g.a = (g.a || []).concat(limpo.toLowerCase()); salvarFam(); }
-          fam = g; escolherBebe(g, g.n);
-          atual = { nome: g.n, tipo: 'texto', pronto: false, origem };
-          if (!g.f) await prepararMosaico();
+          fam = g;
+          if (!(await vendoLetras())) {
+            escolherBebe(g, g.n);
+            atual = { nome: g.n, tipo: 'texto', pronto: false, origem };
+            if (!g.f) await prepararMosaico();
+          }
         }
       }
     }
   }
   if (fam) { await completarFamoso(fam); if (meu !== preparo) return; escolherBebe(fam, nome); }
-  if (fam && fam.f) {                   // 2) troca pelo rosto
+  const manter = await vendoLetras();   // já está mostrando as letras com zoom: fica com as letras (a foto fica guardada para a próxima vez)
+  if (fam && fam.f && !manter) {        // 2) troca pelo rosto
     pontos(2, true);
     atual = { nome: fam.n, tipo: 'rosto', arq: fam.f, pronto: false, origem };
     await prepararMosaico();
@@ -302,7 +311,7 @@ async function definirNome(txt, origem) {
   pontos(3, atual.tipo === 'rosto');
   mostrarAtual();
   estado(atual.tipo === 'rosto' ? 'pronto ✓' : 'pronto (sem foto: nome escrito)', 'ok');
-  if (cfg.vibrar) vibrar('leve');
+  if (cfg.vibrar) { vibrar('leve'); setTimeout(() => vibrar('leve'), 200); }   // pronto: duas batidinhas leves (ouvi o nome = uma)
 }
 
 /* bebê da piada: automático (sexo pelo cadastro da Wikipédia, tom de pele pela foto) ou o marcado na lista */
@@ -1404,7 +1413,8 @@ async function ligarVoz() {
   catch (e) { vozLigada = false; vibrar('forte'); }
 }
 const PALAVRAS_SOBRA = new Set(('o a os as e é de da do dos das um uma esse essa este esta isso aqui ai aí olha olhe então entao era foi ' +
-  'ele ela the bebe bebê desenhado desenhada desenho quando pequeno pequena com meses mes foto ne né tá ta que quem').split(' ').map(semAcento));
+  'ele ela the bebe bebê desenhado desenhada desenho quando pequeno pequena com meses mes foto ne né tá ta que quem ' +
+  'não nao sim pode ser acho parece tipo certeza claro hum hm hã ah eh ok okay agora já ja só so mesmo muito eu você voce meu minha seu sua pra para por no na nos nas em').split(' ').map(semAcento));
 /* foto real: segurar o volume (ou Selecionar) com o rosto inteiro na tela */
 let naFace = false, revelado = false, ultVol = 0, selSegura = false, realP = 0, realTrava = false, realT = 0, realLoop = 0;
 function podeReal() { return !!(naFace && atual && atual.tipo === 'rosto' && comMosaico()); }
@@ -2089,13 +2099,22 @@ document.addEventListener('visibilitychange', () => {
     bebeTravado = false; jaRevelou = false; injZerar = true;
     if (telaAtual === 'fototeca' && nativo) nat.call('galeriaInicio').catch(() => {});
   }
-  saiuEm = 0;
+  saiuEm = 0; acordarVidros();
   iniciarInject(); if (nat.tem) carregarFotos();
 });
 
 /* =====================================================================
    INÍCIO
    ===================================================================== */
+/* força o iPhone a redesenhar o vidro da base e do Buscar (na abertura às vezes fica escuro até tocar na tela) */
+function acordarVidros() {
+  const vs = Array.from(document.querySelectorAll('#inicio .vidro'));
+  const f = () => {
+    vs.forEach(v => { v.style.webkitBackdropFilter = 'none'; v.style.backdropFilter = 'none'; v.style.transform = 'translateZ(0)'; void v.offsetWidth; });
+    requestAnimationFrame(() => vs.forEach(v => { v.style.webkitBackdropFilter = ''; v.style.backdropFilter = ''; v.style.transform = ''; }));
+  };
+  requestAnimationFrame(f); [150, 400, 800, 1500].forEach(t => setTimeout(f, t));
+}
 window.addEventListener('resize', () => { ajustarTamanho(); enviarGaleria(); desenharInicio(); });
 async function testarNativo() {
   if (!nat.tem) return;
@@ -2106,7 +2125,7 @@ function iniciar() {
   ajustarTamanho(); aplicarTema(); desenharInicio();
   zoom = +cfg.n0 || 3;
   mostrar(cfg.abrir === 'inicio' && temInicio() ? 'inicio' : 'fototeca');
-  mostrarAtual();
+  mostrarAtual(); acordarVidros();
   carregarFotos().then(async () => { if (atual) { await prepararMosaico(); if (atual) pontos(3, atual.tipo === 'rosto'); } });
   iniciarInject();
   setTimeout(() => { iniciado = true; }, 1500);   // abrir o app é você, não o público
