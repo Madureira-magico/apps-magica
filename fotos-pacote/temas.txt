@@ -4,82 +4,82 @@
 # Para mudar: edite este arquivo e salve no GitHub — o robô baixa tudo de novo sozinho.
 
 ## pele-clara
-beach sand | 15
-bread loaf | 12
-croissant | 12
-pasta dish | 12
-latte coffee | 12
-soft sunset sky | 12
-beige wall old house | 10
-light brown dog | 12
-peach fruit | 10
+beach sand | 30
+bread loaf | 24
+croissant | 24
+pasta dish | 24
+latte coffee | 24
+soft sunset sky | 24
+beige wall old house | 20
+light brown dog | 24
+peach fruit | 20
 
 ## pele-morena
-coffee beans | 12
-chocolate cake | 12
-barbecue meat | 12
-wooden table | 12
-wooden furniture | 10
-leather bag | 10
-brown horse | 12
-brown dog | 12
-autumn leaves | 12
-desert dunes | 12
-old church brick | 10
+coffee beans | 24
+chocolate cake | 24
+barbecue meat | 24
+wooden table | 24
+wooden furniture | 20
+leather sofa | 20
+brown horse | 24
+brown dog | 24
+autumn leaves | 24
+desert dunes | 24
+old church brick | 20
 
 ## branco-dentes-olhos
-snow landscape | 12
-white clouds sky | 12
-wedding cake | 10
-rice bowl | 10
-white plate food | 10
-white sailboat | 10
-white building | 10
-white dog | 12
-eggs | 10
+snow landscape | 24
+white clouds sky | 24
+wedding cake | 20
+rice bowl | 20
+white plate food | 20
+white sailboat | 20
+white building | 20
+white dog | 24
+eggs | 20
 
 ## escuro-cabelo-sombra
-city at night | 15
-concert crowd | 12
-restaurant dim light | 12
-black car | 10
-black cat | 12
-night sky stars | 12
-dark forest | 10
-candle light | 10
+city at night | 30
+concert stage lights | 24
+restaurant dim light | 24
+black car | 20
+black cat | 24
+night sky stars | 24
+dark forest | 20
+candle light | 20
 
 ## dourado-loiro
-wheat field | 12
-golden hour beach | 12
-beer glass | 10
-french fries | 10
-christmas lights | 12
-golden retriever | 12
-honey | 8
+wheat field | 24
+golden hour beach | 24
+beer glass | 20
+french fries | 20
+christmas lights | 24
+golden retriever | 24
+honey | 16
 
 ## vermelho-rosado
-strawberries | 12
-red wine glass | 10
-pink flowers | 12
-red sunset | 12
-pizza | 12
-tomatoes market | 10
-red car | 10
+strawberries | 24
+red wine glass | 20
+pink flowers | 24
+red sunset | 24
+pizza | 24
+tomatoes market | 20
+red car | 20
 
 ## fundo-azul-verde-cinza
-ocean waves | 12
-blue sky | 10
-swimming pool | 10
-green forest | 12
-city street | 12
-airport | 10
-mountain lake | 12
+ocean waves | 24
+blue sky | 20
+swimming pool | 20
+green forest | 24
+city street | 24
+airport | 20
+mountain lake | 24
 
 ## dia-a-dia-celular
-hotel room | 10
-travel bridge city | 10
-street food | 12
-birthday party | 10
-road trip car | 10
-park walk | 10
-museum | 10
+hotel room interior | 20
+travel bridge city | 20
+street food | 24
+birthday cake candles | 20
+road trip car | 20
+park walk | 20
+museum hall interior | 20

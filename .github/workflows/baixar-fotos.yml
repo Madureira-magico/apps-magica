@@ -27,8 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Instalar Pillow
-        run: pip install pillow
+      - name: Instalar ferramentas
+        run: pip install pillow "opencv-python-headless<5" numpy
 
       - name: Baixar e separar as fotos
         run: python3 fotos-pacote/baixar.py fotos-pacote/temas.txt "$RUNNER_TEMP/saida"

@@ -11,6 +11,13 @@ import io, json, os, re, sys, time, zipfile, random
 import urllib.request, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageStat
+try:
+    import cv2, numpy as np
+    ROSTOS = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    if ROSTOS.empty():
+        raise RuntimeError("sem detector de rosto")
+except Exception:
+    ROSTOS = None
 
 UA = "MosaicFotosPacote/1.0 (https://github.com/Madureira-magico/apps-magica)"
 LADO = 640
@@ -92,7 +99,19 @@ def preparar(dados):
     media, desvio = st.mean[0], st.stddev[0]
     if desvio < 14 or media > 238 or media < 14:   # lisa, branca ou preta demais
         return None
+    # objeto em fundo branco/liso (foto de catálogo ou museu): bordas quase todas iguais
+    borda = [pequena.getpixel((x, y)) for x in range(32) for y in (0, 31)] + \
+            [pequena.getpixel((x, y)) for y in range(32) for x in (0, 31)]
+    clara = sum(1 for p in borda if min(p) > 225)
+    if clara > len(borda) * 0.7:
+        return None
     img.thumbnail((LADO, LADO), Image.LANCZOS)
+    # rosto de desconhecido aparecendo grande: não serve para a galeria
+    if ROSTOS is not None:
+        cinza = np.array(img.convert("L"))
+        for (x, y, fw, fh) in ROSTOS.detectMultiScale(cinza, 1.1, 10, minSize=(40, 40)):
+            if fw > img.size[0] * 0.08:
+                return None
     cor = [round(c) for c in ImageStat.Stat(pequena).mean]
     quad = []
     for (x, y) in ((0, 0), (16, 0), (0, 16), (16, 16)):
@@ -115,7 +134,7 @@ def slug(t):
 def baixar_tema(busca, qtd, vistos, urls_vistas, log):
     pegas = []
     for fonte in (openverse, wikimedia):
-        for pagina in (1, 2, 3, 4):
+        for pagina in range(1, 9):
             if len(pegas) >= qtd:
                 break
             try:
