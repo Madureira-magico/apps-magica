@@ -97,3 +97,13 @@ App nativo de iPhone no projeto `apps-magica` (pasta `apps/mosaico`), montado pe
 - Ao medir posição antes de refazer a grade, usar as colunas de **antes** (senão volta para o começo ou pula para o rosto).
 - `snapshotView` para esconder a troca saiu deslocado → trocado pela "tela pronta" desenhada pelo app.
 - Analisar sempre os vídeos quadro a quadro (ffmpeg 30 fps) e medir pixels antes de mudar algo.
+
+---
+## Mozaic Plus (cópia do Mosaico 3.38 + Post-It Iarvel)
+- App separado (bundle br.com.ricardomadureira.mosaicoplus), sem dividir ajustes com o Mosaico. Abre na tela de início.
+- Post-It: mesmo protocolo do app Relógio (serviço 58570001…, abrir com `58 57 tipo 51 00 00 00 00` duas vezes, bateria = byte 3, pontos com op 0x00: [10]=qtd, 5 bytes por ponto).
+  Conexão pela ponte Bluetooth do `comum/`; `getDevices` + `connect` pendente (o iPhone conecta sozinho quando o Post-It liga/volta).
+- Escrita guardada em `pit.tracos` sem mostrar nada. Zera quando o rosto inteiro aparece (`postitRevelou`) ou com o "sinal de apagar" escolhido no menu.
+- Volume + na tela de início (`postitVolume`): desenha a escrita em JPEG preto no branco em inclinações 0/±8 → ±16/180 → ±25/±90 e manda para `lerImagens` (Vision .accurate, com e sem correção + customWords = nomes da lista). Para no primeiro texto que bate com a lista (`acharFamoso`/`acharFamosoEm`) → `definirNome(nome,'postit')`. Sem nome: `PIT.falhou` → "Atualizando…" embaixo do Instagram, sem o 1.
+- Segurar o Instagram: `#ilha` (janela preta que cresce do topo como a ilha dinâmica) com a escrita recortada; some ao soltar.
+- Bateria no Telefone: `dock.webp` sem o "5" impresso; `#cvDock` desenha floor(bat/10) (mín. 1, 10 = 100%); sem conexão, sem número.

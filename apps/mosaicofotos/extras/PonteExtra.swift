@@ -234,14 +234,18 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         case "vozDesligar":
             pararVoz(avisar: false)
             responder(true, nil)
-        case "notasTeclado":   // Notas falso: barrinha grudada no teclado e teclado abrindo sozinho
-            PonteExtra.barraNotasLigada = (m["barra"] as? Bool) ?? false
-            PonteExtra.tecladoSozinho = (m["sozinho"] as? Bool) ?? false
-            responder(true, nil)
         case "exportar":   // cópia da lista de famosos, Fototeca e bebês
             exportarCopia(dados: txt("dados"), pastas: (m["pastas"] as? [String]) ?? [], nome: txt("nome"), responder)
         case "importar":
             importarCopia(responder)
+        case "notasTeclado":   // Notas falso: barrinha grudada no teclado e teclado abrindo sozinho
+            PonteExtra.barraNotasLigada = (m["barra"] as? Bool) ?? false
+            PonteExtra.tecladoSozinho = (m["sozinho"] as? Bool) ?? false
+            responder(true, nil)
+        case "lerImagens":   // Post-It: lê a escrita (desenhada pela página em várias inclinações) com o mesmo leitor da câmera
+            let imgs = (m["imgs"] as? [String]) ?? []
+            let palavras = (m["palavras"] as? [String]) ?? []
+            fila.async { responder(self.lerImagens(imgs, palavras), nil) }
         default:
             if !galeria.recado(cmd, m, responder) { responder(nil, "recado desconhecido: \(cmd)") }
         }
@@ -853,6 +857,40 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             return ["t": t, "h": Double(o.boundingBox.height)]
         }
         if !linhas.isEmpty { evento(["tipo": "texto", "linhas": linhas]) }
+    }
+
+    // MARK: Post-It (escrita desenhada pela página → texto)
+    /// para cada imagem e cada leitura (sem e com correção): as linhas, de cima para baixo, cada uma com até 3 palpites
+    private func lerImagens(_ imgs: [String], _ palavras: [String]) -> [[[[String]]]] {
+        var saida = [[[[String]]]](repeating: [], count: imgs.count)
+        let trava = NSLock()
+        DispatchQueue.concurrentPerform(iterations: imgs.count) { n in   // as imagens ao mesmo tempo (mais rápido)
+            let s = imgs[n]
+            let b64 = s.components(separatedBy: ",").last ?? s
+            guard let d = Data(base64Encoded: b64), let im = UIImage(data: d), let cg = im.cgImage else { return }
+            var leituras: [[[String]]] = []
+            for corrigir in [false, true] {   // sem correção (letra por letra) e com correção puxando para os nomes da lista
+                let pedido = VNRecognizeTextRequest()
+                pedido.recognitionLevel = .accurate
+                pedido.usesLanguageCorrection = corrigir
+                if corrigir && !palavras.isEmpty { pedido.customWords = Array(palavras.prefix(4000)) }
+                if let idiomas = try? pedido.supportedRecognitionLanguages() {
+                    let quero = ["pt-BR", "en-US"].filter { idiomas.contains($0) }
+                    if !quero.isEmpty { pedido.recognitionLanguages = quero }
+                }
+                try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([pedido])
+                // de cima para baixo; na mesma altura, da esquerda para a direita
+                let obs = (pedido.results ?? []).sorted { a, b in
+                    let ba = a.boundingBox, bb = b.boundingBox
+                    if abs(ba.midY - bb.midY) < 0.5 * min(ba.height, bb.height) { return ba.minX < bb.minX }
+                    return ba.midY > bb.midY
+                }
+                let linhas: [[String]] = obs.map { o in o.topCandidates(3).map { $0.string }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty } }.filter { !$0.isEmpty }
+                leituras.append(linhas)
+            }
+            trava.lock(); saida[n] = leituras; trava.unlock()
+        }
+        return saida
     }
 
     // MARK: microfone (o mágico fala o nome)

@@ -42,6 +42,10 @@ svg{display:block}
 #iniPags img{top:0;height:100%}
 #iniDockIc{top:85.404%;height:14.596%}
 #cvIni{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#cvDock{position:absolute;left:0;width:100%;top:85.404%;height:14.596%;pointer-events:none}
+#ilha{position:fixed;left:50%;top:11px;transform:translateX(-50%);background:#000;display:none;z-index:9999;overflow:hidden;pointer-events:none;align-items:flex-end;justify-content:center}
+#ilha.on{display:flex}#ilhaCv{flex:none;opacity:0;transition:opacity .18s}#ilha.grande #ilhaCv{opacity:1;transition:opacity .25s .12s}
+#aPiCv{display:block;width:100%;height:170px;background:#000;border-radius:10px}
 .ic{position:absolute;transition:transform .12s,filter .12s}
 .ic img{display:block;width:100%;height:100%;border-radius:22.5%;object-fit:cover}
 .ic .nm{position:absolute;left:-16px;right:-16px;text-align:center;font:500 12px -apple-system,system-ui;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px}
@@ -230,7 +234,7 @@ body:not(.claro) .nok{color:#000}
 </head>
 <body>
 
-<div class="tela" id="inicio"><div id="iniPalco"><div id="iniFundo"></div><div class="vidro" id="iniVidroDock"></div><div class="vidro" id="iniVidroBusca"><span class="txt"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Buscar</span></span><span class="pts"><i class="on"></i><i></i></span></div><div id="iniPags"><div class="pag"><img src="ini/pag1.webp" alt=""><canvas id="cvIni"></canvas></div><div class="pag p2"><img src="ini/pag2.webp" alt=""></div></div><img id="iniDockIc" src="ini/dock.webp" alt=""></div></div>
+<div class="tela" id="inicio"><div id="iniPalco"><div id="iniFundo"></div><div class="vidro" id="iniVidroDock"></div><div class="vidro" id="iniVidroBusca"><span class="txt"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M15.5 15.5 22 22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>Buscar</span></span><span class="pts"><i class="on"></i><i></i></span></div><div id="iniPags"><div class="pag"><img src="ini/pag1.webp" alt=""><canvas id="cvIni"></canvas></div><div class="pag p2"><img src="ini/pag2.webp" alt=""></div></div><img id="iniDockIc" src="ini/dock.webp" alt=""><canvas id="cvDock"></canvas></div></div><div id="ilha"><canvas id="ilhaCv"></canvas></div>
 
 <div class="tela" id="fototeca">
   <canvas id="cv"></canvas>
@@ -321,6 +325,21 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Câmera para ler o nome<select id="aCamTras"><option value="frente">Frontal</option><option value="tras">Traseira</option></select></div>
   </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
 
+  <div class="sec" data-ic="✎" data-cor="#ffcc00"><h3>Post-It</h3><div class="caixa">
+    <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aPi"><span></span></label></div>
+    <div class="lin"><button class="bt" id="aPiCon">Conectar</button><span class="r" id="aPiEst">—</span></div>
+    <div class="lin">Bateria<span class="r" id="aPiBat">—</span></div>
+  </div><div class="nota">Na tela de início: volume + lê a escrita (sem nada escrito, não faz nada). Segurar o Instagram mostra a escrita. Bateria no ícone do Telefone (5 = 50%).</div>
+  <div class="caixa" style="margin-top:14px">
+    <div class="lin" style="display:block"><canvas id="aPiCv"></canvas></div>
+    <div class="lin"><button class="bt" id="aPiLer">Ler agora</button><button class="bt cinza" id="aPiLimpa">Limpar escrita</button><span class="r" id="aPiN"></span></div>
+    <div class="lin">Resultado<span class="r" id="aPiRes">—</span></div>
+    <div class="lin" style="display:block;font-size:13px;color:var(--fg2)" id="aPiCands"></div>
+    <div class="lin">Sinais do Post-It<span class="r" id="aPiOps">—</span></div>
+    <div class="lin">Proporção da letra<input type="text" id="aPiProp" inputmode="decimal" placeholder="1.7"></div>
+    <div class="lin">Sinal de apagar (op)<input type="text" id="aPiOp" inputmode="numeric" placeholder="nenhum"></div>
+  </div><div class="nota">Teste: escreva, toque em Ler agora. "Sinais" mostra os avisos que o Post-It manda além da escrita; se aparecer um ao apagar o Post-It, coloque o número em "Sinal de apagar". A escrita também zera depois que o rosto inteiro aparece.</div></div>
+
   <div class="sec" data-ic="📡" data-cor="#007aff"><h3>Receber pelo Inject</h3><div class="caixa">
     <div class="lin">Ligado<label class="chave"><input type="checkbox" id="aInj"><span></span></label></div>
     <div class="lin">ID do Inject<input type="text" id="aInjId" inputmode="numeric" placeholder="13579"></div>
@@ -367,7 +386,7 @@ body:not(.claro) .nok{color:#000}
   </div>
   <div class="caixa" style="margin-top:10px">
     <div class="lin"><button class="bt" id="aExportar">Exportar</button><button class="bt cinza" id="aImportar">Importar</button><button class="bt verm" id="aApagarFam">Apagar</button><span class="r" id="aCopiaEst"></span></div>
-  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mosaico e no Mozaic Plus. Os nomes iguais são trocados pelos do arquivo e os novos entram na lista. Apagar: tira a lista inteira (para ficar só com a sua, apague e depois importe).</div>
+  </div><div class="nota">Exportar: guarda num arquivo a lista de famosos (com fotos e bebê de cada um), as fotos da primeira tela da Fototeca e as fotos dos bebês. Salve em Arquivos (iCloud Drive). Importar: escolha esse arquivo para trazer tudo de volta — serve no Mozaic Plus e no Mosaic Fotos. Os nomes iguais são trocados pelos do arquivo e os novos entram na lista. Apagar: tira a lista inteira (para ficar só com a sua, apague e depois importe).</div>
   <div class="caixa" id="listaFam" style="margin-top:10px"></div>
   <div class="nota">1 a 4: qual bebê combina com cada famoso. Toque na miniatura para trocar a foto.</div></div>
 
