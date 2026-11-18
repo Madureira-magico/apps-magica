@@ -158,6 +158,8 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #vooCx{position:absolute;overflow:hidden}
 #vooCx img{width:100%;height:100%;object-fit:cover;display:block}
 #ver.limpo{background:#000}
+#ver.voando{background:transparent!important;z-index:61;pointer-events:none}
+#ver.voando .palco{visibility:hidden}
 #notas{background:var(--bg);z-index:6}
 .ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 16px;z-index:2}
 .ndir{display:flex;align-items:center;gap:10px}
@@ -323,6 +325,7 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
     <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
     <div class="lin">Câmera para ler o nome<select id="aCamTras"><option value="frente">Frontal</option><option value="tras">Traseira</option></select></div>
+    <div class="lin">Abrir e fechar a foto<select id="aVoo"><option value="curva">Curva</option><option value="molejo">Molejo Apple</option></select></div>
   </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
 
   <div class="sec" data-ic="✎" data-cor="#ffcc00"><h3>Post-It</h3><div class="caixa">

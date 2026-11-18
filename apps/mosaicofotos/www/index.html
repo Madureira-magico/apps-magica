@@ -158,6 +158,8 @@ body.claro .vid{border-color:rgba(0,0,0,.06);box-shadow:0 2px 14px rgba(0,0,0,.1
 #vooCx{position:absolute;overflow:hidden}
 #vooCx img{width:100%;height:100%;object-fit:cover;display:block}
 #ver.limpo{background:#000}
+#ver.voando{background:transparent!important;z-index:61;pointer-events:none}
+#ver.voando .palco{visibility:hidden}
 #notas{background:var(--bg);z-index:6}
 .ncab{position:absolute;left:0;right:0;top:calc(var(--st) + 4px);display:flex;justify-content:space-between;align-items:center;padding:0 16px;z-index:2}
 .ndir{display:flex;align-items:center;gap:10px}
@@ -323,6 +325,7 @@ body:not(.claro) .nok{color:#000}
     <div class="lin">Famoso<span class="r" id="aAtual">—</span></div>
     <div class="lin"><button class="bt cinza" id="aLimpar">Apagar</button><span class="r" id="aEstado"></span></div>
     <div class="lin">Câmera para ler o nome<select id="aCamTras"><option value="frente">Frontal</option><option value="tras">Traseira</option></select></div>
+    <div class="lin">Abrir e fechar a foto<select id="aVoo"><option value="curva">Curva</option><option value="molejo">Molejo Apple</option></select></div>
   </div><div class="nota">Ver o nome: botão redondo do meio. Câmera: lupa. Digitar o nome: dois toques na aba "Fototeca". Microfone: lixeira da foto da piada. Voltar à tela de início: toque no título "Fototeca".</div></div>
 
   <div class="sec" data-ic="✎" data-cor="#ffcc00"><h3>Post-It</h3><div class="caixa">
@@ -717,7 +720,7 @@ Arthur Aguiar|Arthur Aguiar|artur aguiar
 <script>
 'use strict';
 /* =====================================================================
-   MOSAIC FOTOS 1.2 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
+   MOSAIC FOTOS 1.3 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
    ===================================================================== */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const DPR = Math.min(3, window.devicePixelRatio || 1);
@@ -2049,24 +2052,61 @@ async function tamanhoFoto0(it) {
   return [3, 4];
 }
 function encaixe(w, h) { const k = Math.min(W / w, H / h); return { w: w * k, h: h * k, x: (W - w * k) / 2, y: (H - h * k) / 2 }; }
-function voar(de, para, src, fundoDe, fundoPara, fim) {
-  const v = $('#voo'), cx = $('#vooCx'), f = $('#vooFundo');
-  $('#vooImg').src = src || '';
-  v.style.display = 'block';
-  f.style.transition = 'none'; f.style.opacity = fundoDe;
-  cx.style.transition = 'none';
-  Object.assign(cx.style, { left: de.x + 'px', top: de.y + 'px', width: de.w + 'px', height: de.h + 'px', borderRadius: (de.r || 0) + 'px' });
-  cx.getBoundingClientRect();
-  requestAnimationFrame(() => {
-    f.style.transition = 'opacity .32s ease'; f.style.opacity = fundoPara;
-    cx.style.transition = 'left .34s cubic-bezier(.2,.85,.25,1), top .34s cubic-bezier(.2,.85,.25,1), width .34s cubic-bezier(.2,.85,.25,1), height .34s cubic-bezier(.2,.85,.25,1)';
-    Object.assign(cx.style, { left: para.x + 'px', top: para.y + 'px', width: para.w + 'px', height: para.h + 'px' });
-  });
-  setTimeout(() => { if (fim) fim(); setTimeout(() => { v.style.display = 'none'; }, 30); }, 360);
+/* ===== Mosaic Fotos 1.3: abrir e fechar a foto igual ao Fotos de verdade =====
+   - a foto voa só com "transform" (o chip gráfico faz sozinho: liso, sem recalcular a tela)
+   - a cada quadro a conta é feita aqui (posição, tamanho e o recorte da foto), então dá para usar
+     a CURVA (sai rápido e assenta) ou o MOLEJO (mola parecida com a da Apple) — escolha no menu
+   - os botões, a barra de cima e as miniaturas aparecem/somem JUNTO com a foto */
+function curvaVoo(t, dur, abrir) {
+  if (cfg.molejo) {   // mola amortecida (como as animações do iOS): resposta curta, quase sem quique
+    const resp = abrir ? 0.36 : 0.3, zeta = 0.82, w = 2 * Math.PI / resp, wd = w * Math.sqrt(1 - zeta * zeta), T = t * dur;
+    return 1 - Math.exp(-zeta * w * T) * (Math.cos(wd * T) + zeta * w / wd * Math.sin(wd * T));
+  }
+  const k = 0.6, u = t - 1;   // curva: sai rápido e assenta devagar, com uma passadinha mínima
+  return 1 + (k + 1) * u * u * u + k * u * u;
 }
-let abrindo = false;
+const durVoo = abrir => cfg.molejo ? (abrir ? 0.5 : 0.42) : (abrir ? 0.32 : 0.26);
+let vooAnims = [];
+function cromo() { return [...$$('#ver .vcab, #ver .vrod, #ver .tiraCx, #ver .vbadge')]; }
+function fadeCromo(de, para, ms) {
+  cromo().forEach(el => { try { el.animate([{ opacity: de }, { opacity: para }], { duration: ms, easing: 'ease-out', fill: 'forwards' }); } catch (_) {} });
+}
+function soltarCromo() { cromo().forEach(el => { try { el.getAnimations().forEach(a => a.cancel()); } catch (_) {} }); }
+/* de / para: retângulos na tela; base: o retângulo da foto inteira (o tamanho de verdade dela na tela) */
+function voar(de, para, base, src, fundoDe, fundoPara, abrir, fim) {
+  const v = $('#voo'), cx = $('#vooCx'), f = $('#vooFundo'), im = $('#vooImg');
+  vooAnims.forEach(a => { try { a.cancel(); } catch (_) {} }); vooAnims = [];
+  im.src = src || '';
+  v.style.display = 'block'; v.style.opacity = 1;
+  Object.assign(cx.style, { transition: 'none', left: base.x + 'px', top: base.y + 'px', width: base.w + 'px', height: base.h + 'px', borderRadius: '0px', transformOrigin: '0 0' });
+  im.style.transformOrigin = '50% 50%';
+  const dur = durVoo(abrir), n = Math.max(14, Math.round(dur * 60)), qc = [], qi = [];
+  for (let k = 0; k <= n; k++) {
+    const p = k === n ? 1 : curvaVoo(k / n, dur, abrir);
+    const x = de.x + (para.x - de.x) * p, y = de.y + (para.y - de.y) * p;
+    const w = Math.max(1, de.w + (para.w - de.w) * p), h = Math.max(1, de.h + (para.h - de.h) * p);
+    const sx = w / base.w, sy = h / base.h, kk = Math.max(sx, sy);   // a foto cobre o quadradinho (como no mosaico), sem deformar
+    qc.push({ transform: 'translate(' + (x - base.x) + 'px,' + (y - base.y) + 'px) scale(' + sx + ',' + sy + ')' });
+    qi.push({ transform: 'scale(' + (kk / sx) + ',' + (kk / sy) + ')' });
+  }
+  const ms = dur * 1000;
+  // primeiro quadro já no lugar de saída (nada pisca antes de começar)
+  cx.style.transform = qc[0].transform; im.style.transform = qi[0].transform; f.style.transition = 'none'; f.style.opacity = fundoDe;
+  const a1 = cx.animate(qc, { duration: ms, easing: 'linear', fill: 'forwards' });
+  const a2 = im.animate(qi, { duration: ms, easing: 'linear', fill: 'forwards' });
+  const a3 = f.animate([{ opacity: fundoDe }, { opacity: fundoPara }], { duration: abrir ? 300 : 240, easing: 'ease-out', fill: 'forwards' });
+  vooAnims = [a1, a2, a3];
+  a1.finished.then(() => { if (fim) fim(); }).catch(() => {});
+}
+function esconderVoo(suave) {
+  const v = $('#voo');
+  const fimV = () => { v.style.display = 'none'; v.style.opacity = 1; vooAnims.forEach(a => { try { a.cancel(); } catch (_) {} }); vooAnims = []; };
+  if (!suave) { requestAnimationFrame(() => requestAnimationFrame(fimV)); return; }
+  try { v.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 110, easing: 'ease-out', fill: 'forwards' }).finished.then(fimV); } catch (_) { fimV(); }
+}
+let abrindo = false, fechando = false;
 async function abrirFoto(i, jFixo) {
-  if (abrindo) return; abrindo = true;
+  if (abrindo || fechando) return; abrindo = true;
   listaVer();
   const cel = i; i = jFixo != null ? jFixo : verDeCel(cel); if (i < 0) { abrindo = false; return; }
   verI = i; const it = vSeq[i];
@@ -2079,24 +2119,61 @@ async function abrirFoto(i, jFixo) {
     src = pronta(g) ? g.src : pronta(md) ? md.src : src;
     mediasVizinhas(i);
   }
-  $('#ver').classList.remove('limpo');
+  const ver = $('#ver');
+  ver.classList.remove('limpo');
   if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
+  // a tela da foto entra POR CIMA da Fototeca já no começo: fundo transparente, foto escondida (quem aparece é a que voa),
+  // e os botões/barra/miniaturas vão aparecendo junto com o voo
+  $('#vooFundo').style.background = '';
+  ver.classList.add('voando', 'on');
+  montarPalco();
+  soltarCromo(); fadeCromo(0, 1, 280);
   preCarregar(i);
-  voar(de, para, src, 0, 1, () => { mostrar('ver', true); montarPalco(); abrindo = false; });
+  voar(de, para, para, src, 0, 1, true, () => {
+    mostrar('ver', true);
+    ver.classList.remove('voando'); soltarCromo();
+    esconderVoo(false);
+    abrindo = false;
+  });
 }
-async function fecharFoto() {
+async function fecharFoto(op0) {
+  if (fechando || abrindo || telaAtual !== 'ver') return; fechando = true;
+  const ver = $('#ver');
+  const opIni = typeof op0 === 'number' ? op0 : 1, limpo = ver.classList.contains('limpo');
+  $('#vooFundo').style.background = limpo ? '#000' : '';   // com os botões escondidos o fundo é preto
   const it = vSeq[verI], im = $('#imgAtual');
   const src = im && im.src ? im.src : '';
-  const [fw, fh] = await tamanhoFoto(it), de = encaixe(fw, fh);
-  mostrar('fototeca');
-  if (nativo) nat.call('galeriaCapa').catch(() => {});
-  let para;
+  const [fw, fh] = await tamanhoFoto(it), F = encaixe(fw, fh);
+  // onde a foto está AGORA (se foi puxada para baixo, sai de onde o dedo deixou)
+  let de = F;
+  const sl = slides.get(verI);
+  if (sl && sl.style.transform && sl.style.transform !== 'none') {
+    const r = sl.getBoundingClientRect(), s = r.width / W;
+    de = { x: r.left + F.x * s, y: r.top + F.y * s, w: F.w * s, h: F.h * s };
+  }
+  // calcula o lugar de volta ANTES de mexer na tela (era isso que dava o tranquinho)
   const cel = celDeVer(verI);
-  if (cel < 0) return;
-  if (nativo) { await nat.call('galeriaVer', { i: cel }).catch(() => {}); para = await rectNat(cel); }
-  else { garantirVisivel(cel); desenhar(); para = rectDoItem(cel); }
-  if (!para || !src) return;
-  voar(de, para, src, 1, 0, null);
+  let para = null;
+  if (cel >= 0) {
+    if (nativo) { await nat.call('galeriaVer', { i: cel }).catch(() => {}); para = await rectNat(cel); }
+    else { garantirVisivel(cel); desenhar(); para = rectDoItem(cel); }
+  }
+  if (!para || !src) {   // sem lugar de volta: fecha do jeito simples
+    mostrar('fototeca'); if (nativo) nat.call('galeriaCapa').catch(() => {});
+    ver.classList.remove('voando'); fechando = false; return;
+  }
+  // tudo junto: a foto encolhe, os botões e o fundo somem, o mosaico aparece por trás
+  voar(de, para, F, src, opIni, 0, false, () => {
+    ver.classList.remove('voando', 'on'); soltarCromo();
+    if (sl) { sl.style.transition = 'none'; sl.style.transform = 'none'; }
+    esconderVoo(true);
+    fechando = false;
+  });
+  ver.classList.add('voando');
+  mostrar('fototeca');
+  ver.classList.add('on');   // a tela da foto continua por cima só com os botões sumindo
+  if (nativo) nat.call('galeriaCapa').catch(() => {});
+  soltarCromo(); if (!limpo) fadeCromo(1, 0, 200);
 }
 $('#vVolta').addEventListener('click', fecharFoto);
 $('#vLixo').addEventListener('click', () => {
@@ -2124,7 +2201,7 @@ $('#vLixo').addEventListener('click', () => {
     if (modo === 'baixo') {
       $('#ver').style.background = '';
       const a = atual();
-      if (dy > 110) fecharFoto();
+      if (dy > 110) fecharFoto(Math.max(0, 1 - dy / 400));
       else if (a) { a.style.transition = 'transform .25s ease'; a.style.transform = 'none'; }
     }
   });
@@ -2532,6 +2609,7 @@ async function encherAjustes() {
   encherPostit();
   mostrarAtual(); mostrarTirados();
   $('#aCamTras').value = cfg.camTras === true ? 'tras' : 'frente';
+  $('#aVoo').value = cfg.molejo ? 'molejo' : 'curva';
   $('#aInj').checked = !!cfg.inj; $('#aInjId').value = cfg.injId || ''; $('#aWk').value = cfg.wk || ''; $('#aIa').checked = cfg.ia !== false; $('#aIaPrompt').value = cfg.iaPrompt || IA_PADRAO;
   $('#aCols').value = String(cfg.colsM); $('#aCor').value = cfg.cor; $('#aRef').value = cfg.reforco; $('#aRefV').textContent = Math.round(cfg.reforco * 100) + '%';
 $('#aCentrar').checked = cfg.centrar !== false; $('#aVoltar18').checked = cfg.voltar18 !== false; if (cfg.momento == null) cfg.momento = 5; $('#aMomento').value = cfg.momento; $('#aMomentoV').textContent = cfg.momento;
@@ -2759,6 +2837,7 @@ $('#aBaixar').addEventListener('click', async () => {
 });
 $('#aLimpar').addEventListener('click', limparNome);
 $('#aCamTras').addEventListener('change', e => { cfg.camTras = e.target.value === 'tras'; salvar(); });
+$('#aVoo').addEventListener('change', e => { cfg.molejo = e.target.value === 'molejo'; salvar(); });
 $('#aInj').addEventListener('change', e => { cfg.inj = e.target.checked; salvar(); iniciarInject(); });
 $('#aInjId').addEventListener('input', e => { cfg.injId = e.target.value.trim(); salvar(); iniciarInject(); });
 $('#aWk').addEventListener('input', e => { cfg.wk = e.target.value.trim(); salvar(); });
