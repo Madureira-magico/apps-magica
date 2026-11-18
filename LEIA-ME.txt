@@ -12,6 +12,7 @@ apps/         uma pasta para cada app (listas, bola, relogio, lousa, mosaico, lo
   loteria/www/      o app Loterias (abertura, cartões, volante, modo mágica, ajustes)
   loteria/extras/   parte do iPhone só do Loterias (busca de prêmios, vídeo da abertura, imagens)
 comum/        a "casca" do iPhone, igual para todos os apps
+comum/telas/  PEÇAS PRONTAS: tela de ícones (Mosaico), tela bloqueada (Timeline) e animação de abrir/fechar — ver GUIA.md
 scripts/      a receita que monta os apps
 .github/      o robô do GitHub que monta tudo a cada envio
 

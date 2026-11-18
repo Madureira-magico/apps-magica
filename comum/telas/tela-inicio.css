@@ -1,0 +1,18 @@
+/* PEÇA PRONTA (comum/telas): tela de início falsa igual à do Mosaico. O elemento "raiz" ocupa a tela toda (position:fixed; inset:0). */
+.tiPalco{position:absolute;overflow:hidden}
+.tiFundo{position:absolute;inset:0;background:#000 center/cover no-repeat}
+.tiPalco .vidro{position:absolute;background:rgba(255,255,255,.17);-webkit-backdrop-filter:blur(9px) saturate(1.4);backdrop-filter:blur(9px) saturate(1.4);box-shadow:inset 0 0 0 1px rgba(255,255,255,.33),inset 0 1px 1px rgba(255,255,255,.25)}
+.tiDock{left:4.139%;top:86.14%;width:91.55%;height:11.80%}
+.tiBusca{left:40.12%;top:80.47%;width:19.59%;height:3.416%;border-radius:999px;display:flex;align-items:center;justify-content:center;transition:width .25s,left .25s}
+.tiBusca .txt{display:flex;align-items:center;color:rgba(255,255,255,.84);font-weight:600;font-family:-apple-system,system-ui;white-space:nowrap;transition:opacity .15s}
+.tiBusca .pts{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.tiBusca .pts i{border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s}.tiBusca .pts i.on{background:#fff}
+.tiBusca.pg{left:43.5%;width:12.8%}.tiBusca.pg .txt{opacity:0}.tiBusca.pg .pts{opacity:1}
+.tiPags{position:absolute;inset:0;will-change:transform}
+.tiPags .pag{position:absolute;inset:0}.tiPags .pag.p2{left:100%;right:-100%}
+.tiPags img,.tiDockIc{position:absolute;left:0;width:100%;pointer-events:none;-webkit-user-select:none;user-select:none}
+.tiPags img{top:0;height:100%}
+.tiDockIc{top:85.404%;height:14.596%}
+.tiRot{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.tiToque{position:absolute;border-radius:22%;background:rgba(0,0,0,.28);pointer-events:none;opacity:0;transition:opacity .12s}
+.tiToque.on{opacity:1;transition:none}
