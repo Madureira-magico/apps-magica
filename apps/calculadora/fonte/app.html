@@ -174,6 +174,10 @@ input[type=file]{display:none}
 .aopt{height:34px;min-width:42px;padding:0 8px;border-radius:10px;border:1.5px solid #3a3a3c;background:none;color:#8e8e93;font-family:inherit;font-size:15px;font-weight:600;flex:none}
 .aopt.t{font-size:13px;padding:0 7px;letter-spacing:-.2px}
 .aopt.on{background:#ff9f0a;border-color:#ff9f0a;color:#1b1000}
+.impOps{display:flex;gap:12px}.imp{flex:1;background:none;border:0;padding:0;color:#fff;font-family:inherit;text-align:center}
+.imp img{width:100%;aspect-ratio:1654/2339;background:#fff;border-radius:8px;display:block;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.imp:active img{outline:3px solid #ff9f0a}
+.imp b{display:block;margin-top:8px;font-size:15px}.imp small{display:block;color:#8e8e93;font-size:12px;margin-top:2px}
 .apopov{position:absolute;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:0 20px;z-index:10}
 .apopov.on{display:flex}
 .apop{background:#2c2c2e;border-radius:18px;padding:18px 18px 16px;width:100%;max-width:420px;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.6)}
@@ -276,6 +280,16 @@ input[type=file]{display:none}
       <div class="aver" id="sVer"></div>
     </div>
   </div>
+
+  <!-- janelinha: imprimir Pronta ou Rascunho -->
+  <div id="impPop" class="apopov"><div class="apop">
+    <button class="apx" id="impX">✕</button>
+    <h3>Imprimir</h3><div class="sub">Toque na folha que você quer imprimir</div>
+    <div class="impOps">
+      <button class="imp" data-f="pronta"><img id="impPronta" alt=""><b>Pronta</b><small>o nome em preto</small></button>
+      <button class="imp" data-f="rascunho"><img id="impRascunho" alt=""><b>Rascunho</b><small>para cobrir com a caneta</small></button>
+    </div>
+  </div></div>
 
   <!-- janelinha: dígitos que faltam -->
   <div id="dicaPop" class="apopov"><div class="apop">
@@ -398,7 +412,7 @@ input[type=file]{display:none}
 const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
 const isStandalone=window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 if(isStandalone)document.documentElement.classList.add('sa');
-const VER='Versão 1.4';
+const VER='Versão 1.5';
 const NAT=!!window.__NATIVE_APP__; /* dentro do app de iPhone (apps magicas) */
 function natMsg(n,v){try{webkit.messageHandlers[n].postMessage(v);}catch(_){}}
 function natCalc(cmd,args){try{return webkit.messageHandlers.calc.postMessage(Object.assign({cmd:cmd},args||{}));}catch(_){return Promise.reject();}}
@@ -751,7 +765,7 @@ function helpHTML(){
   '<p>No relógio, a barra de cima da calculadora é desenhada pelo app: a hora, o sinal (3 tracinhos), o Wi-Fi (cheio) e a bateria de verdade. A dica aparece quando você aperta o último <b>=</b>; na troca, só os números que mudam fazem um fade suave, como no original.</p>'+
   '<h2>5. Nome</h2>'+
   '<ol><li>Em '+gear+' Nome, digite o nome como vai escrever no papel (o número precisa ter até 9 dígitos). O app mostra o número (fonte Cryptext, lido de trás para frente, como fica virando o papel).</li><li>O efeito é igual ao do Número: no final aparece o número do nome.</li></ol>'+
-  '<p>• <b>Mostrar:</b> o nome na tela inteira, para copiar no papel. 1 toque gira (e mostra o número embaixo), 2 toques voltam.<br>• <b>Salvar em Fotos:</b> guarda uma imagem em pé, só com o nome.<br>• <b>Imprimir:</b> abre a impressão do iPhone com essa folha.</p>'+
+  '<p>• <b>Mostrar:</b> o nome na tela inteira, para copiar no papel. 1 toque gira (e mostra o número embaixo), 2 toques voltam.<br>• <b>Salvar em Fotos:</b> guarda uma imagem em pé, só com o nome.<br>• <b>Imprimir:</b> abre uma janelinha com duas folhas: <b>Pronta</b> (o nome em preto) ou <b>Rascunho</b> (um risco fino cinza claro no centro de cada letra, no mesmo lugar, para você passar a caneta por cima). Toque na folha e abre a impressão do iPhone.</p>'+
   '<h2>6. Data e hora</h2>'+
   '<p>O resultado é a data e a hora de daqui a alguns segundos (a <b>folga</b>, de 30 a 90 s, de 5 em 5). Faça contas livres; depois de apertar <b>=</b> o número de vezes escolhido, aparece o sinal e a bolinha, igual ao Número.</p><p>• <b>Compacto</b> (ligado de fábrica): sem os zeros da frente e, se passar de 9 números, sai o ano. Ex.: 5/3/26 9:05 → 5326905 (7 números); 17/11/26 23:58 → 17112358 (sem o ano).<br>• <b>Desligado:</b> dd mm aa hh mm, sempre com 10 números.</p>'+
   '<h2>7. Mnemônica</h2>'+
@@ -810,7 +824,7 @@ async function openShow(){const r=cryptNum(cfg.name);if(!r)return;
   $('#showCap').textContent='';showStep=0;$('#show').classList.add('on');barra();requestAnimationFrame(layoutShow);}
 $('#bShow').addEventListener('click',openShow);
 /* salvar / imprimir: imagem em pé (A4), só o nome, escrito ao longo da folha */
-async function nameImage(){const r=cryptNum(cfg.name);if(!r)return null;
+async function nameCanvas(){const r=cryptNum(cfg.name);if(!r)return null;
   try{await document.fonts.load('100px "Cryptext"');}catch(_){}
   const n=(cfg.name||'').normalize('NFC').trim();let txt=n,last='';
   if(r.special){const m=n.match(/[ao]([^A-Za-z]*)$/);if(m){txt=n.slice(0,m.index);last=m[1];}}
@@ -825,7 +839,46 @@ async function nameImage(){const r=cryptNum(cfg.name);if(!r)return null;
   if(fin){const ih=.66*fs,iw=m.iw-.04*fs;px+=.04*fs;const asc=x.measureText('A').actualBoundingBoxAscent||fs*.7;
     const base=asc/2;x.drawImage(fin,px,base+.155*fs-ih,iw,ih);px+=iw;}
   if(last)x.fillText(last,px,0);x.restore();
-  return await new Promise(res=>c.toBlob(res,'image/png'));}
+  return {c:c,fs:fs};}
+async function nameImage(){const nc=await nameCanvas();if(!nc)return null;return await new Promise(res=>nc.c.toBlob(res,'image/png'));}
+/* RASCUNHO: o mesmo nome, no mesmo lugar da folha, só com um risco fino cinza claro no centro de cada letra
+   (para passar a caneta por cima). Passos: suaviza a letra, tapa buraquinhos, afina até sobrar o "esqueleto"
+   (Zhang-Suen), tira os galhinhos curtos e desenha o risco. */
+function rascunhoCanvas(nc){
+  const S=2,src=nc.c,W=Math.round(src.width/S),H=Math.round(src.height/S),k=nc.fs/S/700; /* k: escala em relação à amostra aprovada (letra de 700) */
+  const t=document.createElement('canvas');t.width=W;t.height=H;const g=t.getContext('2d');
+  g.filter='blur('+Math.max(1,10*k)+'px)';g.drawImage(src,0,0,W,H);g.filter='none';
+  const d=g.getImageData(0,0,W,H).data,N=W*H,m=new Uint8Array(N);
+  for(let i=0;i<N;i++)m[i]=d[i*4]<145?1:0;
+  /* tapa buraquinhos (fundo cercado pequeno) */
+  const lab=new Int32Array(N).fill(-1),fila=new Int32Array(N);
+  const tapar=(alvo,valor,limite,borda)=>{for(let i=0;i<N;i++){if(m[i]!==alvo||lab[i]!==-1)continue;let h=0,t2=0;fila[t2++]=i;lab[i]=i;const comp=[];let toca=false;
+    while(h<t2){const p=fila[h++];comp.push(p);const x=p%W,y=(p-x)/W;if(x===0||y===0||x===W-1||y===H-1)toca=true;
+      const vs=[p-1,p+1,p-W,p+W];for(const q of vs){if(q<0||q>=N)continue;const qx=q%W;if(Math.abs(qx-x)>1)continue;if(m[q]===alvo&&lab[q]===-1){lab[q]=i;fila[t2++]=q;}}}
+    if(comp.length<limite&&(!borda||!toca))for(const p of comp)m[p]=valor;}};
+  tapar(0,1,2500*k*k,true);lab.fill(-1);tapar(1,0,800*k*k,false);
+  /* afina (Zhang-Suen) */
+  const P=(x,y)=>(x<0||y<0||x>=W||y>=H)?0:m[y*W+x];
+  let mudou=true;const apagar=[];
+  while(mudou){mudou=false;for(let passo=0;passo<2;passo++){apagar.length=0;
+    for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){if(!m[y*W+x])continue;
+      const p2=P(x,y-1),p3=P(x+1,y-1),p4=P(x+1,y),p5=P(x+1,y+1),p6=P(x,y+1),p7=P(x-1,y+1),p8=P(x-1,y),p9=P(x-1,y-1);
+      const B=p2+p3+p4+p5+p6+p7+p8+p9;if(B<2||B>6)continue;
+      const A=(!p2&&p3)+(!p3&&p4)+(!p4&&p5)+(!p5&&p6)+(!p6&&p7)+(!p7&&p8)+(!p8&&p9)+(!p9&&p2);if(A!==1)continue;
+      if(passo===0){if(p2*p4*p6||p4*p6*p8)continue;}else{if(p2*p4*p8||p2*p6*p8)continue;}
+      apagar.push(y*W+x);}
+    if(apagar.length){mudou=true;for(const i of apagar)m[i]=0;}}}
+  /* tira galhinhos curtos (pontas), depois devolve o que continua ligado ao tronco */
+  const esq=m.slice(),viz=(i)=>{const x=i%W;let n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,q=i+dy*W+dx;if(xx<0||xx>=W||q<0||q>=N)continue;n+=m[q];}return n;};
+  const voltas=Math.round(45*k);
+  for(let v=0;v<voltas;v++){const fora=[];for(let i=0;i<N;i++)if(m[i]&&viz(i)<=1)fora.push(i);for(const i of fora)m[i]=0;}
+  for(let v=0;v<voltas;v++){const volta=[];for(let i=0;i<N;i++){if(m[i]||!esq[i])continue;if(viz(i)>0)volta.push(i);}for(const i of volta)m[i]=1;}
+  /* desenha o risco em tamanho real, cinza claro */
+  const out=document.createElement('canvas');out.width=src.width;out.height=src.height;const o=out.getContext('2d');
+  o.fillStyle='#fff';o.fillRect(0,0,out.width,out.height);o.fillStyle='rgb(195,195,195)';
+  const r=Math.max(1.5,5*k*S);
+  for(let i=0;i<N;i++)if(m[i]){const x=i%W,y=(i-x)/W;o.beginPath();o.arc(x*S+S/2,y*S+S/2,r,0,Math.PI*2);o.fill();}
+  return out;}
 function blobB64(b){return new Promise(ok=>{const f=new FileReader();f.onload=()=>ok(f.result);f.onerror=()=>ok(null);f.readAsDataURL(b);});}
 async function nomeAcao(qual){const st=$('#saveSt');
   if(!cryptNum(cfg.name)){st.textContent='Digite um nome primeiro.';return;}
@@ -838,7 +891,21 @@ async function nomeAcao(qual){const st=$('#saveSt');
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);st.textContent='Imagem baixada';}
 $('#bSaveName').addEventListener('click',()=>nomeAcao('save'));
-$('#bPrintName').addEventListener('click',()=>nomeAcao('print'));
+let folhas=null; /* {pronta, rascunho} já prontas para imprimir */
+$('#bPrintName').addEventListener('click',async()=>{const st=$('#saveSt');
+  if(!cryptNum(cfg.name)){st.textContent='Digite um nome primeiro.';return;}
+  st.textContent='Preparando…';const nc=await nameCanvas();if(!nc){st.textContent='Não deu certo.';return;}
+  await new Promise(r=>setTimeout(r,30));const ras=rascunhoCanvas(nc);folhas={pronta:nc.c,rascunho:ras};st.textContent='';
+  const mini=c=>{const t=document.createElement('canvas');t.width=330;t.height=Math.round(330*c.height/c.width);t.getContext('2d').drawImage(c,0,0,t.width,t.height);return t.toDataURL('image/png');};
+  $('#impPronta').src=mini(nc.c);$('#impRascunho').src=mini(ras);
+  $('#impPop').classList.add('on');mAnim($('#impPop .apop'),[{opacity:0,transform:'scale(.92)'},{opacity:1,transform:'scale(1)'}],220);});
+async function imprimirFolha(c){$('#impPop').classList.remove('on');const st=$('#saveSt');
+  const blob=await new Promise(res=>c.toBlob(res,'image/png'));if(!blob){st.textContent='Não deu certo.';return;}
+  if(NAT){let r='erro';try{r=await natCalc('imprimir',{png:await blobB64(blob)});}catch(_){}st.textContent=r==='ok'?'Enviado para a impressora ✓':r==='cancelado'?'':'Não deu certo.';return;}
+  const url=URL.createObjectURL(blob);const w=window.open(url);if(!w){const a=document.createElement('a');a.href=url;a.download='Nome.png';a.click();}}
+$$('#impPop .imp').forEach(b=>b.addEventListener('click',()=>{if(folhas)imprimirFolha(folhas[b.dataset.f]);}));
+$('#impX').addEventListener('click',()=>$('#impPop').classList.remove('on'));
+$('#impPop').addEventListener('click',e=>{if(e.target===$('#impPop'))$('#impPop').classList.remove('on');});
 let tapT=null;
 $('#show').addEventListener('click',()=>{
   if(tapT){clearTimeout(tapT);tapT=null;$('#show').classList.remove('on');barra();return;} /* 2 toques: fecha */
