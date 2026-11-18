@@ -2092,19 +2092,25 @@ function camAchou(nome) {
   vibrar('media'); definirNome(nome, 'camera');
 }
 let vozTexto = '', vozPausa = 0;
-/* palavras-chave do microfone: o nome começa depois de "é o" / "é a" e termina em "pode ver" */
-function nomeMarcado(t) {
-  const p = semAcento(t).split(' ').filter(Boolean);
-  let fim = -1;
-  for (let i = 0; i < p.length - 1; i++) if (p[i] === 'pode' && p[i + 1] === 'ver') { fim = i; break; }
-  const ate = fim >= 0 ? fim : p.length;
+/* palavras-chave do microfone: o nome começa depois de "é o" / "é a" e termina em "pode" + qualquer palavra (pode ver, pode olhar…) */
+function nomeEntre(p, ate) {
   let ini = -1;
   for (let i = 0; i < ate - 1; i++) if (p[i] === 'e' && (p[i + 1] === 'o' || p[i + 1] === 'a')) ini = i + 2;   // o último "é o"/"é a" antes do fim
-  if (ini < 0 && fim < 0) return null;
   const nome = p.slice(ini < 0 ? 0 : ini, ate).filter(w => !PALAVRAS_SOBRA.has(w) || ini >= 0);
-  return nome.length >= 1 && nome.length <= 5 ? nome.join(' ') : null;
+  return { ini, nome };
 }
-const temPodeVer = t => / pode ver( |$)/.test(' ' + semAcento(t));
+function nomeMarcado(t, soPode) {
+  const p = semAcento(t).split(' ').filter(Boolean);
+  for (let i = 0; i < p.length - 1; i++) {        // primeiro "pode X" que tenha um nome antes
+    if (p[i] !== 'pode') continue;
+    const { nome } = nomeEntre(p, i);
+    if (nome.length >= 1 && nome.length <= 5) return nome.join(' ');
+  }
+  if (soPode) return null;
+  const { ini, nome } = nomeEntre(p, p[p.length - 1] === 'pode' ? p.length - 1 : p.length);   // "pode" sozinho no fim também corta
+  return ini >= 0 && nome.length >= 1 && nome.length <= 5 ? nome.join(' ') : null;
+}
+const temPodeVer = t => !!nomeMarcado(t, true);
 function decidirVoz() {
   clearTimeout(vozPausa);
   if (!vozLigada) return;
