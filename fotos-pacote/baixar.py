@@ -7,7 +7,8 @@ filtrada (sem foto lisa, branca ou preta demais) e sem repetidas.
 
 Uso: python3 baixar.py temas.txt SAIDA
 """
-import io, json, os, re, sys, time, zipfile, random
+import io, json, os, re, sys, time, zipfile, random, threading
+TRAVA_ROSTO = threading.Lock()
 import urllib.request, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageOps, ImageStat
@@ -109,7 +110,9 @@ def preparar(dados):
     # rosto de desconhecido aparecendo grande: não serve para a galeria
     if ROSTOS is not None:
         cinza = np.array(img.convert("L"))
-        for (x, y, fw, fh) in ROSTOS.detectMultiScale(cinza, 1.1, 10, minSize=(40, 40)):
+        with TRAVA_ROSTO:   # o detector não aguenta duas fotos ao mesmo tempo
+            achados = list(ROSTOS.detectMultiScale(cinza, 1.1, 10, minSize=(40, 40)))
+        for (x, y, fw, fh) in achados:
             if fw > img.size[0] * 0.08:
                 return None
     cor = [round(c) for c in ImageStat.Stat(pequena).mean]
