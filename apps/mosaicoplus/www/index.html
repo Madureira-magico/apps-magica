@@ -2111,11 +2111,26 @@ function camAchou(nome) {
   vibrar('media'); definirNome(nome, 'camera');
 }
 let vozTexto = '', vozPausa = 0;
+/* palavras-chave do microfone: o nome começa depois de "é o" / "é a" e termina em "pode ver" */
+function nomeMarcado(t) {
+  const p = semAcento(t).split(' ').filter(Boolean);
+  let fim = -1;
+  for (let i = 0; i < p.length - 1; i++) if (p[i] === 'pode' && p[i + 1] === 'ver') { fim = i; break; }
+  const ate = fim >= 0 ? fim : p.length;
+  let ini = -1;
+  for (let i = 0; i < ate - 1; i++) if (p[i] === 'e' && (p[i + 1] === 'o' || p[i + 1] === 'a')) ini = i + 2;   // o último "é o"/"é a" antes do fim
+  if (ini < 0 && fim < 0) return null;
+  const nome = p.slice(ini < 0 ? 0 : ini, ate).filter(w => !PALAVRAS_SOBRA.has(w) || ini >= 0);
+  return nome.length >= 1 && nome.length <= 5 ? nome.join(' ') : null;
+}
+const temPodeVer = t => / pode ver( |$)/.test(' ' + semAcento(t));
 function decidirVoz() {
   clearTimeout(vozPausa);
   if (!vozLigada) return;
   vozLigada = false; nat.call('vozDesligar').catch(() => {});
   const t = vozTexto; vozTexto = '';
+  const m = nomeMarcado(t);   // "… é o / é a NOME pode ver …": vale só o que está no meio
+  if (m) { const g = acharFamoso(m) || acharFamosoEm(m); vibrar('media'); definirNome(g ? g.n : maiusculas(m), 'voz'); return; }
   const f = acharFamosoEm(t) || acharFamoso(t);
   if (f) { vibrar('media'); definirNome(f.n, 'voz'); return; }
   const resto = semAcento(t).split(' ').filter(p => p && !PALAVRAS_SOBRA.has(p));   // fora da lista: segue Wikipédia/IA
@@ -2195,7 +2210,7 @@ window.__mzEvento = ev => {
     // espera você terminar de falar (1,5 s de silêncio) e decide com o nome mais completo ("Daniel Craig", não "Daniel")
     vozTexto = ev.texto || vozTexto;
     clearTimeout(vozPausa);
-    if (ev.final) decidirVoz(); else vozPausa = setTimeout(decidirVoz, 1500);
+    if (ev.final || temPodeVer(vozTexto)) decidirVoz(); else vozPausa = setTimeout(decidirVoz, 1500);   // "pode ver": manda na hora
   } else if (ev.tipo === 'vozFim') {
     if (vozLigada) decidirVoz();   // acabou o tempo: usa o que já ouviu (não joga fora)
   }
