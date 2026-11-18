@@ -1,6 +1,6 @@
 APPS DE MÁGICA — um projeto só para todos os apps de iPhone
 
-apps/         uma pasta para cada app (listas, bola, relogio, lousa, mosaico, loteria, detector)
+apps/         uma pasta para cada app (listas, bola, relogio, lousa, mosaico, loteria, detector, calculadora)
   listas/app.conf   nome do app e identificação
   listas/icone.png  ícone
   listas/www/       o app em si (a mesma página do site)
@@ -24,3 +24,6 @@ https://madureira-magico.github.io/apps-magica/lousa/assistente.html
   detector/extras/  parte do iPhone só do Detector (sensor magnético e vibração)
   timeline/www/     o app Timeline (grade escondida, tela de bloqueio falsa e o tempo voltando)
   timeline/extras/  parte do iPhone só do Timeline (volume +, chacoalhar, virar, som, ícones)
+  calculadora/fonte/ a Calculadora mágica (python3 build.py monta www/; a fonte Cryptext fica em cryptext.css)
+  calculadora/www/  tela de início falsa (ini/), calculadora, tela bloqueada da Mnemônica e Ajustes
+  calculadora/extras/ parte do iPhone só da Calculadora (salvar o nome em Fotos e imprimir)
