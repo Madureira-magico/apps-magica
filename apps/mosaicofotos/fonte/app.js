@@ -1,6 +1,6 @@
 'use strict';
 /* =====================================================================
-   MOSAIC FOTOS 1.5 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
+   MOSAIC FOTOS 1.6 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
    ===================================================================== */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const DPR = Math.min(3, window.devicePixelRatio || 1);
@@ -1246,7 +1246,10 @@ function slideDe(i) {
       const md = ehArq(it) ? null : mdCarga.get(srcMedia(it));
       const c = grandeEmCache(it) || (pronta(md) ? md.src : null);
       im.src = c || srcMini(it);
-      if (!c && md && !ehArq(it)) md.addEventListener('load', () => { if (!im.dataset.grande) { im.src = md.src; im.style.objectFit = 'contain'; } });
+      // troca só depois da nova estar decodificada (nada de quadro vazio no meio da troca)
+      const trocar = (x, grande) => { const ok = () => { if (grande) im.dataset.grande = '1'; else if (im.dataset.grande) return; im.src = x.src; im.style.objectFit = 'contain'; };
+        try { x.decode().then(ok, ok); } catch (_) { ok(); } };
+      if (!c && md && !ehArq(it)) md.addEventListener('load', () => trocar(md, false));
       if (!c && tams.has(it)) { const e = encaixe(...tams.get(it)); Object.assign(im.style, { position: 'absolute', left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', objectFit: 'cover' }); }
       else if (!c) {
         im.style.visibility = 'hidden';
@@ -1256,7 +1259,7 @@ function slideDe(i) {
         });
       }
       const g = pc || new Image();
-      g.addEventListener('load', () => { im.dataset.grande = '1'; im.src = g.src; im.style.objectFit = 'contain'; });
+      g.addEventListener('load', () => trocar(g, true));
       if (!pc) { g.src = srcGrande(it); preCarga.set(srcGrande(it), g); }
     }
     el.appendChild(im);
@@ -1327,7 +1330,12 @@ async function tamanhoFoto(it) {
 }
 async function tamanhoFoto0(it) {
   const ab = abertDe(it); if (ab && ab.w) return [ab.w, ab.h];
-  if (it === '#piada') { const im = IMG.get(arqPiada() + '|' + cfg.ver); return im && im.ok ? [im.img.naturalWidth, im.img.naturalHeight] : [3, 4]; }
+  if (it === '#piada') { const im = IMG.get(arqPiada() + '|' + cfg.ver); if (im && im.ok) return [im.img.naturalWidth, im.img.naturalHeight]; }
+  if (it === '#piada' || String(it).startsWith('arq:')) {   // bebê e fotos guardadas no app: mede a foto de verdade (antes caía no 3×4 e a foto mudava de tamanho ao abrir)
+    const u = srcGrande(it), g = new Image(); g.src = u;
+    try { await Promise.race([g.decode(), new Promise(r => setTimeout(r, 350))]); } catch (_) {}
+    if (g.naturalWidth) return [g.naturalWidth, g.naturalHeight];
+  }
   try { const d = await Promise.race([nat.call('info', { id: it }), new Promise(r => setTimeout(() => r(null), 120))]); if (d && d.w) return [d.w, d.h]; } catch (_) {}
   return [3, 4];
 }
@@ -1379,7 +1387,7 @@ function voar(de, para, base, src, fundoDe, fundoPara, abrir, fim) {
   cx.style.transform = qc[0].transform; im.style.transform = qi[0].transform; f.style.transition = 'none'; f.style.opacity = fundoDe;
   const a1 = cx.animate(qc, { duration: ms, easing: 'linear', fill: 'forwards' });
   const a2 = im.animate(qi, { duration: ms, easing: 'linear', fill: 'forwards' });
-  const a3 = f.animate([{ opacity: fundoDe }, { opacity: fundoPara }], { duration: abrir ? 280 : 150, easing: 'ease-out', fill: 'forwards' });
+  const a3 = f.animate([{ opacity: fundoDe }, { opacity: fundoPara }], { duration: abrir ? 220 : 150, easing: 'ease-out', fill: 'forwards' });
   vooAnims = [a1, a2, a3];
   a1.finished.then(() => { if (fim) fim(); }).catch(() => {});
 }
@@ -1395,15 +1403,23 @@ async function abrirFoto(i, jFixo) {
   listaVer();
   const cel = i; i = jFixo != null ? jFixo : verDeCel(cel); if (i < 0) { abrindo = false; return; }
   verI = i; const it = vSeq[i];
-  const de = nativo ? await rectNat(cel) : rectDoItem(cel), [fw, fh] = await tamanhoFoto(it), para = encaixe(fw, fh);
+  const de = nativo ? await rectNat(cel) : rectDoItem(cel);
+  let [fw, fh] = await tamanhoFoto(it);
   let src = grandeEmCache(it) || srcMini(it);
-  if (!grandeEmCache(it) && !ehArq(it)) {   // Mosaic Fotos: pede a média (rápida) e a grande juntas; abre com a que chegar (no máx. 0,4 s)
+  if (!grandeEmCache(it) && !ehArq(it)) {   // Mosaic Fotos: pede a média (rápida) e a grande juntas; abre com a que chegar (no máx. 0,6 s)
     const md = mdGuardar(it), g = pcGuardar(it);
     const chegou = x => new Promise(r => { if (x.complete) r(); else { x.addEventListener('load', r); x.addEventListener('error', r); } });
-    if (!pronta(g) && !pronta(md)) await Promise.race([chegou(md), new Promise(r => setTimeout(r, 400))]);
-    src = pronta(g) ? g.src : pronta(md) ? md.src : src;
+    if (!pronta(g) && !pronta(md)) await Promise.race([chegou(md), new Promise(r => setTimeout(r, 600))]);
+    const usa = pronta(g) ? g : pronta(md) ? md : null;
+    if (usa) {
+      src = usa.src;
+      try { await usa.decode(); } catch (_) {}   // já decodificada: entra inteira no primeiro quadro
+      // o tamanho vem da PRÓPRIA foto que vai voar (a média/grande mantém a proporção): nunca muda de tamanho depois
+      if (!tams.has(it) || Math.abs(usa.naturalWidth / usa.naturalHeight - fw / fh) > 0.02) { fw = usa.naturalWidth; fh = usa.naturalHeight; tams.set(it, [fw, fh]); }
+    }
     mediasVizinhas(i);
   }
+  const para = encaixe(fw, fh);
   const ver = $('#ver');
   ver.classList.remove('limpo');
   if (!de) { mostrar('ver', true); montarPalco(); abrindo = false; return; }
@@ -1415,10 +1431,15 @@ async function abrirFoto(i, jFixo) {
   soltarCromo(); fadeCromo(0, 1, 280);
   preCarregar(i);
   voar(de, para, para, src, 0, 1, true, () => {
+    // pouso sem piscar: a foto de verdade aparece POR BAIXO dos botões ainda na frente da foto que voou;
+    // só depois some a que voou e a tela volta ao normal (antes a que voou cobria os botões por 2 quadros)
     mostrar('ver', true);
-    ver.classList.remove('voando'); soltarCromo();
-    esconderVoo(false);
-    abrindo = false;
+    ver.classList.add('on', 'pousou');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      $('#voo').style.display = 'none'; limparVoo();
+      ver.classList.remove('voando', 'pousou'); soltarCromo();
+      abrindo = false;
+    }));
   });
 }
 async function fecharFoto(op0) {
