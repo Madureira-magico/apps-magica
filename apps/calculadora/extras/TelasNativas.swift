@@ -48,7 +48,7 @@ final class TelasNativas {
         guard let jan = janela() else { return false }
         let alt = jan.windowScene?.statusBarManager?.statusBarFrame.height ?? 54
         // foto da tela inteira, com a barra de verdade ainda aparecendo (só mostra, não dá para ler)
-        guard let foto = jan.screen.snapshotView(afterScreenUpdates: false) else { return false }
+        let foto = jan.screen.snapshotView(afterScreenUpdates: false)
         let caixa = UIView(frame: CGRect(x: x0, y: 0, width: jan.bounds.width - x0, height: alt))
         caixa.clipsToBounds = true
         caixa.isUserInteractionEnabled = false
