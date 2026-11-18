@@ -167,6 +167,24 @@ body.land .k[data-k="pm"]{background:#353535}
 .aver{font-size:13px;color:#636366;text-align:center;margin-top:26px}
 #sTable{width:100%;min-height:220px;border:0;font-size:15px;font-family:inherit;padding:12px 16px;outline:none;resize:vertical;background:#1c1c1e;color:#fff;-webkit-user-select:text;user-select:text;border-top:.5px solid #38383a}
 input[type=file]{display:none}
+
+/* dígitos que faltam: dois botões e a janelinha de explicação */
+.aopt{height:34px;min-width:42px;padding:0 8px;border-radius:10px;border:1.5px solid #3a3a3c;background:none;color:#8e8e93;font-family:inherit;font-size:15px;font-weight:600;flex:none}
+.aopt.t{font-size:13px;padding:0 7px;letter-spacing:-.2px}
+.aopt.on{background:#ff9f0a;border-color:#ff9f0a;color:#1b1000}
+.apopov{position:absolute;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:0 20px;z-index:10}
+.apopov.on{display:flex}
+.apop{background:#2c2c2e;border-radius:18px;padding:18px 18px 16px;width:100%;max-width:420px;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+.apop h3{font-size:19px;margin:0 36px 4px 0}
+.apop .sub{color:#8e8e93;font-size:13px;margin-bottom:14px}
+.apx{position:absolute;right:12px;top:12px;width:30px;height:30px;border-radius:50%;background:#3a3a3c;border:0;color:#c7c7cc;font-size:15px;padding:0}
+.apop .ex,.hlp .ex{display:flex;gap:14px;align-items:flex-start;margin:4px 0}
+.dk{width:46px;height:46px;border-radius:50%;background:#5c5c5f;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;position:relative}
+.dk.n{background:#1c1c1e;font-size:20px}
+.dk i{position:absolute;bottom:6px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:#fff}
+.dl{font-size:12px;color:#8e8e93;text-align:center;margin-top:4px}
+.dr{font:600 17px -apple-system,system-ui;color:#fff;background:#000;border-radius:8px;padding:6px 10px}
+.apop p{font-size:14px;color:#c7c7cc;line-height:1.4;margin:14px 0 0}.apop p b{color:#fff}
 /* papel de parede: miniatura */
 .awall{display:flex;gap:14px;justify-content:center;margin:6px 0 4px}
 .awall>div{width:96px;height:208px;border-radius:16px;background:#222 center/cover no-repeat;box-shadow:0 0 0 1px #3a3a3c;position:relative;overflow:hidden}
@@ -247,6 +265,7 @@ input[type=file]{display:none}
       <span class="acap">Geral</span>
       <div class="agrp cic">
         <div class="arow tap" data-go="pgWall"><div class="aico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg></div><div class="at"><b>Papel de parede e bloqueio</b><small>Fundo de todas as telas e relógio</small></div><svg class="achev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" fill="none" stroke="#5a5a5e" stroke-width="2"/></svg></div>
+        <div class="arow" id="rowDica"><div class="aico">9</div><div class="at"><b>Dígitos que faltam</b><small id="dicaSub"></small></div><button class="aopt" data-dica="tecla">⁺∕₋</button><button class="aopt t" data-dica="relogio">00;00</button></div>
         <div class="arow tap" data-go="pgHelp"><div class="aico">?</div><div class="at"><b>Como usar</b></div><svg class="achev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" fill="none" stroke="#5a5a5e" stroke-width="2"/></svg></div>
       </div>
       <span class="acap">Modo</span>
@@ -255,6 +274,12 @@ input[type=file]{display:none}
       <div class="aver" id="sVer"></div>
     </div>
   </div>
+
+  <!-- janelinha: dígitos que faltam -->
+  <div id="dicaPop" class="apopov"><div class="apop">
+    <button class="apx" id="dicaX">✕</button>
+    <div id="dicaTxt"></div>
+  </div></div>
 
   <!-- papel de parede -->
   <div class="apg off" id="pgWall">
@@ -366,11 +391,12 @@ input[type=file]{display:none}
 <script>
 /*PECA:tela-inicio.js*/
 /*PECA:tela-bloqueio.js*/
+/*PECA:barra-falsa.js*/
 (function(){
 const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
 const isStandalone=window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 if(isStandalone)document.documentElement.classList.add('sa');
-const VER='Versão 1.1';
+const VER='Versão 1.2';
 const NAT=!!window.__NATIVE_APP__; /* dentro do app de iPhone (apps magicas) */
 function natMsg(n,v){try{webkit.messageHandlers[n].postMessage(v);}catch(_){}}
 function natCalc(cmd,args){try{return webkit.messageHandlers.calc.postMessage(Object.assign({cmd:cmd},args||{}));}catch(_){return Promise.reject();}}
@@ -388,7 +414,7 @@ function fit(){const portrait=innerHeight>=innerWidth;let h=innerHeight;if(isSta
     r.setProperty('--kw',kw+'px');r.setProperty('--kh',kh+'px');r.setProperty('--bot',bot+'px');
     r.setProperty('--dispB',(bot+kh*4+gv*3+Math.round(h*.04))+'px');}
   layoutKeys(land);
-  if(window.scrollX||window.scrollY)window.scrollTo(0,0);render();if(typeof desenharInicio==='function')desenharInicio();}
+  if(window.scrollX||window.scrollY)window.scrollTo(0,0);render();try{desenharInicio();barra();}catch(_){}}
 ['resize','orientationchange','pageshow','focus'].forEach(ev=>addEventListener(ev,()=>{fit();setTimeout(fit,300);}));
 addEventListener('scroll',()=>{if(window.scrollY||window.scrollX)window.scrollTo(0,0);},{passive:true});
 if(window.visualViewport){visualViewport.addEventListener('resize',fit);visualViewport.addEventListener('scroll',()=>window.scrollTo(0,0));}
@@ -401,7 +427,7 @@ document.addEventListener('dblclick',e=>e.preventDefault());
 const mem={};
 const store={get(k,d){try{const v=localStorage.getItem('calc_'+k);if(v!=null)return JSON.parse(v);}catch(e){}return(k in mem)?mem[k]:d;},
   set(k,v){mem[k]=v;try{localStorage.setItem('calc_'+k,JSON.stringify(v));}catch(e){}}};
-let cfg=Object.assign({target:'1234567',count:3,eqs:2,sec:30,name:'',zeroSub:'6',show2:'num',order:'sv',pin:'off',comp:true,letra:'normal',peso:'500'},store.get('cfg',{}));
+let cfg=Object.assign({target:'1234567',count:3,eqs:2,sec:30,name:'',zeroSub:'6',show2:'num',order:'sv',pin:'off',comp:true,letra:'normal',peso:'500',dica:'tecla'},store.get('cfg',{}));
 if(String(cfg.target||'').replace(/\D/g,'').length>9)cfg.target=String(cfg.target).replace(/\D/g,'').slice(0,9); /* até 9 números (cabe em qualquer celular) */
 /* modo: 'num' (segurar 1), 'name' (segurar 2), 'mnemo' (segurar 3), 'off' = calculadora normal depois do efeito */
 /* 📌 modo fixado: o app sempre abre nele (os 2 toques na calculadora trocam só até fechar o app) */
@@ -510,7 +536,7 @@ function oper(op){
   if(entry!=null&&entry!==''&&entry!=='-'){tokens.push(entryNum(entry));entry=null;}
   else{entry=null;if(!tokens.length)tokens=[0];}
   if(isOp(tokens[tokens.length-1]))tokens[tokens.length-1]=op;else tokens.push(op);
-  if(arm)force={diff:arm.diff,shown:0};}
+  if(arm)force={diff:arm.diff,shown:0,sign:arm.sign};}
 function equals(){
   if(force&&force.shown<force.diff.length)return;
   const wasForce=!!force;finishForce();
@@ -546,10 +572,13 @@ function render(){
   /* tecla AC / apagar */
   const del=!isLand&&entry!=null&&entry!=='';K.ac.querySelector('.lb').innerHTML=del?BK:'AC';
   /* sinal disfarçado */
-  K.pm.querySelector('.lb').innerHTML=pend?(pend.sign==='+'?PM('+','+'):PM('−','−')):PM('+','−');
+  /* dígitos que faltam: quantos números ainda faltam e o sinal (antes de apertar o sinal e durante a entrada final) */
+  const falta=pend?{n:pend.diff.length,sign:pend.sign}:(force&&force.shown<force.diff.length?{n:force.diff.length-force.shown,sign:force.sign}:null);
+  const noRelogio=cfg.dica==='relogio';
+  K.pm.querySelector('.lb').innerHTML=(pend&&!noRelogio)?(pend.sign==='+'?PM('+','+'):PM('−','−')):PM('+','−');
+  if(window.bf){if(noRelogio&&falta){const d=new Date();bf.hora(String(d.getHours()).padStart(2,'0')+(falta.sign==='+'?';':'.')+String(falta.n).padStart(2,'0'));}else bf.hora(null);}
   $$('.k.mk').forEach(k=>k.classList.remove('mk'));
-  const mark=pend?pend.diff:(force&&force.shown<force.diff.length?force.diff:null);
-  if(mark)K[String(mark.length%10)].classList.add('mk');
+  if(falta&&!noRelogio)K[String(falta.n%10)].classList.add('mk'); /* a bolinha anda: fica no número de quantos faltam */
 }
 
 /* ---------- toques ---------- */
@@ -650,14 +679,14 @@ function prepPagina(id){
   if(id==='pgWall'){$('#sMsgWall').textContent='';wallPrev();}
   if(id==='pgHelp')$('#helpTxt').innerHTML=helpHTML();}
 const selS=$('#sSec');for(let s=30;s<=90;s+=5){const o=document.createElement('option');o.value=s;o.textContent=s;selS.appendChild(o);}
-function openSettings(){closeModeMenu();
+function openSettings(){closeModeMenu();dicaUI();$('#dicaPop').classList.remove('on');
   $$('#settings .apg').forEach(p=>p.classList.toggle('off',p.id!=='pgMain'));pagina='pgMain';drawModes();
   $('#pgMain .asc').scrollTop=0;$('#pgMain').classList.remove('rolou');
-  $('#sVer').textContent='Calculadora · '+VER.toLowerCase();$('#settings').classList.add('on');giro(false);
+  $('#sVer').textContent='Calculadora · '+VER.toLowerCase();$('#settings').classList.add('on');giro(false);barra();
   mAnim($('#settings'),[{transform:'translateY(100%)'},{transform:'translateY(0)'}],320);}
 function closeSettings(){document.activeElement&&document.activeElement.blur&&document.activeElement.blur();
   const s=$('#settings');const a=mAnim(s,[{transform:'translateY(0)'},{transform:'translateY(100%)'}],260);
-  const f=()=>{s.classList.remove('on');render();};if(a)a.onfinish=f;else f();}
+  const f=()=>{s.classList.remove('on');render();barra();};if(a)a.onfinish=f;else f();}
 $('#sTarget').addEventListener('input',e=>{const v=digitsOnly(e.target.value).slice(0,9);if(e.target.value!==v)e.target.value=v;cfg.target=v;save();});
 $$('.astp button').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.st,v=Math.min(9,Math.max(1,(+cfg[k]||(k==='eqs'?2:3))+(+b.dataset.d)));
   cfg[k]=v;save();$(k==='count'?'#sCountV':'#sEqsV').textContent=v;}));
@@ -672,6 +701,22 @@ $$('#segPeso button').forEach(b=>b.addEventListener('click',()=>{cfg.peso=b.data
 function showS2(){const n=cfg.show2==='name';$('#bS2num').className=n?'':'on';$('#bS2name').className=n?'on':'';}
 $('#bS2num').addEventListener('click',()=>{cfg.show2='num';save();showS2();});
 $('#bS2name').addEventListener('click',()=>{cfg.show2='name';save();showS2();});
+
+
+/* ---------- dígitos que faltam: na tecla (⁺∕₋ e bolinha) ou no relógio da barra de cima (17;05 / 17.05) ---------- */
+function dicaHTML(q,titulo){
+  if(q==='relogio')return (titulo?'<h3>No relógio</h3><div class="sub">A dica aparece no relógio da barra de cima</div>':'')+
+    '<div class="ex"><div><div class="dr">17;05</div><div class="dl">mais</div></div><div><div class="dr">17.05</div><div class="dl">menos</div></div></div>'+
+    '<p><b>;</b> (ponto e vírgula) = aperte <b>+</b><br><b>.</b> (só o ponto) = aperte <b>−</b><br>Os minutos mostram quantos números faltam: <b>05</b> = faltam 5. A cada toque da pessoa desce (04, 03…) até voltar a hora certa.</p>';
+  return (titulo?'<h3>Na tecla</h3><div class="sub">A dica aparece nas teclas da calculadora</div>':'')+
+    '<div class="ex"><div><div class="dk">⁺∕₊</div><div class="dl">mais</div></div><div><div class="dk">⁻∕₋</div><div class="dl">menos</div></div><div><div class="dk n">7<i></i></div><div class="dl">faltam 7</div></div></div>'+
+    '<p>A tecla <b>⁺∕₋</b> vira <b>⁺∕₊</b> (aperte <b>+</b>) ou <b>⁻∕₋</b> (aperte <b>−</b>).<br>A <b>bolinha</b> fica na tecla do número de quantos faltam: no 7 = faltam 7. A cada toque ela desce (6, 5…) até sumir.</p>';}
+function dicaUI(){const r=cfg.dica==='relogio';$$('#rowDica .aopt').forEach(b=>b.classList.toggle('on',b.dataset.dica===(r?'relogio':'tecla')));
+  $('#dicaSub').textContent=r?'17;05 mais · 17.05 menos':'⁺∕₊ mais · ⁻∕₋ menos';}
+$$('#rowDica .aopt').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();cfg.dica=b.dataset.dica;save();dicaUI();
+  $('#dicaTxt').innerHTML=dicaHTML(cfg.dica,true);$('#dicaPop').classList.add('on');mAnim($('#dicaPop .apop'),[{opacity:0,transform:'scale(.92)'},{opacity:1,transform:'scale(1)'}],220);}));
+$('#dicaX').addEventListener('click',()=>$('#dicaPop').classList.remove('on'));
+$('#dicaPop').addEventListener('click',e=>{if(e.target===$('#dicaPop'))$('#dicaPop').classList.remove('on');});
 
 /* ---------- como usar ---------- */
 function helpHTML(){
@@ -692,8 +737,13 @@ function helpHTML(){
   '<p>A troca vale só até fechar o app. Na próxima abertura, volta o modo do 📌.</p>'+
   '<p><b>Segurar</b> a mesma tecla 1,5 s abre este menu de Ajustes.</p>'+
   '<h2>4. Número</h2>'+
-  '<ol><li>Em '+gear+' Número, escolha o <b>número final</b> (até 9 números, que cabe em qualquer celular) e a <b>quantidade de números</b>.</li><li>Faça contas livres (+, −, ×, ÷; pode apertar = no meio).</li><li>Depois desse tanto de números, a tecla <b>⁺∕₋</b> vira <b>⁺∕₊</b> (próxima é soma) ou <b>⁻∕₋</b> (subtração), e uma bolinha numa tecla de número mostra quantos dígitos faltam (bolinha no 0 = 10).</li><li>Aperte o sinal indicado e deixe a pessoa digitar qualquer coisa: entram os números certos. No <b>=</b> aparece o número final.</li></ol>'+
+  '<ol><li>Em '+gear+' Número, escolha o <b>número final</b> (até 9 números, que cabe em qualquer celular) e a <b>quantidade de números</b>.</li><li>Faça contas livres (+, −, ×, ÷; pode apertar = no meio).</li><li>Depois desse tanto de números, aparece a dica do sinal (+ ou −) e de quantos números faltam: na tecla ou no relógio, conforme <b>Dígitos que faltam</b> (veja abaixo).</li><li>Aperte o sinal indicado e deixe a pessoa digitar qualquer coisa: entram os números certos. No <b>=</b> aparece o número final.</li></ol>'+
   '<p>Se o sinal não aparecer, a diferença não cabe (mais de 9 dígitos) ou deu número quebrado: continue a conta.</p>'+
+  '<h2>Dígitos que faltam</h2>'+
+  '<p>Em <b>Geral › Dígitos que faltam</b>, escolha onde aparece a dica do sinal e de quantos números faltam (vale para Número, Nome e Data e hora). Tocar no botão também mostra a explicação.</p>'+
+  '<p><b>⁺∕₋ · Na tecla</b></p>'+dicaHTML('tecla')+
+  '<p style="margin-top:14px"><b>00;00 · No relógio</b></p>'+dicaHTML('relogio')+
+  '<p>No relógio, a barra de cima da calculadora é desenhada pelo app (hora, sinal, Wi-Fi e a bateria de verdade).</p>'+
   '<h2>5. Nome</h2>'+
   '<ol><li>Em '+gear+' Nome, digite o nome como vai escrever no papel (o número precisa ter até 9 dígitos). O app mostra o número (fonte Cryptext, lido de trás para frente, como fica virando o papel).</li><li>O efeito é igual ao do Número: no final aparece o número do nome.</li></ol>'+
   '<p>• <b>Mostrar:</b> o nome na tela inteira, para copiar no papel. 1 toque gira (e mostra o número embaixo), 2 toques voltam.<br>• <b>Salvar em Fotos:</b> guarda uma imagem em pé, só com o nome.<br>• <b>Imprimir:</b> abre a impressão do iPhone com essa folha.</p>'+
@@ -838,9 +888,9 @@ let tbPrev=null; /* miniatura da tela bloqueada nos Ajustes (mesma peça, em tam
 function wallPrev(){$('#wPrevLock').style.backgroundImage='url("'+wallURL()+'")';$('#wPrevHome').style.backgroundImage='url("'+wallURL()+'")';
   if(!tbPrev)tbPrev=criarTelaBloqueio({raiz:$('#wPrevLockIn'),opcoes:tbOpcoes,nativo:natTelas});requestAnimationFrame(()=>tbPrev.medir());}
 
-function openMLock(){code='';drawMDots();$('#mlc').style.transform='';scrOn('mlock');giro(false);tb.mostrar();
+function openMLock(){code='';drawMDots();$('#mlc').style.transform='';scrOn('mlock');giro(false);tb.mostrar();barra();
   mAnim($('#mlock'),[{opacity:0},{opacity:1}],250);}
-function closeAllM(){['mlock','mpass'].forEach(scrOff);tb.parar();}
+function closeAllM(){['mlock','mpass'].forEach(scrOff);tb.parar();if(typeof barra==='function')barra();}
 
 /* bloqueio: deslizar para cima; segurar 1,5 s volta para a calculadora */
 let msy=null,mlp=null;const mlc=$('#mlc');
@@ -889,7 +939,8 @@ const ti=window.ti=criarTelaInicio({raiz:$('#inicio'),ini:'ini/',nativo:natTelas
   rotulos:[{texto:'Instagram',cx:.6153,topo:.6471,larg:.1588}],
   icones:[{x:PI.calc.x,y:PI.calc.y,acao:()=>abrirCalc()},{x:PI.ajustes.x,y:PI.ajustes.y,acao:()=>openSettings()}],
   segurar:{ms:1500,quando:()=>mode==='mnemo',acao:()=>openMLock()}}); /* Mnemônica: segurar 1,5 s volta à tela bloqueada */
-function desenharInicio(){ti.desenhar();}
+function desenharInicio(){ti.desenhar();if(window.bf)bf.desenhar();}
+const bf=window.bf=criarBarraFalsa({raiz:$('#calc'),nativo:natTelas});
 const inicioOn=()=>$('#inicio').classList.contains('on');
 function mostrarInicio(){ti.pagina1();$('#inicio').classList.add('on');giro(false);barra();ti.acordarVidros();}
 /* abrir e fechar a calculadora como no iPhone: cresce do ícone e volta para ele */
@@ -910,7 +961,10 @@ function voltarInicio(){if(ti.animando()||inicioOn())return;
   c.addEventListener('pointercancel',()=>{p0=null;});})();
 
 /* ---------- barra de cima e iPhone deitado (só no app) ---------- */
-function barra(){if(!NAT)return;natMsg('barra',$('#show').classList.contains('on'));natMsg('estilo',$('#cheat').classList.contains('on')?'escuro':'claro');}
+function barra(){
+  const falsa=cfg.dica==='relogio'&&!isLand&&!inicioOn()&&!['settings','show','cheat','mlock','mpass'].some(id=>$('#'+id).classList.contains('on'));
+  if(window.bf)bf.mostrar(falsa); /* relógio da barra de cima com os dígitos que faltam */
+  if(!NAT)return;natMsg('barra',falsa||$('#show').classList.contains('on'));natMsg('estilo',$('#cheat').classList.contains('on')?'escuro':'claro');}
 let deitado=false;
 function giro(v){if(!NAT||v===deitado)return;deitado=v;natMsg('giro',v);}
 /* calculadora deitada: o iPhone só gira quando a calculadora está na frente */

@@ -5,7 +5,7 @@ aqui = os.path.dirname(os.path.abspath(__file__))
 telas = os.path.join(aqui, '..', '..', '..', 'comum', 'telas')
 ler = lambda n, d=aqui: open(os.path.join(d, n), encoding='utf-8').read()
 html = ler('app.html')
-for peca in ('tela-inicio.css', 'tela-bloqueio.css', 'tela-inicio.js', 'tela-bloqueio.js'):
+for peca in ('tela-inicio.css', 'tela-bloqueio.css', 'tela-inicio.js', 'tela-bloqueio.js', 'barra-falsa.js'):
     html = html.replace('/*PECA:' + peca + '*/', ler(peca, telas))
 html = html.replace('/*CRYPTEXT*/', ler('cryptext.css'))
 html = html.replace('/*FINAL_A*/', ler('final_a.txt').strip())

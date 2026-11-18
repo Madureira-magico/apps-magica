@@ -8,6 +8,8 @@ import WebKit
 ///   telaFechar {x, y, s}      -> congela o app na tela (a página troca para a tela de início por baixo)
 ///   telaFecharVai {x, y, s}   -> o app encolhe até o ícone, como no iOS 26 (ícone chacoalha, fundo desfoca e cresce)
 ///   icones                    -> devolve a lanterna e a câmera do próprio iPhone (desenhos oficiais), em PNG
+///   wifi                      -> o desenho do Wi-Fi da barra de cima, em PNG
+///   bateria                   -> {nivel 0–1, carregando, economia} de verdade (para a barra de cima falsa)
 final class TelasNativas {
     weak var web: WKWebView?
     private var capaTela: UIView?
@@ -22,6 +24,8 @@ final class TelasNativas {
         case "telaFechar": telaFechar(num("x", 0), num("y", 0), num("s", 60), responder)
         case "telaFecharVai": telaFecharVai(num("x", 0), num("y", 0), num("s", 60)); responder(true)
         case "icones": responder(icones())
+        case "wifi": responder(png("wifi", 60, .semibold))
+        case "bateria": responder(bateria())
         default: return false
         }
         return true
@@ -128,18 +132,28 @@ final class TelasNativas {
         }
     }
 
+    /// Desenho oficial do iPhone (SF Symbol) em PNG branco.
+    private func png(_ nome: String, _ tamanho: CGFloat = 90, _ peso: UIImage.SymbolWeight = .regular) -> String {
+        let conf = UIImage.SymbolConfiguration(pointSize: tamanho, weight: peso)
+        guard let img = UIImage(systemName: nome, withConfiguration: conf)?
+                .withTintColor(.white, renderingMode: .alwaysOriginal) else { return "" }
+        let f = UIGraphicsImageRendererFormat()
+        f.scale = 3
+        let r = UIGraphicsImageRenderer(size: img.size, format: f)
+        let dados = r.pngData { _ in img.draw(in: CGRect(origin: .zero, size: img.size)) }
+        return "data:image/png;base64," + dados.base64EncodedString()
+    }
+
     /// Lanterna e câmera do próprio iPhone (os mesmos desenhos da tela bloqueada de verdade).
     private func icones() -> [String: String] {
-        func png(_ nome: String) -> String {
-            let conf = UIImage.SymbolConfiguration(pointSize: 90, weight: .regular)
-            guard let img = UIImage(systemName: nome, withConfiguration: conf)?
-                    .withTintColor(.white, renderingMode: .alwaysOriginal) else { return "" }
-            let f = UIGraphicsImageRendererFormat()
-            f.scale = 3
-            let r = UIGraphicsImageRenderer(size: img.size, format: f)
-            let dados = r.pngData { _ in img.draw(in: CGRect(origin: .zero, size: img.size)) }
-            return "data:image/png;base64," + dados.base64EncodedString()
-        }
         return ["lan": png("flashlight.off.fill"), "cam": png("camera.fill")]
+    }
+
+    /// Bateria de verdade, para a barra de cima falsa.
+    private func bateria() -> [String: Any] {
+        let d = UIDevice.current
+        d.isBatteryMonitoringEnabled = true
+        return ["nivel": Double(d.batteryLevel), "carregando": d.batteryState == .charging || d.batteryState == .full,
+                "economia": ProcessInfo.processInfo.isLowPowerModeEnabled]
     }
 }

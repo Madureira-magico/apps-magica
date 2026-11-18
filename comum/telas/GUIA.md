@@ -13,6 +13,7 @@ Primeiro app que usa as peças: `apps/calculadora` (veja `fonte/app.html` e `fon
 |---|---|
 | `tela-inicio.css` / `tela-inicio.js` | tela de ícones: `criarTelaInicio({...})` |
 | `tela-bloqueio.css` / `tela-bloqueio.js` | tela bloqueada: `criarTelaBloqueio({...})` |
+| `barra-falsa.js` | barra de cima falsa (hora, sinal, Wi-Fi, bateria de verdade): `criarBarraFalsa({...})` — ex.: dica no relógio da Calculadora |
 | `TelasNativas.swift` | parte do iPhone: animação de abrir/fechar e ícones da lanterna e câmera |
 | `ini/` | imagens padrão: `pag1.webp` (1ª página), `pag2.webp` (2ª), `dock.webp` (base), `papel.jpg` (papel de parede) |
 
