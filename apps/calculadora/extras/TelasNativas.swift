@@ -10,6 +10,10 @@ import WebKit
 ///   icones                    -> devolve a lanterna e a câmera do próprio iPhone (desenhos oficiais), em PNG
 ///   wifi                      -> o desenho do Wi-Fi da barra de cima, em PNG
 ///   bateria                   -> {nivel 0–1, carregando, economia} de verdade (para a barra de cima falsa)
+///   barraFoto {x}             -> congela uma foto do lado direito da barra de cima (de x pontos até o fim) e mostra por cima
+///   barraFotoTirar            -> tira a foto congelada
+///   relogioCobrir {on, cx, cy, w, h} -> janelinha ACIMA da barra de verdade cobrindo só o relógio (fundo preto), entra e sai com fade
+///   relogioTexto {texto}      -> o texto do relógio coberto, trocando com um fade de meio segundo
 final class TelasNativas {
     weak var web: WKWebView?
     private var capaTela: UIView?
@@ -26,12 +30,74 @@ final class TelasNativas {
         case "icones": responder(icones())
         case "wifi": responder(png("wifi", 60, .semibold))
         case "bateria": responder(bateria())
+        case "barraFoto": responder(barraFoto(num("x", 280)))
+        case "barraFotoTirar": fotoBarra?.removeFromSuperview(); fotoBarra = nil; responder(true)
+        case "relogioCobrir": responder(relogioCobrir((d["on"] as? Bool) ?? false, num("cx", 62), num("cy", 32), num("w", 80), num("h", 26)))
+        case "relogioTexto": relogioTexto((d["texto"] as? String) ?? ""); responder(true)
         default: return false
         }
         return true
     }
 
     private func janela() -> UIWindow? { web?.window }
+
+    // MARK: barra de cima: foto congelada do lado direito (sinal, Wi-Fi e bateria de verdade)
+    private var fotoBarra: UIView?
+    private func barraFoto(_ x0: CGFloat) -> Bool {
+        fotoBarra?.removeFromSuperview(); fotoBarra = nil
+        guard let jan = janela() else { return false }
+        let alt = jan.windowScene?.statusBarManager?.statusBarFrame.height ?? 54
+        // foto da tela inteira, com a barra de verdade ainda aparecendo (só mostra, não dá para ler)
+        guard let foto = jan.screen.snapshotView(afterScreenUpdates: false) else { return false }
+        let caixa = UIView(frame: CGRect(x: x0, y: 0, width: jan.bounds.width - x0, height: alt))
+        caixa.clipsToBounds = true
+        caixa.isUserInteractionEnabled = false
+        caixa.backgroundColor = .black
+        foto.frame = CGRect(x: -x0, y: 0, width: jan.bounds.width, height: jan.bounds.height)
+        caixa.addSubview(foto)
+        jan.addSubview(caixa)
+        fotoBarra = caixa
+        return true
+    }
+
+    // MARK: só o relógio: janelinha acima da barra de verdade
+    private var janRelogio: UIWindow?
+    private var rotulo: UILabel?
+    private func relogioCobrir(_ on: Bool, _ cx: CGFloat, _ cy: CGFloat, _ w: CGFloat, _ h: CGFloat) -> Bool {
+        if !on {
+            // some com fade (aparece de novo o relógio de verdade por baixo)
+            guard let jw = janRelogio else { return true }
+            janRelogio = nil; rotulo = nil
+            UIView.animate(withDuration: 0.45, animations: { jw.alpha = 0 }) { _ in jw.isHidden = true }
+            return true
+        }
+        if janRelogio != nil { return true }
+        guard let cena = janela()?.windowScene else { return false }
+        let jw = UIWindow(windowScene: cena)
+        jw.windowLevel = .statusBar + 1
+        jw.isUserInteractionEnabled = false
+        jw.backgroundColor = .clear
+        jw.frame = CGRect(x: cx - w / 2, y: cy - h / 2, width: w, height: h)
+        let vc = UIViewController(); vc.view.backgroundColor = .black
+        let l = UILabel(frame: CGRect(x: 0, y: 0, width: w, height: h))
+        l.font = .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+        l.textColor = .white
+        l.textAlignment = .center
+        l.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        vc.view.addSubview(l)
+        jw.rootViewController = vc
+        jw.alpha = 0
+        jw.isHidden = false
+        janRelogio = jw; rotulo = l
+        // aparece com fade por cima do relógio de verdade
+        UIView.animate(withDuration: 0.45) { jw.alpha = 1 }
+        return true
+    }
+    private func relogioTexto(_ t: String) {
+        guard let l = rotulo, l.text != t else { return }
+        if l.text == nil || l.text == "" { l.text = t; return }
+        UIView.transition(with: l, duration: 0.45, options: [.transitionCrossDissolve, .allowAnimatedContent]) { l.text = t }
+    }
 
     private func telaCobrir() {
         capaTela?.removeFromSuperview(); capaTela = nil
