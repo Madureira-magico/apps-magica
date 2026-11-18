@@ -1,0 +1,85 @@
+# PACOTE DE FOTOS DO MOSAIC
+# Cada "## grupo" vira uma pasta. Embaixo, uma busca por linha (em inglês, acha mais fotos).
+# Depois da barra | vai quantas fotos baixar daquela busca (se não tiver, usa 15).
+# Para mudar: edite este arquivo e salve no GitHub — o robô baixa tudo de novo sozinho.
+
+## pele-clara
+beach sand | 15
+bread loaf | 12
+croissant | 12
+pasta dish | 12
+latte coffee | 12
+soft sunset sky | 12
+beige wall old house | 10
+light brown dog | 12
+peach fruit | 10
+
+## pele-morena
+coffee beans | 12
+chocolate cake | 12
+barbecue meat | 12
+wooden table | 12
+wooden furniture | 10
+leather bag | 10
+brown horse | 12
+brown dog | 12
+autumn leaves | 12
+desert dunes | 12
+old church brick | 10
+
+## branco-dentes-olhos
+snow landscape | 12
+white clouds sky | 12
+wedding cake | 10
+rice bowl | 10
+white plate food | 10
+white sailboat | 10
+white building | 10
+white dog | 12
+eggs | 10
+
+## escuro-cabelo-sombra
+city at night | 15
+concert crowd | 12
+restaurant dim light | 12
+black car | 10
+black cat | 12
+night sky stars | 12
+dark forest | 10
+candle light | 10
+
+## dourado-loiro
+wheat field | 12
+golden hour beach | 12
+beer glass | 10
+french fries | 10
+christmas lights | 12
+golden retriever | 12
+honey | 8
+
+## vermelho-rosado
+strawberries | 12
+red wine glass | 10
+pink flowers | 12
+red sunset | 12
+pizza | 12
+tomatoes market | 10
+red car | 10
+
+## fundo-azul-verde-cinza
+ocean waves | 12
+blue sky | 10
+swimming pool | 10
+green forest | 12
+city street | 12
+airport | 10
+mountain lake | 12
+
+## dia-a-dia-celular
+hotel room | 10
+travel bridge city | 10
+street food | 12
+birthday party | 10
+road trip car | 10
+park walk | 10
+museum | 10

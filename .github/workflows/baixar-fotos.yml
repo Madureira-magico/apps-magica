@@ -1,0 +1,44 @@
+name: Baixar fotos do Mosaic
+
+# Roda sozinho quando a lista de temas (fotos-pacote/temas.txt) muda,
+# ou pelo botão "Run workflow" no GitHub.
+# O resultado vai para o ramo "pacote-fotos": pacote-fotos-mosaico.zip,
+# lista.json, resumo.txt e amostras/ (uma folha com as fotos de cada grupo).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'fotos-pacote/**'
+      - '.github/workflows/baixar-fotos.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: baixar-fotos
+  cancel-in-progress: true
+
+jobs:
+  baixar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Pillow
+        run: pip install pillow
+
+      - name: Baixar e separar as fotos
+        run: python3 fotos-pacote/baixar.py fotos-pacote/temas.txt "$RUNNER_TEMP/saida"
+
+      - name: Guardar no ramo pacote-fotos
+        run: |
+          cd "$RUNNER_TEMP/saida"
+          git init -q -b pacote-fotos
+          git config user.name "robo-fotos"
+          git config user.email "robo-fotos@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Pacote de fotos do Mosaic ($(date -u +%Y-%m-%d))"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" pacote-fotos

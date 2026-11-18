@@ -7,6 +7,8 @@ on:
     paths-ignore:
       - 'android/**'
       - '.github/workflows/android.yml'
+      - 'fotos-pacote/**'
+      - '.github/workflows/baixar-fotos.yml'
 
 permissions:
   contents: read
