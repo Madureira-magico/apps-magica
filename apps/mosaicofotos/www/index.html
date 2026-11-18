@@ -720,7 +720,7 @@ Arthur Aguiar|Arthur Aguiar|artur aguiar
 <script>
 'use strict';
 /* =====================================================================
-   MOSAIC FOTOS 1.4 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
+   MOSAIC FOTOS 1.5 (cópia do Mozaic Plus 2.5 + sorteio entre todas as fotos de cor parecida; brancas variam mais) — Fototeca falsa em que as fotos formam o rosto do famoso
    ===================================================================== */
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const DPR = Math.min(3, window.devicePixelRatio || 1);
@@ -2059,13 +2059,13 @@ function encaixe(w, h) { const k = Math.min(W / w, H / h); return { w: w * k, h:
    - os botões, a barra de cima e as miniaturas aparecem/somem JUNTO com a foto */
 function curvaVoo(t, dur, abrir) {
   if (cfg.molejo) {   // mola amortecida (como as animações do iOS): resposta curta, quase sem quique
-    const resp = abrir ? 0.36 : 0.24, zeta = 0.82, w = 2 * Math.PI / resp, wd = w * Math.sqrt(1 - zeta * zeta), T = t * dur;
+    const resp = abrir ? 0.36 : 0.2, zeta = 0.82, w = 2 * Math.PI / resp, wd = w * Math.sqrt(1 - zeta * zeta), T = t * dur;
     return 1 - Math.exp(-zeta * w * T) * (Math.cos(wd * T) + zeta * w / wd * Math.sin(wd * T));
   }
   const k = 0.6, u = t - 1;   // curva: sai rápido e assenta devagar, com uma passadinha mínima
   return 1 + (k + 1) * u * u * u + k * u * u;
 }
-const durVoo = abrir => cfg.molejo ? (abrir ? 0.5 : 0.34) : (abrir ? 0.3 : 0.2);   // medido no vídeo do Fotos de verdade: abrir ~0,3 s, fechar ~0,2 s
+const durVoo = abrir => cfg.molejo ? (abrir ? 0.5 : 0.28) : (abrir ? 0.3 : 0.15);   // medido nos vídeos do Fotos de verdade: abrir ~0,3 s, fechar ~0,15 s
 let vooAnims = [];
 /* tira TODAS as animações que ficaram presas no #voo (a do sumiço suave ficava "presa" em 0 e escondia a foto da próxima vez) */
 function limparVoo() {
@@ -2099,7 +2099,7 @@ function voar(de, para, base, src, fundoDe, fundoPara, abrir, fim) {
   cx.style.transform = qc[0].transform; im.style.transform = qi[0].transform; f.style.transition = 'none'; f.style.opacity = fundoDe;
   const a1 = cx.animate(qc, { duration: ms, easing: 'linear', fill: 'forwards' });
   const a2 = im.animate(qi, { duration: ms, easing: 'linear', fill: 'forwards' });
-  const a3 = f.animate([{ opacity: fundoDe }, { opacity: fundoPara }], { duration: abrir ? 280 : 190, easing: 'ease-out', fill: 'forwards' });
+  const a3 = f.animate([{ opacity: fundoDe }, { opacity: fundoPara }], { duration: abrir ? 280 : 150, easing: 'ease-out', fill: 'forwards' });
   vooAnims = [a1, a2, a3];
   a1.finished.then(() => { if (fim) fim(); }).catch(() => {});
 }
@@ -2178,7 +2178,7 @@ async function fecharFoto(op0) {
   mostrar('fototeca');
   ver.classList.add('on');   // a tela da foto continua por cima só com os botões sumindo
   if (nativo) nat.call('galeriaCapa').catch(() => {});
-  soltarCromo(); if (!limpo) fadeCromo(1, 0, 160);
+  soltarCromo(); if (!limpo) fadeCromo(1, 0, 130);
 }
 $('#vVolta').addEventListener('click', fecharFoto);
 $('#vLixo').addEventListener('click', () => {
