@@ -50,6 +50,32 @@ input[type=file]{display:none}
 #tb{position:absolute;inset:0}
 #foco{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 /*PECA:tela-bloqueio.css*/
+/* caixinha branca do desenho (cresce do topo, como a ilha do Mosaic) */
+#ilha{position:fixed;left:50%;top:11px;transform:translateX(-50%);background:#fff;display:none;z-index:9999;overflow:hidden;pointer-events:none;align-items:center;justify-content:center}
+#ilha.on{display:flex}#ilhaCv{flex:none;opacity:0;transition:opacity .15s}#ilha.grande #ilhaCv{opacity:1;transition:opacity .22s .1s}
+/* tela de desenho da previsão */
+#desenho{background:#fff;touch-action:none}
+#dCv{position:absolute;left:0;width:100%;touch-action:none}
+.dTopo{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top) + 8px);display:flex;justify-content:space-between;padding:0 18px;z-index:2}
+.dIc{width:44px;height:44px;border-radius:50%;background:#f2f2f7;display:flex;align-items:center;justify-content:center}
+.dIc:active{background:#e0e0e6}
+.dBase{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 22px);display:flex;justify-content:space-between;align-items:center;padding:0 22px;z-index:2}
+.dLinha{position:absolute;left:0;right:0;height:.5px;background:#e5e5ea}
+.dCor{width:42px;height:42px;border-radius:50%}
+.dCor.sel{box-shadow:0 0 0 3px #fff,0 0 0 5px #8e8e93}
+.dDesf{width:42px;height:42px;display:flex;align-items:center;justify-content:center}
+/* escolha de quantos por folha */
+#folhas{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:none}
+#folhas.on{display:block}
+#folhas .f{position:absolute;left:0;right:0;bottom:0;background:#f2f2f7;border-radius:22px 22px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom) + 24px);color:#000}
+#folhas h3{font-size:17px;font-weight:600;text-align:center;margin-bottom:16px}
+#folhas .ops{display:flex;gap:12px}
+#folhas .op{flex:1;text-align:center;font-size:14px;color:#333}
+#folhas .a4{width:100%;aspect-ratio:210/297;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.2);margin-bottom:8px;display:grid;gap:3px;padding:5px}
+#folhas .a4 canvas{width:100%;height:100%;border:1px dashed #d0d0d5;min-width:0;min-height:0}
+#folhas .op.sel .a4{outline:3px solid #0a84ff}
+#folhas .ok2{margin-top:20px;background:#0a84ff;color:#fff;text-align:center;padding:14px;border-radius:14px;font-size:17px;font-weight:600}
+#folhas .x2{margin-top:8px;text-align:center;color:#0a84ff;font-size:17px;padding:8px}
 </style></head>
 <body>
 
@@ -59,6 +85,33 @@ input[type=file]{display:none}
   <div id="tb"></div>
   <canvas id="foco"></canvas>
 </div>
+<div id="ilha"><canvas id="ilhaCv"></canvas></div>
+
+<!-- ================= DESENHAR PREVISÃO ================= -->
+<div id="desenho" class="tela">
+  <div class="dTopo">
+    <div class="dIc" id="dFechar" aria-label="Fechar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3a3a3c" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+    <div class="dIc" id="dApagar" aria-label="Apagar tudo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3a3a3c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></svg></div>
+    <div class="dIc" id="dImprimir" aria-label="Imprimir"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3a3a3c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8V3.5h10V8"/><rect x="3" y="8" width="18" height="9" rx="2.5"/><path d="M7 14h10v6.5H7z" fill="#f2f2f7"/><circle cx="17.5" cy="11" r=".6" fill="#3a3a3c"/></svg></div>
+  </div>
+  <canvas id="dCv"></canvas>
+  <div class="dLinha" id="dLinhaCima"></div>
+  <div class="dLinha" id="dLinhaBaixo"></div>
+  <div class="dBase" id="dBase">
+    <div class="dDesf" id="dDesfazer" aria-label="Desfazer"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.6" stroke-linecap="round"><path d="M4 4v6h6"/><path d="M4.5 10a8 8 0 1 1 1.9 7.5"/></svg></div>
+  </div>
+</div>
+
+<div id="folhas"><div class="f">
+  <h3>Quantos desenhos por folha A4?</h3>
+  <div class="ops" id="fOps">
+    <div class="op" data-n="1"><div class="a4" style="grid-template:1fr/1fr"><canvas></canvas></div>1 por folha</div>
+    <div class="op" data-n="2"><div class="a4" style="grid-template:1fr 1fr/1fr"><canvas></canvas><canvas></canvas></div>2 por folha</div>
+    <div class="op" data-n="4"><div class="a4" style="grid-template:1fr 1fr/1fr 1fr"><canvas></canvas><canvas></canvas><canvas></canvas><canvas></canvas></div>4 por folha</div>
+  </div>
+  <div class="ok2" id="fImprimir">Imprimir</div>
+  <div class="x2" id="fCancelar">Cancelar</div>
+</div></div>
 
 <!-- ================= MENU ================= -->
 <div id="menu" class="tela">
@@ -96,6 +149,10 @@ input[type=file]{display:none}
 
   <div class="sec">Tela de bloqueio</div>
   <div class="grupo">
+    <div class="lin col">Mostrar a cor
+      <div class="seg" data-k="mostrarCor"><div data-v="nome">No nome</div><div data-v="camera">Na câmera</div><div data-v="dois">Os dois</div></div>
+      <small id="mostrarDica" style="margin-top:6px"></small>
+    </div>
     <div class="lin">Linha de cima<input type="text" id="l1" autocomplete="off" autocorrect="off" spellcheck="false"></div>
     <div class="lin">Linha de baixo<input type="text" id="l2" autocomplete="off" autocorrect="off" spellcheck="false"></div>
     <div class="lin">Maleta antes do nome<div class="sw" data-k="maleta"></div></div>
@@ -110,11 +167,17 @@ input[type=file]{display:none}
     </div>
   </div>
 
+  <div class="sec">Previsão</div>
+  <div class="grupo">
+    <div class="lin bt" id="abrirDesenho">Desenhar previsão</div>
+  </div>
+  <div class="dica">O desenho fica guardado até você apagar (lixeira). Imprime 1, 2 ou 4 por folha A4.</div>
+
   <div class="sec">Apresentação</div>
   <div class="grupo">
     <div class="lin bt" id="zerar">Zerar (volta a mostrar a linha de baixo)</div>
   </div>
-  <div class="dica">Dois dedos deslizando para baixo na tela de bloqueio: abre este menu.<br>Um toque no botão da câmera: reconecta (o mesmo que Reconectar), com um toquinho de vibração.<br>Ao conectar, a linha de baixo mostra o número da página; depois, o nome de cada cor que chegar (fica sempre a última).</div>
+  <div class="dica">Dois dedos deslizando para baixo na tela de bloqueio: abre este menu.<br>Um toque no botão da câmera: reconecta (o mesmo que Reconectar), com um toquinho de vibração.<br>Segurar o botão da lanterna: mostra o desenho do espectador numa caixinha branca (some ao soltar).<br>Ao conectar, a linha de baixo mostra o número da página; depois, o nome de cada cor que chegar (fica sempre a última).</div>
   <input type="file" id="arquivo" accept="image/*">
 </div>
 
@@ -144,7 +207,7 @@ const CORES = [
 const PADRAO = {
   cores:{azul:{t:'Short', v:4}, amarelo:{t:'Sapato', v:5}, vermelho:{t:'Balão', v:1}, verde:{t:'Camiseta', v:3}, laranja:{t:'Cabelo', v:2}, preto:{t:'', v:0}},
   vibrar:true, forca:100, tutu:true, rep:'1', tipo:'classica',
-  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500'
+  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500', mostrarCor:'nome', folhas:'1'
 };
 let A = JSON.parse(JSON.stringify(PADRAO));
 try{
@@ -264,21 +327,25 @@ function pintarMenu(){
   $('forcaDica').textContent = A.tipo === 'grave' ? 'Grave: quanto maior, mais forte (melhor no máximo)' : (A.forca >= 100 ? 'No máximo: vibração clássica do iPhone (a de chamada)' : 'Ajustável: quanto maior, mais forte');
   $('tipoDica').textContent = A.tipo === 'grave' ? 'Tremor mais grosso e pesado, faz menos barulho' : 'A vibração de chamada do iPhone';
   $('l1').value = A.l1; $('l2').value = A.l2;
+  $('mostrarDica').textContent = A.mostrarCor === 'camera' ? 'A lente da câmera fica da cor escolhida; o nome continua "' + (A.l2 || '') + '"'
+    : A.mostrarCor === 'dois' ? 'O nome da cor aparece embaixo e a lente da câmera fica da cor' : 'O nome da cor aparece na linha de baixo';
 }
 document.querySelectorAll('.sw').forEach(s => s.onclick = () => { A[s.dataset.k] = !A[s.dataset.k]; salvar(); pintarMenu(); desenharFoco(); });
 document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.onclick = () => {
   A[g.dataset.k] = d.dataset.v; salvar(); pintarMenu(); if(g.dataset.k === 'letra' || g.dataset.k === 'peso') tb.medir();
   if(g.dataset.k === 'tipo') vibrarTeste();
+  if(g.dataset.k === 'mostrarCor'){ aplicarCor(); }
 }));
 $('forca').oninput = e => { A.forca = +e.target.value; salvar(); pintarMenu(); };
 $('forca').onchange = () => vibrarTeste();
 $('l1').oninput = e => { A.l1 = e.target.value; salvar(); desenharFoco(); };
 $('l2').oninput = e => { A.l2 = e.target.value; salvar(); desenharFoco(); };
-$('zerar').onclick = () => { recebeuCor = false; linha2 = null; numeroMostrado = false; desenharFoco(); setUltima('Zerado: volta a mostrar "' + (A.l2 || '') + '"'); };
+$('zerar').onclick = () => { recebeuCor = false; linha2 = null; numeroMostrado = false; ultimaCor = null; lente.pintar(null); desenharFoco(); setUltima('Zerado: volta a mostrar "' + (A.l2 || '') + '"'); };
 $('entrar').onclick = () => nat('entrar').catch(() => {});
 function reconectar(){
   // reconecta e zera: ao conectar de novo, mostra o número da página nova (até chegar a 1ª cor)
   recebeuCor = false; linha2 = null; numeroMostrado = false; conectado = false; grupo = ''; textoInicial = '';
+  ultimaCor = null; lente.pintar(null);
   desenharFoco();
   setStatus('amarelo', 'Reconectando…');
   nat('recarregar').catch(() => {});
@@ -327,6 +394,18 @@ function acharCor(texto){
   if(!t) return 'preto';
   return null;
 }
+/* mostra a última cor do jeito escolhido no menu: no nome (linha de baixo), na lente da câmera ou nos dois */
+let ultimaCor = null;
+function aplicarCor(){
+  const c = ultimaCor ? A.cores[ultimaCor] : null;
+  const vazio = !c || !c.t.trim();
+  if(recebeuCor && c){
+    if(A.mostrarCor === 'camera') mostrarLinha2(null);         // o nome continua "Madureira"
+    else mostrarLinha2(c.t.trim());                           // nome vazio: a linha fica em branco
+  }
+  // a lente só ganha cor quando o nome não está vazio (preto vazio = lente normal)
+  lente.pintar(A.mostrarCor !== 'nome' && c && !vazio ? CORES.find(x => x.id === ultimaCor).css : null);
+}
 function mostrarNumero(){
   if(recebeuCor) return;
   const n = grupo || textoInicial;
@@ -346,7 +425,9 @@ function chegouTexto(texto){
     return;
   }
   const c = A.cores[id], nomeCor = CORES.find(x => x.id === id).nome;
-  recebeuCor = true; mostrarLinha2(c.t.trim());   // nome vazio: a linha fica em branco
+  recebeuCor = true;
+  ultimaCor = id;
+  aplicarCor();
   setUltima(nomeCor + ' → ' + (c.t.trim() || '(nada)') + ' · ' + c.v + ' vibr.' + (bruto ? '  [site: "' + bruto + '"]' : ''));
   vibrarCor(id, false);
 }
@@ -366,6 +447,7 @@ window.paintRx = function(d){
       break;
     case 'texto': chegouTexto(d.texto); break;
     case 'msg': ultimaMsg = {msg:d.msg, t:Date.now()}; break;
+    case 'desenho': receberDesenho(d.src); break;
     case 'login': conectado = false; setStatus('vermelho', 'Precisa entrar no paint.land (toque em Entrar)'); break;
     case 'erro': conectado = false; setStatus('vermelho', 'Sem conexão com o paint.land'); break;
     case 'url': case 'pagina':
@@ -376,10 +458,243 @@ window.paintRx = function(d){
   }
 };
 
+/* ---------- lente da câmera colorida ---------- */
+/* acha o círculo da lente dentro do desenho da câmera (o "buraco" do meio) e pinta por cima */
+const lente = (function(){
+  let cor = null, achado = null;
+  const cam = document.querySelector('#tb .tbCam');
+  function canvasCam(){ return cam.querySelector('canvas'); }
+  function procurar(cv){
+    const w = cv.width, h = cv.height; if(!w || !h) return null;
+    const px = cv.getContext('2d').getImageData(0, 0, w, h).data;
+    const opaco = (x, y) => px[(y * w + x) * 4 + 3] > 100;
+    // a partir do meio (um pouco abaixo), procura um pedaço transparente fechado (não encosta na borda)
+    const visto = new Uint8Array(w * h);
+    const cx0 = Math.round(w / 2), cy0 = Math.round(h * 0.56);
+    for(let r = 0; r < Math.min(w, h) / 2; r++){
+      for(let a = 0; a < 16; a++){
+        const x = Math.round(cx0 + r * Math.cos(a * Math.PI / 8)), y = Math.round(cy0 + r * Math.sin(a * Math.PI / 8));
+        if(x < 1 || y < 1 || x >= w - 1 || y >= h - 1 || opaco(x, y) || visto[y * w + x]) continue;
+        const pilha = [[x, y]], pts = []; let borda = false; visto[y * w + x] = 1;
+        while(pilha.length){
+          const [px1, py1] = pilha.pop(); pts.push([px1, py1]);
+          if(px1 === 0 || py1 === 0 || px1 === w - 1 || py1 === h - 1){ borda = true; }
+          for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+            const nx = px1 + dx, ny = py1 + dy;
+            if(nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const k = ny * w + nx; if(visto[k] || opaco(nx, ny)) continue;
+            visto[k] = 1; pilha.push([nx, ny]);
+          }
+        }
+        if(!borda && pts.length > 12){
+          let sx = 0, sy = 0; for(const p of pts){ sx += p[0]; sy += p[1]; }
+          const mx = sx / pts.length, my = sy / pts.length;
+          let rm = 0; for(const p of pts) rm = Math.max(rm, Math.hypot(p[0] - mx, p[1] - my));
+          return {x: mx, y: my, r: rm + 0.6};
+        }
+      }
+    }
+    return null;
+  }
+  function pintar(c){
+    cor = c;
+    const cv = canvasCam(); if(!cv) return;
+    const g = cv.getContext('2d');
+    if(cv.__original){ g.putImageData(cv.__original, 0, 0); }
+    if(!cor) return;
+    if(!cv.__original) cv.__original = g.getImageData(0, 0, cv.width, cv.height);
+    achado = procurar(cv);
+    if(!achado) return;
+    g.save(); g.fillStyle = cor; g.beginPath(); g.arc(achado.x, achado.y, achado.r, 0, Math.PI * 2); g.fill(); g.restore();
+  }
+  // o desenho da câmera é refeito ao medir a tela: pinta de novo
+  new MutationObserver(() => { const c = cor; if(c) setTimeout(() => pintar(c), 0); }).observe(cam, {childList:true});
+  return {pintar, cor: () => cor, achado: () => achado};
+})();
+
+/* ---------- caixinha branca com o desenho do espectador (segurar a lanterna) ---------- */
+let desenhoEsp = null;          // imagem do desenho que chegou do paint.land
+function receberDesenho(src){
+  if(!src) return;
+  const i = new Image();
+  i.onload = () => { desenhoEsp = i; if(ilhaAberta) desenharIlha(); };
+  i.src = src;
+}
+/* acha só os riscos (sem o fundo branco) com uma margem de sobra */
+function areaTracos(img){
+  const c = document.createElement('canvas'); c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+  if(!c.width || !c.height) return null;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  let d; try{ d = g.getImageData(0, 0, c.width, c.height).data; }catch(e){ return {x:0, y:0, w:c.width, h:c.height}; }
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for(let y = 0; y < c.height; y++) for(let x = 0; x < c.width; x++){
+    const k = (y * c.width + x) * 4;
+    if(d[k + 3] > 30 && Math.min(d[k], d[k + 1], d[k + 2]) < 230){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+  }
+  if(x1 < 0) return null;
+  const m = 4;
+  return {x: Math.max(0, x0 - m), y: Math.max(0, y0 - m), w: Math.min(c.width, x1 + m + 1) - Math.max(0, x0 - m), h: Math.min(c.height, y1 + m + 1) - Math.max(0, y0 - m)};
+}
+let ilhaAberta = false, ilhaT = null;
+function medidaIlha(){ const W = innerWidth; return {w: W - 30, h: Math.round(Math.min(innerHeight * 0.36, (W - 30) * 0.82))}; }
+function desenharIlha(){
+  const m = medidaIlha(), cv = $('ilhaCv'), dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(m.w * dpr); cv.height = Math.round(m.h * dpr);
+  cv.style.width = m.w + 'px'; cv.style.height = m.h + 'px';
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, m.w, m.h);
+  if(!desenhoEsp) return;
+  const a = areaTracos(desenhoEsp); if(!a) return;
+  // o desenho no meio da parte branca, com folga em volta
+  const aw = m.w * 0.62, ah = m.h * 0.66;
+  const k = Math.min(aw / a.w, ah / a.h, 4);
+  const w = a.w * k, h = a.h * k;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(desenhoEsp, a.x, a.y, a.w, a.h, (m.w - w) / 2, (m.h - h) / 2, w, h);
+}
+function abrirIlha(){
+  if(ilhaAberta) return; ilhaAberta = true; clearTimeout(ilhaT);
+  const m = medidaIlha(), il = $('ilha');
+  desenharIlha();
+  il.style.transition = 'none'; il.className = 'on';
+  Object.assign(il.style, {width: '124px', height: '36px', borderRadius: '18px'});
+  il.getBoundingClientRect();
+  il.style.transition = 'width .42s cubic-bezier(.2,1.25,.35,1), height .42s cubic-bezier(.2,1.25,.35,1), border-radius .42s';
+  Object.assign(il.style, {width: m.w + 'px', height: m.h + 'px', borderRadius: '42px'});
+  il.classList.add('grande');
+}
+function fecharIlha(){
+  if(!ilhaAberta) return; ilhaAberta = false;
+  const il = $('ilha'); il.classList.remove('grande');
+  il.style.transition = 'width .3s cubic-bezier(.4,0,.2,1), height .3s cubic-bezier(.4,0,.2,1), border-radius .3s';
+  Object.assign(il.style, {width: '124px', height: '36px', borderRadius: '18px'});
+  ilhaT = setTimeout(() => { il.className = ''; }, 300);
+}
+(function(){
+  const bLan = document.querySelector('#tb .tbLan');
+  bLan.addEventListener('touchstart', e => { if(e.touches.length === 1 && $('lock').classList.contains('on')) abrirIlha(); }, {passive:true});
+  const fim = () => fecharIlha();
+  document.addEventListener('touchend', e => { if(e.touches.length === 0) fim(); }, {passive:true});
+  document.addEventListener('touchcancel', fim, {passive:true});
+  bLan.addEventListener('mousedown', abrirIlha); document.addEventListener('mouseup', fim);
+})();
+
+/* ---------- desenhar previsão (fica guardado até apagar) ---------- */
+const DCORES = ['#0000FF', '#3A7F25', '#FFF94F', '#F0A93E', '#E8392A', '#000000'];
+const DLARG = 6;
+let riscos = [], dCor = '#000000', dAtual = null;
+try{ const s = JSON.parse(localStorage.getItem('pt-desenho') || 'null'); if(s && s.t) riscos = s.t; if(s && s.c) dCor = s.c; }catch(e){}
+function guardarDesenho(){ try{ localStorage.setItem('pt-desenho', JSON.stringify({t: riscos, c: dCor})); }catch(e){} }
+(function(){
+  const base = $('dBase');
+  DCORES.forEach(c => {
+    const d = document.createElement('div'); d.className = 'dCor'; d.style.background = c; d.dataset.c = c;
+    if(c === '#FFF94F') d.style.boxShadow = 'inset 0 0 0 .5px #ccc';
+    d.onclick = () => { dCor = c; guardarDesenho(); marcarCor(); };
+    base.appendChild(d);
+  });
+})();
+function marcarCor(){ document.querySelectorAll('.dCor').forEach(d => d.classList.toggle('sel', d.dataset.c === dCor)); }
+const dCv = $('dCv'), dG = dCv.getContext('2d');
+let dArea = {top: 0, h: 0, w: 0};
+function medirDesenho(){
+  const topo = document.querySelector('.dTopo').getBoundingClientRect(), base = $('dBase').getBoundingClientRect();
+  const top = Math.round(topo.bottom + 8), bot = Math.round(base.top - 14);
+  dArea = {top, h: Math.max(100, bot - top), w: innerWidth};
+  const dpr = window.devicePixelRatio || 1;
+  dCv.style.top = top + 'px'; dCv.style.height = dArea.h + 'px';
+  dCv.width = Math.round(dArea.w * dpr); dCv.height = Math.round(dArea.h * dpr);
+  dG.setTransform(dpr, 0, 0, dpr, 0, 0);
+  $('dLinhaCima').style.top = top + 'px'; $('dLinhaBaixo').style.top = (top + dArea.h) + 'px';
+  $('dLinhaCima').style.opacity = 0;
+  redesenhar();
+}
+/* os riscos são guardados em frações da área (assim servem em qualquer tamanho) */
+function tracar(g, t, W, H, ox, oy, esc){
+  const p = t.p; if(!p.length) return;
+  g.strokeStyle = t.c; g.fillStyle = t.c; g.lineWidth = DLARG * esc; g.lineCap = 'round'; g.lineJoin = 'round';
+  const X = i => ox + p[i][0] * W, Y = i => oy + p[i][1] * H;
+  if(p.length === 1){ g.beginPath(); g.arc(X(0), Y(0), DLARG * esc / 2, 0, Math.PI * 2); g.fill(); return; }
+  g.beginPath(); g.moveTo(X(0), Y(0));
+  for(let i = 1; i < p.length - 1; i++){ g.quadraticCurveTo(X(i), Y(i), (X(i) + X(i + 1)) / 2, (Y(i) + Y(i + 1)) / 2); }
+  g.lineTo(X(p.length - 1), Y(p.length - 1)); g.stroke();
+}
+function redesenhar(){
+  dG.clearRect(0, 0, dArea.w, dArea.h); dG.fillStyle = '#fff'; dG.fillRect(0, 0, dArea.w, dArea.h);
+  riscos.forEach(t => tracar(dG, t, dArea.w, dArea.h, 0, 0, 1));
+  if(dAtual) tracar(dG, dAtual, dArea.w, dArea.h, 0, 0, 1);
+}
+function pontoD(e){ const r = dCv.getBoundingClientRect(), t = e.touches ? e.touches[0] : e; return [(t.clientX - r.left) / r.width, (t.clientY - r.top) / r.height]; }
+dCv.addEventListener('touchstart', e => { if(e.touches.length !== 1) return; e.preventDefault(); dAtual = {c: dCor, p: [pontoD(e)]}; redesenhar(); }, {passive:false});
+dCv.addEventListener('touchmove', e => { if(!dAtual || e.touches.length !== 1) return; e.preventDefault(); dAtual.p.push(pontoD(e)); redesenhar(); }, {passive:false});
+function fimTraco(){ if(!dAtual) return; riscos.push(dAtual); dAtual = null; guardarDesenho(); redesenhar(); }
+dCv.addEventListener('touchend', fimTraco); dCv.addEventListener('touchcancel', fimTraco);
+let mouseD = false;
+dCv.addEventListener('mousedown', e => { mouseD = true; dAtual = {c: dCor, p: [pontoD(e)]}; redesenhar(); });
+dCv.addEventListener('mousemove', e => { if(!mouseD || !dAtual) return; dAtual.p.push(pontoD(e)); redesenhar(); });
+addEventListener('mouseup', () => { if(mouseD){ mouseD = false; fimTraco(); } });
+$('dDesfazer').onclick = () => { riscos.pop(); guardarDesenho(); redesenhar(); };
+$('dApagar').onclick = () => { if(!riscos.length) return; if(confirm('Apagar o desenho?')){ riscos = []; guardarDesenho(); redesenhar(); } };
+$('dFechar').onclick = () => irMenu();
+$('abrirDesenho').onclick = () => { mostrar('desenho'); marcarCor(); requestAnimationFrame(medirDesenho); };
+
+/* ---------- impressão: 1, 2 ou 4 por folha A4 ---------- */
+function caixaTracos(){
+  // retângulo que envolve todos os riscos (em frações), com a grossura da linha
+  let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+  riscos.forEach(t => t.p.forEach(([x, y]) => { if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }));
+  if(x1 < x0) return null;
+  return {x0, y0, x1, y1};
+}
+/* desenha a previsão centralizada numa caixa (x, y, w, h) da folha */
+function colocar(g, cx, cy, cw, ch, escLinha){
+  const b = caixaTracos(); if(!b) return;
+  const W = dArea.w || innerWidth, H = dArea.h || innerHeight * 0.75;   // proporção da área de desenho
+  const bw = Math.max((b.x1 - b.x0) * W, 1), bh = Math.max((b.y1 - b.y0) * H, 1);
+  const folga = 0.84;
+  const k = Math.min(cw * folga / (bw + DLARG * 2), ch * folga / (bh + DLARG * 2));
+  const ox = cx + (cw - bw * k) / 2 - b.x0 * W * k, oy = cy + (ch - bh * k) / 2 - b.y0 * H * k;
+  riscos.forEach(t => tracar(g, t, W * k, H * k, ox, oy, k * escLinha));
+}
+function montarFolha(n, largura){
+  const W = largura, H = Math.round(largura * 297 / 210);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  const cel = n === 1 ? [[0, 0, W, H]] : n === 2 ? [[0, 0, W, H / 2], [0, H / 2, W, H / 2]]
+    : [[0, 0, W / 2, H / 2], [W / 2, 0, W / 2, H / 2], [0, H / 2, W / 2, H / 2], [W / 2, H / 2, W / 2, H / 2]];
+  cel.forEach(([x, y, w, h]) => colocar(g, x, y, w, h, 1));
+  return c;
+}
+function miniaturas(){
+  document.querySelectorAll('#fOps .op').forEach(op => {
+    op.classList.toggle('sel', op.dataset.n === String(A.folhas));
+    op.querySelectorAll('canvas').forEach(cv => {
+      const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      cv.width = Math.max(1, Math.round(r.width * dpr)); cv.height = Math.max(1, Math.round(r.height * dpr));
+      const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+      colocar(g, 0, 0, cv.width, cv.height, 0.35);
+    });
+  });
+}
+$('dImprimir').onclick = () => {
+  if(!riscos.length){ alert('Faça o desenho antes de imprimir.'); return; }
+  $('folhas').classList.add('on'); requestAnimationFrame(miniaturas);
+};
+document.querySelectorAll('#fOps .op').forEach(op => op.onclick = () => { A.folhas = op.dataset.n; salvar(); miniaturas(); });
+$('fCancelar').onclick = () => $('folhas').classList.remove('on');
+$('folhas').addEventListener('click', e => { if(e.target.id === 'folhas') $('folhas').classList.remove('on'); });
+$('fImprimir').onclick = () => {
+  const folha = montarFolha(+A.folhas || 1, 2480);   // A4 em boa resolução (300 por polegada)
+  const png = folha.toDataURL('image/png');
+  if(window.__teste) window.__teste.folha = png;
+  $('folhas').classList.remove('on');
+  nat('imprimir', {png}).catch(() => { const w = window.open(); if(w) w.document.write('<img src="' + png + '" style="width:100%">'); });
+};
+
 /* ---------- telas e gestos ---------- */
 function mostrar(id){
   document.querySelectorAll('.tela').forEach(t => t.classList.toggle('on', t.id === id));
-  if(id === 'lock'){ tb.mostrar(); medirFoco(); } else tb.parar();
+  if(id === 'lock'){ tb.mostrar(); medirFoco(); aplicarCor(); } else tb.parar();
 }
 function irMenu(){ document.activeElement && document.activeElement.blur && document.activeElement.blur(); mostrar('menu'); pintarMenu(); $('menu').scrollTop = 0; }
 $('ok').onclick = () => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); mostrar('lock'); };
@@ -402,7 +717,7 @@ document.addEventListener('touchend', e => {
 document.addEventListener('gesturestart', e => e.preventDefault());
 
 let redim = null;
-addEventListener('resize', () => { clearTimeout(redim); redim = setTimeout(() => { if($('lock').classList.contains('on')){ tb.medir(); medirFoco(); } }, 120); });
+addEventListener('resize', () => { clearTimeout(redim); redim = setTimeout(() => { if($('lock').classList.contains('on')){ tb.medir(); medirFoco(); } if($('desenho').classList.contains('on')) medirDesenho(); }, 120); });
 document.addEventListener('visibilitychange', () => { if(!document.hidden && $('lock').classList.contains('on')) tb.mostrar(); });
 
 /* ---------- começo ---------- */

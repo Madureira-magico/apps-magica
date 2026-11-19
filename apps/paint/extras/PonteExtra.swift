@@ -16,6 +16,7 @@ import AudioToolbox
 ///   recarregar                   -> recarrega a página do paint.land (reconectar)
 ///   entrar                       -> abre uma tela própria com a página do paint.land, para fazer o login
 ///   maleta                       -> desenho da maleta do iPhone (modo Foco), em PNG
+///   imprimir {png}               -> abre a janela de impressão do iPhone com a folha A4 da previsão
 ///   telaCobrir / icones / ...    -> peça pronta TelasNativas (comum/telas)
 /// O iPhone avisa a página: window.paintRx({tipo: ...})
 ///   url {path} / pagina {path}       -> endereço que a página do paint.land abriu
@@ -23,6 +24,7 @@ import AudioToolbox
 ///   estado {conectado, grupo}        -> conectado ao servidor e o número da página (ex.: 1108)
 ///   inicial {texto} / texto {texto}  -> texto que a página mostra embaixo (a cor que chegou)
 ///   msg {msg}                        -> recado bruto que chegou do servidor (para conferir)
+///   desenho {src}                    -> imagem do desenho do espectador (data:image/png)
 ///   mostrando {on}                   -> a página do paint.land está (ou não) na tela para o login
 @objc(PonteExtra)
 final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
@@ -94,6 +96,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             DispatchQueue.main.async { self.abrirLogin(); responder(true) }
         case "maleta":
             responder(maleta())
+        case "imprimir":
+            guard let img = imagem(d["png"]) else { return responder("erro") }
+            DispatchQueue.main.async { self.imprimir(img, responder) }
         default:
             responder(false)
         }
@@ -206,6 +211,25 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         mostrando = false
         avisar(["tipo": "mostrando", "on": false])
         recarregar()
+    }
+
+    private func imagem(_ v: Any?) -> UIImage? {
+        guard var s = v as? String else { return nil }
+        if let i = s.range(of: "base64,") { s = String(s[i.upperBound...]) }
+        guard let dados = Data(base64Encoded: s) else { return nil }
+        return UIImage(data: dados)
+    }
+
+    /// Janela de impressão do iPhone com a folha A4 (em pé) da previsão.
+    private func imprimir(_ img: UIImage, _ responder: @escaping (Any?) -> Void) {
+        let info = UIPrintInfo(dictionary: nil)
+        info.outputType = .general
+        info.jobName = "Previsão"
+        info.orientation = .portrait
+        let p = UIPrintInteractionController.shared
+        p.printInfo = info
+        p.printingItem = img
+        p.present(animated: true) { _, feito, _ in responder(feito ? "ok" : "cancelado") }
     }
 
     /// Desenho da maleta do modo Foco do iPhone (o mesmo da tela bloqueada de verdade).
@@ -333,6 +357,27 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         post({tipo:'inicial', texto: nc.textContent});
         new MutationObserver(function(){ post({tipo:'texto', texto: nc.textContent}); })
           .observe(nc, {childList:true, characterData:true, subtree:true});
+      }
+      var dw = document.getElementById('drawing'), ultSrc = '';
+      function mandarDesenho(){
+        if(!dw) return;
+        var src = dw.getAttribute('src') || '';
+        if(!src || src === ultSrc) return; ultSrc = src;
+        if(src.indexOf('data:') === 0){ post({tipo:'desenho', src: src}); return; }
+        // imagem por endereço: converte aqui dentro (mesmo site) para mandar como dado
+        var im = new Image();
+        im.onload = function(){
+          try{
+            var c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+            c.getContext('2d').drawImage(im, 0, 0);
+            post({tipo:'desenho', src: c.toDataURL('image/png')});
+          }catch(e){ post({tipo:'desenho', src: im.src}); }
+        };
+        im.src = dw.src;
+      }
+      if(dw){
+        new MutationObserver(mandarDesenho).observe(dw, {attributes:true, attributeFilter:['src']});
+        mandarDesenho();
       }
       try{
         var orig = window.ClientSendDataCallback;
