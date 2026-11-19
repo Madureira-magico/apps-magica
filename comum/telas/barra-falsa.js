@@ -5,6 +5,8 @@
    Uso: const bf = criarBarraFalsa({ raiz: elemento, nativo: cmd => Promise, opcoes: () => ({sinal: 1-4, wifi: 1-3, soHora: false}) })
         bf.mostrar(true/false)   bf.hora(texto ou null = hora certa)   bf.desenhar()
         soHora: desenha só o relógio (o resto da barra vem de outro lugar, ex.: a foto congelada da barra de verdade).
+        operadora: 'Claro BR' -> como na TELA BLOQUEADA: o nome da operadora no lugar da hora (medidas do print do Paint).
+        puxador: true -> a barrinha curta embaixo do Wi-Fi e da bateria (aparece na tela bloqueada).
         Na troca do relógio, só os caracteres que mudam fazem um fade de 0,75 s (como no original); o resto fica parado.
    O app esconde a barra de verdade enquanto esta aparece (recado "barra" = true).
    ===================================================================== */
@@ -29,6 +31,19 @@ function criarBarraFalsa(o){
     // hora: altura dos números igual ao print, centrada no lado esquerdo.
     // Cada caractere tem largura fixa (nada anda para os lados) e, na troca, só os que mudam fazem o fade
     // (o velho some enquanto o novo aparece, uns 0,75 s, como no original); os iguais ficam parados.
+    if(p.operadora != null){
+      // tela bloqueada: operadora à esquerda (largura de "Claro BR" = 57,7 pontos; linha de base em 38 pontos)
+      cx.font = '600 100px -apple-system, system-ui, "Inter", sans-serif';
+      const mo = cx.measureText('Claro BR'), to = 100 * 57.7 / (mo.actualBoundingBoxLeft + mo.actualBoundingBoxRight);
+      cx.font = '600 ' + to + 'px -apple-system, system-ui, "Inter", sans-serif';
+      cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+      cx.fillText(String(p.operadora), 44.8 + cx.measureText(String(p.operadora)).actualBoundingBoxLeft, 38);
+      if(p.puxador){
+        cx.fillStyle = 'rgba(255,255,255,.6)';
+        cx.beginPath(); cx.roundRect ? cx.roundRect(299.5, 47.3, 54.6, 2.4, 1.2) : cx.rect(299.5, 47.3, 54.6, 2.4); cx.fill();
+        cx.fillStyle = '#fff';
+      }
+    } else {
     const t = texto || horaCerta();
     if(t !== mostrado){ antigo = mostrado; mostrado = t; fadeIni = antigo ? performance.now() : 0; if(fadeIni && !fadeRaf) fadeRaf = requestAnimationFrame(animar); }
     const f = fadeIni ? Math.min(1, (performance.now() - fadeIni) / FADE) : 1;
@@ -51,6 +66,7 @@ function criarBarraFalsa(o){
     });
     cx.globalAlpha = 1;
     if(p.soHora) return;
+    }
     // sinal: 4 barras (as que passam do escolhido ficam apagadas, como no iPhone)
     [[864, 97], [880, 91], [896, 84], [912, 77]].forEach(([x, y], i) => {
       const w = px(9), h = px(115 - y), r = w / 2;

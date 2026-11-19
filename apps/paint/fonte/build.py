@@ -4,7 +4,7 @@ aqui = os.path.dirname(os.path.abspath(__file__))
 telas = os.path.join(aqui, '..', '..', '..', 'comum', 'telas')
 ler = lambda n, d=aqui: open(os.path.join(d, n), encoding='utf-8').read()
 html = ler('app.html')
-for peca in ('tela-bloqueio.css', 'tela-bloqueio.js'):
+for peca in ('tela-bloqueio.css', 'tela-bloqueio.js', 'barra-falsa.js'):
     html = html.replace('/*PECA:' + peca + '*/', ler(peca, telas))
 assert '/*PECA:' not in html
 saida = os.path.join(aqui, '..', 'www', 'index.html')

@@ -153,6 +153,11 @@ input[type=file]{display:none}
       <div class="seg" data-k="mostrarCor"><div data-v="nome">No nome</div><div data-v="camera">Na câmera</div><div data-v="dois">Os dois</div></div>
       <small id="mostrarDica" style="margin-top:6px"></small>
     </div>
+    <div class="lin">Barra de cima<div class="sw" data-k="barraCima"></div></div>
+    <div class="lin">Operadora<input type="text" id="oper" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+    <div class="lin col">Sinal da operadora
+      <div class="seg" data-k="sinal"><div data-v="1">1</div><div data-v="2">2</div><div data-v="3">3</div><div data-v="4">4</div></div>
+    </div>
     <div class="lin">Linha de cima<input type="text" id="l1" autocomplete="off" autocorrect="off" spellcheck="false"></div>
     <div class="lin">Linha de baixo<input type="text" id="l2" autocomplete="off" autocorrect="off" spellcheck="false"></div>
     <div class="lin">Maleta antes do nome<div class="sw" data-k="maleta"></div></div>
@@ -184,6 +189,7 @@ input[type=file]{display:none}
 <script>
 'use strict';
 /*PECA:tela-bloqueio.js*/
+/*PECA:barra-falsa.js*/
 
 const $ = id => document.getElementById(id);
 const NATIVO = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.paint);
@@ -207,7 +213,7 @@ const CORES = [
 const PADRAO = {
   cores:{azul:{t:'Short', v:4}, amarelo:{t:'Sapato', v:5}, vermelho:{t:'Balão', v:1}, verde:{t:'Camiseta', v:3}, laranja:{t:'Cabelo', v:2}, preto:{t:'', v:0}},
   vibrar:true, forca:100, tutu:true, rep:'1', tipo:'classica',
-  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500', mostrarCor:'nome', folhas:'1'
+  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500', mostrarCor:'nome', folhas:'1', barraCima:true, operadora:'Claro BR', sinal:'3'
 };
 let A = JSON.parse(JSON.stringify(PADRAO));
 try{
@@ -272,6 +278,8 @@ function desenharFoco(){
 function mostrarLinha2(txt){ linha2 = txt; desenharFoco(); }
 
 /* ---------- tela bloqueada (peça pronta igual à do Timeline) ---------- */
+/* barra de cima falsa, igual à da tela bloqueada: operadora à esquerda; sinal, Wi-Fi e bateria de verdade à direita */
+const bf = criarBarraFalsa({raiz:$('lock'), nativo: NATIVO ? cmd => nat(cmd) : null, opcoes:() => ({sinal:+A.sinal || 3, wifi:3, operadora:A.operadora || '', puxador:true})});
 const tb = criarTelaBloqueio({raiz:$('tb'), opcoes:() => ({letra:A.letra, peso:A.peso, zeroHora:true}), nativo: NATIVO ? (cmd, a) => nat(cmd, a) : null});
 
 /* ---------- papel de parede ---------- */
@@ -326,7 +334,7 @@ function pintarMenu(){
   $('forca').value = A.forca; $('forcaTxt').textContent = A.forca >= 100 ? 'Máx.' : A.forca;
   $('forcaDica').textContent = A.tipo === 'grave' ? 'Grave: quanto maior, mais forte (melhor no máximo)' : (A.forca >= 100 ? 'No máximo: vibração clássica do iPhone (a de chamada)' : 'Ajustável: quanto maior, mais forte');
   $('tipoDica').textContent = A.tipo === 'grave' ? 'Tremor mais grosso e pesado, faz menos barulho' : 'A vibração de chamada do iPhone';
-  $('l1').value = A.l1; $('l2').value = A.l2;
+  $('l1').value = A.l1; $('l2').value = A.l2; $('oper').value = A.operadora;
   $('mostrarDica').textContent = A.mostrarCor === 'camera' ? 'A lente da câmera fica da cor escolhida; o nome continua "' + (A.l2 || '') + '"'
     : A.mostrarCor === 'dois' ? 'O nome da cor aparece embaixo e a lente da câmera fica da cor' : 'O nome da cor aparece na linha de baixo';
 }
@@ -338,6 +346,7 @@ document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach
 }));
 $('forca').oninput = e => { A.forca = +e.target.value; salvar(); pintarMenu(); };
 $('forca').onchange = () => vibrarTeste();
+$('oper').oninput = e => { A.operadora = e.target.value; salvar(); bf.desenhar(); };
 $('l1').oninput = e => { A.l1 = e.target.value; salvar(); desenharFoco(); };
 $('l2').oninput = e => { A.l2 = e.target.value; salvar(); desenharFoco(); };
 $('zerar').onclick = () => { recebeuCor = false; linha2 = null; numeroMostrado = false; ultimaCor = null; lente.pintar(null); desenharFoco(); setUltima('Zerado: volta a mostrar "' + (A.l2 || '') + '"'); };
@@ -694,7 +703,7 @@ $('fImprimir').onclick = () => {
 /* ---------- telas e gestos ---------- */
 function mostrar(id){
   document.querySelectorAll('.tela').forEach(t => t.classList.toggle('on', t.id === id));
-  if(id === 'lock'){ tb.mostrar(); medirFoco(); aplicarCor(); } else tb.parar();
+  if(id === 'lock'){ tb.mostrar(); medirFoco(); aplicarCor(); bf.mostrar(!!A.barraCima); } else { tb.parar(); bf.mostrar(false); }
 }
 function irMenu(){ document.activeElement && document.activeElement.blur && document.activeElement.blur(); mostrar('menu'); pintarMenu(); $('menu').scrollTop = 0; }
 $('ok').onclick = () => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); mostrar('lock'); };
@@ -717,7 +726,7 @@ document.addEventListener('touchend', e => {
 document.addEventListener('gesturestart', e => e.preventDefault());
 
 let redim = null;
-addEventListener('resize', () => { clearTimeout(redim); redim = setTimeout(() => { if($('lock').classList.contains('on')){ tb.medir(); medirFoco(); } if($('desenho').classList.contains('on')) medirDesenho(); }, 120); });
+addEventListener('resize', () => { clearTimeout(redim); redim = setTimeout(() => { if($('lock').classList.contains('on')){ tb.medir(); medirFoco(); bf.desenhar(); } if($('desenho').classList.contains('on')) medirDesenho(); }, 120); });
 document.addEventListener('visibilitychange', () => { if(!document.hidden && $('lock').classList.contains('on')) tb.mostrar(); });
 
 /* ---------- começo ---------- */
