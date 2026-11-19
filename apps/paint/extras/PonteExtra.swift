@@ -25,6 +25,14 @@ import AudioToolbox
 @objc(PonteExtra)
 final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
     private static let endereco = URL(string: "https://paint.land/PhoneSimulation")!
+    private static let enderecoLogin = URL(string: "https://paint.land/Identity/Account/Login?ReturnUrl=%2Fadmin")!
+
+    /// O app se apresenta ao site igual ao Safari do iPhone (sem isso o paint.land não responde).
+    static var nomeSafari: String {
+        let v = UIDevice.current.systemVersion.split(separator: ".")
+        let versao = v.prefix(2).joined(separator: ".")
+        return "Version/\(versao) Mobile/15E148 Safari/604.1"
+    }
 
     private weak var web: WKWebView?
     private weak var tela: UIViewController?
@@ -92,6 +100,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         guard receptor == nil, let web = web else { return }
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()          // guarda o login de uma vez para a outra
+        config.applicationNameForUserAgent = PonteExtra.nomeSafari
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         let uc = config.userContentController
@@ -172,7 +181,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     /// no mesmo lugar que a página escondida usa, então ela passa a entrar sozinha.
     private func abrirLogin() {
         guard telaLogin == nil, let tela = tela else { return }
-        let t = TelaLogin(endereco: PonteExtra.endereco)
+        let t = TelaLogin(endereco: PonteExtra.enderecoLogin)
         t.terminou = { [weak self] in self?.loginTerminou() }
         t.modalPresentationStyle = .fullScreen
         telaLogin = t
@@ -345,6 +354,8 @@ final class TelaLogin: UIViewController, WKNavigationDelegate {
     private let carregando = UIActivityIndicatorView(style: .medium)
     private var viuLogin = false
     private var fechou = false
+    private var progresso: NSKeyValueObservation?
+    private var demora: Timer?
 
     init(endereco: URL) { self.endereco = endereco; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError() }
@@ -379,7 +390,12 @@ final class TelaLogin: UIViewController, WKNavigationDelegate {
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        config.applicationNameForUserAgent = PonteExtra.nomeSafari
         web = WKWebView(frame: .zero, configuration: config)
+        progresso = web.observe(\.estimatedProgress, options: [.new]) { [weak self] w, _ in
+            guard let self = self, w.isLoading else { return }
+            self.titulo.text = "Carregando \(Int(w.estimatedProgress * 100))%"
+        }
         web.navigationDelegate = self
         web.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(web)
@@ -404,14 +420,23 @@ final class TelaLogin: UIViewController, WKNavigationDelegate {
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             web.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        web.load(URLRequest(url: endereco))
+        carregar()
+    }
+
+    private func carregar() {
+        web.load(URLRequest(url: endereco, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30))
+        demora?.invalidate()
+        demora = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { [weak self] _ in
+            guard let self = self, self.web.isLoading else { return }
+            self.titulo.text = "Demorando… toque em Recarregar"
+        }
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .default }
     override var prefersStatusBarHidden: Bool { false }
 
     @objc private func tocouFechar() { sair() }
-    @objc private func tocouRecarregar() { web.load(URLRequest(url: endereco)) }
+    @objc private func tocouRecarregar() { carregar() }
 
     private func sair() {
         guard !fechou else { return }
@@ -428,26 +453,40 @@ final class TelaLogin: UIViewController, WKNavigationDelegate {
         carregando.startAnimating()
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        mostrarEndereco()
+        conferir(webView)
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         carregando.stopAnimating()
+        demora?.invalidate()
         mostrarEndereco()
+        conferir(webView)
+    }
+
+    private func conferir(_ webView: WKWebView) {
         let path = webView.url?.path.lowercased() ?? ""
         if path.contains("/identity/account") || path.contains("/login") {
             viuLogin = true
         } else if !path.isEmpty {
             // saiu do login (entrou) ou já estava logado: volta para o app
             titulo.text = "Entrou! Voltando…"
-            DispatchQueue.main.asyncAfter(deadline: .now() + (viuLogin ? 0.8 : 0.3)) { self.sair() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.sair() }
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         carregando.stopAnimating()
+        demora?.invalidate()
+        if (error as NSError).code == NSURLErrorCancelled { return }
         titulo.text = "Erro: " + error.localizedDescription
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         carregando.stopAnimating()
+        demora?.invalidate()
+        if (error as NSError).code == NSURLErrorCancelled { return }
         titulo.text = "Erro: " + error.localizedDescription
     }
 }
