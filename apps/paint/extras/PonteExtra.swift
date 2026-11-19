@@ -16,6 +16,7 @@ import AudioToolbox
 ///   recarregar                   -> recarrega a página do paint.land (reconectar)
 ///   entrar                       -> abre uma tela própria com a página do paint.land, para fazer o login
 ///   maleta                       -> desenho da maleta do iPhone (modo Foco), em PNG
+///   entrarGrupo {n}              -> na página do paint.land, digita o número da sala e toca em Connect
 ///   imprimir {png}               -> abre a janela de impressão do iPhone com a folha A4 da previsão
 ///   telaCobrir / icones / ...    -> peça pronta TelasNativas (comum/telas)
 /// O iPhone avisa a página: window.paintRx({tipo: ...})
@@ -96,6 +97,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             DispatchQueue.main.async { self.abrirLogin(); responder(true) }
         case "maleta":
             responder(maleta())
+        case "entrarGrupo":
+            // só letras e números (vai dentro de um código)
+            let n = String((d["n"] as? String ?? "").filter { $0.isLetter || $0.isNumber }.prefix(12))
+            DispatchQueue.main.async {
+                let js = "(function(){var g=document.getElementById('group');if(!g||!window.joinGroup)return false;g.value='\(n)';joinGroup('group');return true;})()"
+                self.receptor?.evaluateJavaScript(js) { r, _ in responder((r as? Bool) ?? false) }
+            }
         case "imprimir":
             guard let img = imagem(d["png"]) else { return responder("erro") }
             DispatchQueue.main.async { self.imprimir(img, responder) }

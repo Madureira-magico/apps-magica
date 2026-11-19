@@ -128,6 +128,7 @@ input[type=file]{display:none}
   <div class="sec">Conexão com o paint.land</div>
   <div class="grupo">
     <div class="lin"><div><div style="display:flex;align-items:center"><span id="stDot"></span><span id="stTxt">Conectando…</span></div><small id="pagina">Página: —</small></div></div>
+    <div class="lin"><div>Página fixa<br><small>Vazio = a mais recente</small></div><input type="text" id="fixa" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="mais recente" style="flex:0 1 40%"></div>
     <div class="lin bt" id="entrar">Entrar no paint.land (login)</div>
     <div class="lin bt" id="reconectar">Reconectar</div>
     <div class="lin col"><small>Última recebida</small><div id="ultima">—</div></div>
@@ -440,7 +441,7 @@ const CORES = [
 const PADRAO = {
   cores:{azul:{t:'Short', v:4}, amarelo:{t:'Sapato', v:5}, vermelho:{t:'Balão', v:1}, verde:{t:'Camiseta', v:3}, laranja:{t:'Cabelo', v:2}, preto:{t:'', v:0}},
   vibrar:true, forca:100, tutu:true, rep:'1', tipo:'classica',
-  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500', mostrarCor:'nome', folhas:'1', barraCima:true, operadora:'Claro BR', sinal:'3'
+  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500', mostrarCor:'nome', folhas:'1', barraCima:true, operadora:'Claro BR', sinal:'3', fixa:''
 };
 let A = JSON.parse(JSON.stringify(PADRAO));
 try{
@@ -573,6 +574,9 @@ document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach
 }));
 $('forca').oninput = e => { A.forca = +e.target.value; salvar(); pintarMenu(); };
 $('forca').onchange = () => vibrarTeste();
+$('fixa').value = A.fixa || '';
+$('fixa').oninput = e => { A.fixa = e.target.value.replace(/[^0-9A-Za-z]/g, ''); salvar(); };
+$('fixa').onchange = () => { tentouFixa = 0; if(conectado) conferirFixa(); };
 $('oper').oninput = e => { A.operadora = e.target.value; salvar(); bf.desenhar(); };
 $('l1').oninput = e => { A.l1 = e.target.value; salvar(); desenharFoco(); };
 $('l2').oninput = e => { A.l2 = e.target.value; salvar(); desenharFoco(); };
@@ -581,7 +585,7 @@ $('entrar').onclick = () => nat('entrar').catch(() => {});
 function reconectar(){
   // reconecta e zera: ao conectar de novo, mostra o número da página nova (até chegar a 1ª cor)
   recebeuCor = false; linha2 = null; numeroMostrado = false; conectado = false; grupo = ''; textoInicial = '';
-  ultimaCor = null; lente.pintar(null);
+  ultimaCor = null; lente.pintar(null); tentouFixa = 0;
   desenharFoco();
   setStatus('amarelo', 'Reconectando…');
   nat('recarregar').catch(() => {});
@@ -642,8 +646,20 @@ function aplicarCor(){
   // a lente só ganha cor quando o nome não está vazio (preto vazio = lente normal)
   lente.pintar(A.mostrarCor !== 'nome' && c && !vazio ? CORES.find(x => x.id === ultimaCor).css : null);
 }
+/* página fixa: se o paint.land conectou em outra sala, o app entra na sala escolhida */
+let tentouFixa = 0;
+function conferirFixa(){
+  const f = (A.fixa || '').trim();
+  if(!f || !conectado || grupo === f) return false;
+  if(Date.now() - tentouFixa < 4000) return true;
+  tentouFixa = Date.now();
+  setStatus('amarelo', 'Entrando na página ' + f + '…');
+  nat('entrarGrupo', {n: f}).catch(() => {});
+  return true;
+}
 function mostrarNumero(){
   if(recebeuCor) return;
+  if(A.fixa && grupo && grupo !== A.fixa) return;   // ainda não está na página fixa
   const n = grupo || textoInicial;
   if(n){ numeroMostrado = true; mostrarLinha2(n); }
 }
@@ -673,6 +689,7 @@ window.paintRx = function(d){
     case 'estado':
       conectado = !!d.conectado;
       if(d.grupo) grupo = String(d.grupo).trim();
+      if(conectado && conferirFixa()) break;
       if(conectado){ setStatus('verde', 'Conectado' + (grupo ? ' · página ' + grupo : '')); mostrarNumero(); }
       else setStatus('amarelo', 'Conectando ao servidor…');
       break;
