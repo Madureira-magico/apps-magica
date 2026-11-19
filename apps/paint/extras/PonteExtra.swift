@@ -8,7 +8,9 @@ import AudioToolbox
 /// (paint.land/PhoneSimulation, com o login do Ricardo) e avisa a página do app a cada cor que chega.
 ///
 /// Recados da página: window.webkit.messageHandlers.paint.postMessage({cmd: ...}) -> devolve uma resposta
-///   vibrar {n, forca, tutu, rep} -> n "vum" + "tutu" no final, repetido rep vezes (força 100 = vibração clássica)
+///   vibrar {n, forca, tutu, rep, grave} -> n "vum" + "tutu" no final, repetido rep vezes
+///                                (clássica com força 100 = vibração de chamada; grave = tremor grosso)
+///   toque                        -> um toquinho de vibração (confirma o Reconectar pelo botão da câmera)
 ///   pararVibrar                  -> corta a vibração
 ///   iniciar                      -> abre a página do paint.land escondida (se ainda não abriu)
 ///   recarregar                   -> recarrega a página do paint.land (reconectar)
@@ -72,8 +74,16 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         func num(_ k: String, _ p: Double) -> Double { (d[k] as? NSNumber)?.doubleValue ?? p }
         switch cmd {
         case "vibrar":
-            vibrar(Int(num("n", 1)), forca: num("forca", 100), tutu: (d["tutu"] as? Bool) ?? true, rep: Int(num("rep", 1)))
+            vibrar(Int(num("n", 1)), forca: num("forca", 100), tutu: (d["tutu"] as? Bool) ?? true,
+                   rep: Int(num("rep", 1)), grave: (d["grave"] as? Bool) ?? false)
             responder(true)
+        case "toque":
+            DispatchQueue.main.async {
+                let g = UIImpactFeedbackGenerator(style: .heavy)
+                g.prepare()
+                g.impactOccurred()
+                responder(true)
+            }
         case "pararVibrar":
             cortarVibracao(); responder(true)
         case "iniciar":
@@ -235,12 +245,14 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
 
     /// n "vum" + "tutu" (dois toquinhos rápidos) no final; tudo repetido rep vezes.
     /// Uma cor nova corta a vibração que ainda estava tocando.
-    private func vibrar(_ n: Int, forca: Double, tutu: Bool, rep: Int) {
+    private func vibrar(_ n: Int, forca: Double, tutu: Bool, rep: Int, grave: Bool) {
         let n = max(0, min(n, 12)), rep = max(1, min(rep, 5))
         DispatchQueue.main.async {
             self.cortarVibracao()
             guard n > 0 else { return }
-            if forca >= 99 || self.motor == nil { return self.vibrarSistema(n, tutu: tutu, rep: rep) }
+            if (forca >= 99 && !grave) || self.motor == nil { return self.vibrarSistema(n, tutu: tutu, rep: rep) }
+            // grave: "nitidez" no mínimo = tremor mais grosso; a clássica ajustável fica um pouco mais aguda
+            let nitidez: Float = grave ? 0.0 : 0.2
             let intensidade = Float(0.15 + 0.85 * min(forca, 100) / 100)
             var eventos: [CHHapticEvent] = []
             var t = 0.0
@@ -248,7 +260,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
                 for i in 0..<n {
                     eventos.append(CHHapticEvent(eventType: .hapticContinuous,
                                                  parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: intensidade),
-                                                              CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.2)],
+                                                              CHHapticEventParameter(parameterID: .hapticSharpness, value: nitidez)],
                                                  relativeTime: t, duration: self.vum))
                     t += self.vum + (i < n - 1 ? self.pausa : 0)
                 }

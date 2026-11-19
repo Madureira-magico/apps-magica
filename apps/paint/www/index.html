@@ -82,11 +82,15 @@ input[type=file]{display:none}
 
   <div class="sec">Cores — nome que aparece e vibrações</div>
   <div class="grupo" id="cores"></div>
-  <div class="dica">Toque na bolinha da cor para testar a vibração. Nome vazio: a tela não muda.</div>
+  <div class="dica">Toque na bolinha da cor para testar a vibração. Nome vazio: a linha de baixo fica em branco.</div>
 
   <div class="sec">Vibração</div>
   <div class="grupo">
     <div class="lin">Vibrar quando chegar a cor<div class="sw" data-k="vibrar"></div></div>
+    <div class="lin col">Tipo de vibração
+      <div class="seg" data-k="tipo"><div data-v="classica">Clássica</div><div data-v="grave">Grave</div></div>
+      <small id="tipoDica" style="margin-top:6px"></small>
+    </div>
     <div class="lin col">Força
       <div class="passo" style="margin-top:8px"><input type="range" id="forca" min="10" max="100" step="5"><b id="forcaTxt" style="min-width:40px"></b></div>
       <small id="forcaDica" style="margin-top:4px"></small>
@@ -117,7 +121,7 @@ input[type=file]{display:none}
   <div class="grupo">
     <div class="lin bt" id="zerar">Zerar (volta a mostrar a linha de baixo)</div>
   </div>
-  <div class="dica">Dois dedos deslizando para baixo na tela de bloqueio: abre este menu.<br>Ao conectar, a linha de baixo mostra o número da página; depois, o nome de cada cor que chegar (fica sempre a última).</div>
+  <div class="dica">Dois dedos deslizando para baixo na tela de bloqueio: abre este menu.<br>Um toque no botão da câmera: reconecta (o mesmo que Reconectar), com um toquinho de vibração.<br>Ao conectar, a linha de baixo mostra o número da página; depois, o nome de cada cor que chegar (fica sempre a última).</div>
   <input type="file" id="arquivo" accept="image/*">
 </div>
 
@@ -251,7 +255,7 @@ const CORES = [
 /* ---------- ajustes ---------- */
 const PADRAO = {
   cores:{azul:{t:'Short', v:4}, amarelo:{t:'Sapato', v:5}, vermelho:{t:'Balão', v:1}, verde:{t:'Camiseta', v:3}, laranja:{t:'Cabelo', v:2}, preto:{t:'', v:0}},
-  vibrar:true, forca:100, tutu:true, rep:'1',
+  vibrar:true, forca:100, tutu:true, rep:'1', tipo:'classica',
   l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500'
 };
 let A = JSON.parse(JSON.stringify(PADRAO));
@@ -369,12 +373,14 @@ function pintarMenu(){
   document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', !!A[s.dataset.k]));
   document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.classList.toggle('on', d.dataset.v === String(A[g.dataset.k]))));
   $('forca').value = A.forca; $('forcaTxt').textContent = A.forca >= 100 ? 'Máx.' : A.forca;
-  $('forcaDica').textContent = A.forca >= 100 ? 'No máximo: vibração clássica do iPhone (a mais forte)' : 'Ajustável: quanto maior, mais forte';
+  $('forcaDica').textContent = A.tipo === 'grave' ? 'Grave: quanto maior, mais forte (melhor no máximo)' : (A.forca >= 100 ? 'No máximo: vibração clássica do iPhone (a de chamada)' : 'Ajustável: quanto maior, mais forte');
+  $('tipoDica').textContent = A.tipo === 'grave' ? 'Tremor mais grosso e pesado, faz menos barulho' : 'A vibração de chamada do iPhone';
   $('l1').value = A.l1; $('l2').value = A.l2;
 }
 document.querySelectorAll('.sw').forEach(s => s.onclick = () => { A[s.dataset.k] = !A[s.dataset.k]; salvar(); pintarMenu(); desenharFoco(); });
 document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.onclick = () => {
   A[g.dataset.k] = d.dataset.v; salvar(); pintarMenu(); if(g.dataset.k === 'letra' || g.dataset.k === 'peso') tb.medir();
+  if(g.dataset.k === 'tipo') vibrarTeste();
 }));
 $('forca').oninput = e => { A.forca = +e.target.value; salvar(); pintarMenu(); };
 $('forca').onchange = () => vibrarTeste();
@@ -382,17 +388,36 @@ $('l1').oninput = e => { A.l1 = e.target.value; salvar(); desenharFoco(); };
 $('l2').oninput = e => { A.l2 = e.target.value; salvar(); desenharFoco(); };
 $('zerar').onclick = () => { recebeuCor = false; linha2 = null; numeroMostrado = false; desenharFoco(); setUltima('Zerado: volta a mostrar "' + (A.l2 || '') + '"'); };
 $('entrar').onclick = () => nat('entrar').catch(() => {});
-$('reconectar').onclick = () => { setStatus('amarelo', 'Reconectando…'); nat('recarregar').catch(() => {}); };
+function reconectar(){
+  // reconecta e zera: ao conectar de novo, mostra o número da página nova (até chegar a 1ª cor)
+  recebeuCor = false; linha2 = null; numeroMostrado = false; conectado = false; grupo = ''; textoInicial = '';
+  desenharFoco();
+  setStatus('amarelo', 'Reconectando…');
+  nat('recarregar').catch(() => {});
+}
+$('reconectar').onclick = () => reconectar();
+/* botão da câmera da tela de bloqueio: um toque reconecta (com um toquinho de vibração para confirmar) */
+const bCam = document.querySelector('#tb .tbCam');
+let camT = 0;
+function tocouCamera(e){
+  e.preventDefault(); e.stopPropagation();
+  if(Date.now() - camT < 800) return; camT = Date.now();
+  nat('toque').catch(() => {});
+  if(window.__teste) window.__teste.camera = (window.__teste.camera || 0) + 1;
+  reconectar();
+}
+bCam.addEventListener('touchend', e => { if(e.changedTouches.length === 1 && !g2) tocouCamera(e); });
+bCam.addEventListener('click', tocouCamera);
 
 /* ---------- vibração ---------- */
 function vibrarCor(id, teste){
   const c = A.cores[id];
   if(!c || (!A.vibrar && !teste) || c.v <= 0) return;
-  nat('vibrar', {n:c.v, forca:A.forca, tutu:!!A.tutu, rep:+A.rep}).catch(() => {});
-  if(window.__teste) window.__teste.vibrou.push({id, n:c.v, forca:A.forca, tutu:!!A.tutu, rep:+A.rep});
+  nat('vibrar', {n:c.v, forca:A.forca, tutu:!!A.tutu, rep:+A.rep, grave:A.tipo === 'grave'}).catch(() => {});
+  if(window.__teste) window.__teste.vibrou.push({id, n:c.v, forca:A.forca, tutu:!!A.tutu, rep:+A.rep, grave:A.tipo === 'grave'});
 }
 let testeT = null;
-function vibrarTeste(){ clearTimeout(testeT); testeT = setTimeout(() => nat('vibrar', {n:1, forca:A.forca, tutu:false, rep:1}).catch(() => {}), 150); }
+function vibrarTeste(){ clearTimeout(testeT); testeT = setTimeout(() => nat('vibrar', {n:1, forca:A.forca, tutu:false, rep:1, grave:A.tipo === 'grave'}).catch(() => {}), 150); }
 
 /* ---------- recebimento (o iPhone avisa o que a página do paint.land mostrou) ---------- */
 let conectado = false, grupo = '', textoInicial = '', ultimaMsg = null, numeroMostrado = false;
@@ -433,7 +458,7 @@ function chegouTexto(texto){
     return;
   }
   const c = A.cores[id], nomeCor = CORES.find(x => x.id === id).nome;
-  if(c.t.trim()){ recebeuCor = true; mostrarLinha2(c.t.trim()); }
+  recebeuCor = true; mostrarLinha2(c.t.trim());   // nome vazio: a linha fica em branco
   setUltima(nomeCor + ' → ' + (c.t.trim() || '(nada)') + ' · ' + c.v + ' vibr.' + (bruto ? '  [site: "' + bruto + '"]' : ''));
   vibrarCor(id, false);
 }
