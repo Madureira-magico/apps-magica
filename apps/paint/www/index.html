@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Paint</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;margin:0}
+html,body{height:100%;overflow:hidden;background:#000;font-family:-apple-system,system-ui,sans-serif;color:#fff}
+input{-webkit-user-select:text;user-select:text;font-family:inherit}
+.tela{position:fixed;inset:0;z-index:0;pointer-events:none;visibility:hidden}
+.tela.on{z-index:5;pointer-events:auto;visibility:visible}
+
+/* ---------- MENU (mesmo estilo do Timeline) ---------- */
+#menu{background:#000;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 30px)}
+#menu h1{font-size:34px;font-weight:700;margin:6px 4px 14px}
+#ok{display:block;width:100%;padding:16px;border-radius:14px;background:#0a84ff;color:#fff;font-size:19px;font-weight:600;text-align:center;margin-bottom:22px}
+.sec{font-size:13px;color:#8e8e93;text-transform:uppercase;margin:0 16px 7px}
+.grupo{background:#1c1c1e;border-radius:12px;margin-bottom:24px;overflow:hidden}
+.lin{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:8px 16px;font-size:17px;border-bottom:0.5px solid #38383a}
+.lin:last-child{border-bottom:0}
+.lin.col{flex-direction:column;align-items:stretch}
+.lin small{color:#8e8e93;font-size:13px}
+.sw{width:51px;height:31px;border-radius:16px;background:#39393d;position:relative;flex-shrink:0;transition:background .2s}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+.sw.on{background:#30d158}.sw.on::after{left:22px}
+.seg{display:flex;background:#2c2c2e;border-radius:9px;padding:2px;margin-top:8px}
+.seg div{flex:1;text-align:center;padding:7px 2px;font-size:14px;border-radius:7px;color:#ddd}
+.seg div.on{background:#636366;color:#fff;font-weight:600}
+.passo{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.passo b{min-width:18px;text-align:center;font-size:17px}
+.passo div{width:34px;height:30px;border-radius:8px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;font-size:20px}
+.cor{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 16px;border-bottom:0.5px solid #38383a}
+.cor:last-child{border-bottom:0}
+.bola{width:26px;height:26px;border-radius:50%;flex-shrink:0}
+.cor input,.lin input[type=text]{flex:1;min-width:0;height:34px;background:#2c2c2e;border:0;border-radius:8px;color:#fff;font-size:16px;padding:0 10px;outline:none}
+.lin input[type=text]{flex:0 1 55%}
+input[type=range]{flex:1;accent-color:#0a84ff}
+#mini{width:46px;height:100px;border-radius:7px;background:#333 center/cover no-repeat;border:0.5px solid #555}
+.bt{color:#0a84ff}
+.oculto{display:none!important}
+.dica{font-size:13px;color:#8e8e93;margin:-16px 16px 24px;line-height:1.35}
+#stDot{width:10px;height:10px;border-radius:50%;background:#8e8e93;display:inline-block;margin-right:8px;flex-shrink:0}
+#stDot.verde{background:#30d158}#stDot.amarelo{background:#ffd60a}#stDot.vermelho{background:#ff453a}
+#ultima{font-size:13px;color:#8e8e93;word-break:break-all}
+input[type=file]{display:none}
+
+/* ---------- TELA DE BLOQUEIO ---------- */
+#lock{background:#000;touch-action:none}
+#fundo{position:absolute;inset:0;background:#222 center/cover no-repeat}
+#tb{position:absolute;inset:0}
+#foco{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+/* PEÇA PRONTA (comum/telas): tela bloqueada igual à do Timeline. O elemento "raiz" precisa ter position (absolute/fixed/relative). */
+.tbRel{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.tbBot{position:absolute;border-radius:50%;background:rgba(255,255,255,.09);
+  -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);
+  box-shadow:inset 0 1px 0.6px rgba(255,255,255,.55),inset 0 -0.8px 0.6px rgba(255,255,255,.28),0 0 0 0.45px rgba(0,0,0,.35)}
+.tbBot canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.tbBarra{position:absolute;left:50%;background:#fff;transform:translateX(-50%)}
+
+</style></head>
+<body>
+
+<!-- ================= TELA DE BLOQUEIO ================= -->
+<div id="lock" class="tela on">
+  <div id="fundo"></div>
+  <div id="tb"></div>
+  <canvas id="foco"></canvas>
+</div>
+
+<!-- ================= MENU ================= -->
+<div id="menu" class="tela">
+  <h1>Paint</h1>
+  <div id="ok">OK</div>
+
+  <div class="sec">Conexão com o paint.land</div>
+  <div class="grupo">
+    <div class="lin"><div style="display:flex;align-items:center"><span id="stDot"></span><span id="stTxt">Conectando…</span></div></div>
+    <div class="lin bt" id="entrar">Entrar no paint.land (login)</div>
+    <div class="lin bt" id="reconectar">Reconectar</div>
+    <div class="lin col"><small>Última recebida</small><div id="ultima">—</div></div>
+  </div>
+
+  <div class="sec">Cores — nome que aparece e vibrações</div>
+  <div class="grupo" id="cores"></div>
+  <div class="dica">Toque na bolinha da cor para testar a vibração. Nome vazio: a tela não muda.</div>
+
+  <div class="sec">Vibração</div>
+  <div class="grupo">
+    <div class="lin">Vibrar quando chegar a cor<div class="sw" data-k="vibrar"></div></div>
+    <div class="lin col">Força
+      <div class="passo" style="margin-top:8px"><input type="range" id="forca" min="10" max="100" step="5"><b id="forcaTxt" style="min-width:40px"></b></div>
+      <small id="forcaDica" style="margin-top:4px"></small>
+    </div>
+    <div class="lin"><div>Tutu no final<br><small>Dois toquinhos rápidos avisam que acabou</small></div><div class="sw" data-k="tutu"></div></div>
+    <div class="lin col">Repetições
+      <div class="seg" data-k="rep"><div data-v="1">1 vez</div><div data-v="2">2 vezes</div><div data-v="3">3 vezes</div></div>
+    </div>
+  </div>
+
+  <div class="sec">Tela de bloqueio</div>
+  <div class="grupo">
+    <div class="lin">Linha de cima<input type="text" id="l1" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+    <div class="lin">Linha de baixo<input type="text" id="l2" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+    <div class="lin">Maleta antes do nome<div class="sw" data-k="maleta"></div></div>
+    <div class="lin"><div><div>Papel de parede</div><small id="fundoTxt">Original</small></div><div id="mini"></div></div>
+    <div class="lin bt" id="escolher">Escolher foto da Galeria</div>
+    <div class="lin bt" id="original">Voltar ao papel de parede original</div>
+    <div class="lin col">Letra do relógio
+      <div class="seg" data-k="letra"><div data-v="normal">Normal</div><div data-v="redonda">Arredondada</div></div>
+    </div>
+    <div class="lin col">Grossura do relógio
+      <div class="seg" data-k="peso"><div data-v="400">Fina</div><div data-v="500">Média</div><div data-v="600">Grossa</div></div>
+    </div>
+  </div>
+
+  <div class="sec">Apresentação</div>
+  <div class="grupo">
+    <div class="lin bt" id="zerar">Zerar (volta a mostrar a linha de baixo)</div>
+  </div>
+  <div class="dica">Dois dedos deslizando para baixo na tela de bloqueio: abre este menu.<br>Ao conectar, a linha de baixo mostra o número da página; depois, o nome de cada cor que chegar (fica sempre a última).</div>
+  <input type="file" id="arquivo" accept="image/*">
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   PEÇA PRONTA (comum/telas): TELA BLOQUEADA igual à do Timeline (iPhone novo)
+   data "Ter. 17 de nov.", relógio grande (letra e grossura ajustáveis),
+   botões de vidro com a lanterna e a câmera do próprio iPhone e a barrinha.
+   Uso:  const tb = criarTelaBloqueio({ raiz: elemento, opcoes: () => ({letra, peso, zeroHora}), nativo: cmd => Promise })
+         tb.mostrar()  (quando a tela aparece: mede, desenha, acorda o vidro e liga o relógio)
+         tb.parar()    (quando some)        tb.medir() (mudou tamanho ou opções)
+   ===================================================================== */
+const TB_SVG_LAN = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="300" viewBox="0 0 40 100"><path fill="#fff" fill-rule="evenodd" d="M4 0h32a4 4 0 0 1 4 4v8H0V4a4 4 0 0 1 4-4zM0 17h40v4c0 6-8 12-8 18v54a7 7 0 0 1-7 7H15a7 7 0 0 1-7-7V39c0-6-8-12-8-18zm20 30a5 5 0 0 0-5 5v14a5 5 0 0 0 10 0V52a5 5 0 0 0-5-5zm0 12.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/></svg>');
+const TB_SVG_CAM = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="234" viewBox="0 0 100 78"><path fill="#fff" fill-rule="evenodd" d="M36 0h28c4 0 6 2 8 5l4 7h12a12 12 0 0 1 12 12v42a12 12 0 0 1-12 12H12A12 12 0 0 1 0 66V24a12 12 0 0 1 12-12h12l4-7c2-3 4-5 8-5zm14 24a20 20 0 1 0 0 40 20 20 0 0 0 0-40zm0 8a12 12 0 1 1 0 24 12 12 0 0 1 0-24zm34-8a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>');
+/* medidas tiradas do print do iPhone (tela de 402 pontos de largura) */
+const TB_M = {dataTopo:87.3, dataLarg:135.5, relTopo:119.2, relLarg:242.1, relAlt:85.2,
+              botDiam:58.5, botX:74.9, botBaixo:79.6, lanW:12.6, lanH:31.2, camW:27.5, camH:21.4,
+              barraLarg:143.6, barraAlt:4.75, barraBaixo:8.5};
+const TB_DIAS = ['Dom.', 'Seg.', 'Ter.', 'Qua.', 'Qui.', 'Sex.', 'Sáb.'];
+const TB_MESES = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+let tbIcones = null;   // {lan: Image, cam: Image} — os mesmos para todas as telas
+function tbCarregarIcones(nativo){
+  if(tbIcones) return Promise.resolve(tbIcones);
+  const carregar = src => new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+  const svg = () => Promise.all([carregar(TB_SVG_LAN), carregar(TB_SVG_CAM)]);
+  const pedir = nativo ? Promise.resolve().then(() => nativo('icones')).then(r => (r && r.lan) ? Promise.all([carregar(r.lan), carregar(r.cam)]) : svg()).catch(svg) : svg();
+  return pedir.then(([lan, cam]) => (tbIcones = {lan, cam}));
+}
+function criarTelaBloqueio(o){
+  const raiz = o.raiz;
+  raiz.insertAdjacentHTML('beforeend', '<canvas class="tbRel"></canvas><div class="tbBot tbLan"></div><div class="tbBot tbCam"></div><div class="tbBarra"></div>');
+  const cv = raiz.querySelector('.tbRel'), cx = cv.getContext('2d'), bLan = raiz.querySelector('.tbLan'), bCam = raiz.querySelector('.tbCam'), barra = raiz.querySelector('.tbBarra');
+  let K = 1, W = 0, H = 0, fonteRel = '', escRel = 1, baseRel = 0, fonteData = '', baseData = 0, tick = null;
+  const op = () => Object.assign({letra:'normal', peso:'500', zeroHora:true}, o.opcoes ? o.opcoes() : {});
+  const familia = l => l === 'redonda' ? 'ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif' : 'system-ui, -apple-system, "Inter", sans-serif';
+  function textoData(d){ return TB_DIAS[d.getDay()] + ' ' + d.getDate() + ' de ' + TB_MESES[d.getMonth()]; }
+  function textoHora(d){ const h = d.getHours(); return (op().zeroHora && h < 10 ? '0' : '') + h + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function colocarIcone(b, img, w, h){
+    b.innerHTML = '';
+    const dpr = window.devicePixelRatio || 1, c = document.createElement('canvas');
+    c.width = Math.round(w * K * dpr); c.height = Math.round(h * K * dpr);
+    c.style.width = w * K + 'px'; c.style.height = h * K + 'px';
+    b.appendChild(c);
+    if(!img) return;
+    // corta as sobras transparentes do desenho e estica na caixa medida no print
+    const t = document.createElement('canvas'); t.width = img.width; t.height = img.height;
+    const tg = t.getContext('2d'); tg.drawImage(img, 0, 0);
+    const px = tg.getImageData(0, 0, t.width, t.height).data;
+    let x0 = t.width, y0 = t.height, x1 = 0, y1 = 0;
+    for(let y = 0; y < t.height; y++) for(let x = 0; x < t.width; x++) if(px[(y * t.width + x) * 4 + 3] > 40){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+    if(x1 <= x0) return;
+    c.getContext('2d').drawImage(img, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0, 0, c.width, c.height);
+  }
+  function icones(){ if(!tbIcones) return; colocarIcone(bLan, tbIcones.lan, TB_M.lanW, TB_M.lanH); colocarIcone(bCam, tbIcones.cam, TB_M.camW, TB_M.camH); }
+  function medir(){
+    W = raiz.clientWidth || innerWidth; H = raiz.clientHeight || innerHeight; K = W / 402;
+    if(!W || !H) return;
+    const dpr = window.devicePixelRatio || 1, p = op();
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // relógio: tamanho para a altura dos números bater com o print, depois estica na largura
+    cx.font = p.peso + ' 100px ' + familia(p.letra);
+    let m = cx.measureText('11:57');
+    const tam = 100 * (TB_M.relAlt * K) / m.actualBoundingBoxAscent;
+    fonteRel = p.peso + ' ' + tam + 'px ' + familia(p.letra);
+    cx.font = fonteRel; m = cx.measureText('11:57');
+    escRel = (TB_M.relLarg * K) / (m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+    baseRel = TB_M.relTopo * K + m.actualBoundingBoxAscent;
+    // data: tamanho para a largura de "Ter. 17 de nov." bater com o print
+    cx.font = '600 100px system-ui, -apple-system, "Inter", sans-serif';
+    m = cx.measureText('Ter. 17 de nov.');
+    const td = 100 * (TB_M.dataLarg * K) / (m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+    fonteData = '600 ' + td + 'px system-ui, -apple-system, "Inter", sans-serif';
+    cx.font = fonteData; m = cx.measureText('Ter. 17 de nov.');
+    baseData = TB_M.dataTopo * K + m.actualBoundingBoxAscent;
+    [[bLan, TB_M.botX], [bCam, 402 - TB_M.botX]].forEach(([b, x]) => {
+      const d = TB_M.botDiam * K;
+      Object.assign(b.style, {width:d + 'px', height:d + 'px', left:(x * K - d / 2) + 'px', bottom:(TB_M.botBaixo * K - d / 2) + 'px'});
+    });
+    Object.assign(barra.style, {width:TB_M.barraLarg * K + 'px', height:TB_M.barraAlt * K + 'px', bottom:TB_M.barraBaixo * K + 'px', borderRadius:TB_M.barraAlt * K / 2 + 'px'});
+    icones(); desenhar();
+  }
+  function desenhar(){
+    if(!W) return;
+    cx.clearRect(0, 0, W, H);
+    const d = new Date();
+    cx.save(); cx.font = fonteData; cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'alphabetic';
+    cx.fillText(textoData(d), W / 2, baseData); cx.restore();
+    const txt = textoHora(d);
+    cx.save(); cx.font = fonteRel; cx.textBaseline = 'alphabetic';
+    const m = cx.measureText(txt), larg = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) * escRel;
+    cx.translate(W / 2 - larg / 2, baseRel); cx.scale(escRel, 1);
+    cx.fillStyle = '#fff'; cx.fillText(txt, m.actualBoundingBoxLeft, 0);
+    cx.restore();
+  }
+  /* força o iPhone a redesenhar o vidro dos botões (sem isso às vezes fica escuro até tocar na tela) */
+  function acordar(){
+    const bs = [bLan, bCam];
+    const f = () => {
+      bs.forEach(b => { b.style.webkitBackdropFilter = 'none'; b.style.backdropFilter = 'none'; b.style.transform = 'translateZ(0)'; void b.offsetWidth; });
+      requestAnimationFrame(() => bs.forEach(b => { b.style.webkitBackdropFilter = ''; b.style.backdropFilter = ''; b.style.transform = ''; }));
+    };
+    requestAnimationFrame(f); [120, 350, 700, 1500].forEach(t => setTimeout(f, t));
+  }
+  function mostrar(){ medir(); acordar(); clearInterval(tick); tick = setInterval(desenhar, 1000); }
+  function parar(){ clearInterval(tick); tick = null; }
+  tbCarregarIcones(o.nativo).then(icones);
+  return {medir, desenhar, mostrar, parar, acordar};
+}
+
+
+const $ = id => document.getElementById(id);
+const NATIVO = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.paint);
+function nat(cmd, args){
+  if(!NATIVO) return Promise.reject();
+  try{ return window.webkit.messageHandlers.paint.postMessage(Object.assign({cmd}, args || {})); }catch(e){ return Promise.reject(e); }
+}
+try{ window.webkit.messageHandlers.barra.postMessage(true); }catch(e){}
+
+/* ---------- as 6 cores do paint.land (na ordem do site) ---------- */
+const CORES = [
+  {id:'azul',     nome:'Azul',     css:'#0000B8', chaves:['blue','azul','#0000b8','#0000ff','#00f']},
+  {id:'amarelo',  nome:'Amarelo',  css:'#F9F622', chaves:['yellow','amarelo','amarela','#f9f622','#ffff00','#ff0']},
+  {id:'vermelho', nome:'Vermelho', css:'#D80000', chaves:['red','vermelho','vermelha','#d80000','#ff0000','#f00']},
+  {id:'verde',    nome:'Verde',    css:'#29BA27', chaves:['green','verde','#29ba27','#008000']},
+  {id:'laranja',  nome:'Laranja',  css:'#F9802A', chaves:['orange','laranja','#f9802a','#ffa500']},
+  {id:'preto',    nome:'Preto',    css:'#1F202F', chaves:['black','preto','preta','#1f202f','#000000','#000']}
+];
+
+/* ---------- ajustes ---------- */
+const PADRAO = {
+  cores:{azul:{t:'Short', v:4}, amarelo:{t:'Sapato', v:5}, vermelho:{t:'Balão', v:1}, verde:{t:'Camiseta', v:3}, laranja:{t:'Cabelo', v:2}, preto:{t:'', v:0}},
+  vibrar:true, forca:100, tutu:true, rep:'1',
+  l1:'Riccardo', l2:'Madureira', maleta:true, letra:'normal', peso:'500'
+};
+let A = JSON.parse(JSON.stringify(PADRAO));
+try{
+  const s = JSON.parse(localStorage.getItem('pt-ajustes') || '{}');
+  Object.assign(A, s, {cores: Object.assign({}, A.cores, s.cores || {})});
+}catch(e){}
+function salvar(){ try{ localStorage.setItem('pt-ajustes', JSON.stringify(A)); }catch(e){} }
+
+/* ---------- linha do modo Foco (maleta + Riccardo / Madureira) ---------- */
+/* medidas tiradas do print da tela bloqueada do Ricardo (402 pontos de largura, 874 de altura) */
+const FM = {larg2:81.8, base1:85.2, base2:61.4, iconW:20.7, iconH:17.3, iconBaixo:83.1, gap:9.8};
+const SVG_MALETA = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="124" height="102" viewBox="0 0 62 51"><path fill="#fff" fill-rule="evenodd" d="M23 0h16a5 5 0 0 1 5 5v4h-4.5V5.8c0-.8-.6-1.3-1.3-1.3H23.8c-.7 0-1.3.5-1.3 1.3V9H18V5a5 5 0 0 1 5-5zM7 9h48a7 7 0 0 1 7 7v11H36v-1.5a1.5 1.5 0 0 0-1.5-1.5h-7a1.5 1.5 0 0 0-1.5 1.5V27H0V16a7 7 0 0 1 7-7zM0 30h26v2.5c0 .8.7 1.5 1.5 1.5h7c.8 0 1.5-.7 1.5-1.5V30h26v14a7 7 0 0 1-7 7H7a7 7 0 0 1-7-7z"/></svg>');
+let imgMaleta = null;
+function carregar(src){ return new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; }); }
+(NATIVO ? nat('maleta').then(u => u ? carregar(u) : null).catch(() => null) : Promise.resolve(null))
+  .then(i => i || carregar(SVG_MALETA)).then(i => { imgMaleta = i; desenharFoco(); });
+
+let linha2 = null;          // null = mostra a "linha de baixo" do menu (Madureira)
+let recebeuCor = false;     // depois da 1ª cor, a tela nunca volta para o número
+const cv = $('foco'), cx = cv.getContext('2d');
+let fonteFoco = '', tamFoco = 18;
+function medirFoco(){
+  const W = innerWidth, H = innerHeight, dpr = window.devicePixelRatio || 1, K = W / 402;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx.font = '500 100px system-ui, -apple-system, sans-serif';
+  const m = cx.measureText('Madureira');
+  tamFoco = 100 * (FM.larg2 * K) / (m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+  fonteFoco = '500 ' + tamFoco + 'px system-ui, -apple-system, sans-serif';
+  desenharFoco();
+}
+function textoCabe(txt, maxW){
+  // texto comprido: diminui a letra só o necessário para caber
+  cx.font = fonteFoco;
+  const w = cx.measureText(txt).width;
+  if(w <= maxW) return fonteFoco;
+  return '500 ' + (tamFoco * maxW / w) + 'px system-ui, -apple-system, sans-serif';
+}
+function desenharFoco(){
+  const W = innerWidth, H = innerHeight, K = W / 402;
+  cx.clearRect(0, 0, W, H);
+  if(!fonteFoco) return;
+  cx.fillStyle = '#fff'; cx.textBaseline = 'alphabetic';
+  const maxW = 186 * K;   // espaço entre os botões da lanterna e da câmera
+  // linha de cima: maleta + nome, os dois juntos centralizados
+  const t1 = A.l1 || '';
+  cx.font = textoCabe(t1, maxW);
+  const w1 = cx.measureText(t1).width;
+  const comIcone = A.maleta && imgMaleta;
+  const iw = FM.iconW * K, ih = FM.iconH * K, gap = t1 ? FM.gap * K : 0;
+  const total = (comIcone ? iw + gap : 0) + w1;
+  let x = (W - total) / 2;
+  if(comIcone){ cx.drawImage(imgMaleta, x, H - FM.iconBaixo * K - ih, iw, ih); x += iw + gap; }
+  cx.textAlign = 'left';
+  cx.fillText(t1, x, H - FM.base1 * K);
+  // linha de baixo: Madureira -> número da página -> cores
+  const t2 = linha2 == null ? (A.l2 || '') : linha2;
+  cx.font = textoCabe(t2, maxW);
+  cx.textAlign = 'center';
+  cx.fillText(t2, W / 2, H - FM.base2 * K);
+}
+function mostrarLinha2(txt){ linha2 = txt; desenharFoco(); }
+
+/* ---------- tela bloqueada (peça pronta igual à do Timeline) ---------- */
+const tb = criarTelaBloqueio({raiz:$('tb'), opcoes:() => ({letra:A.letra, peso:A.peso, zeroHora:true}), nativo: NATIVO ? (cmd, a) => nat(cmd, a) : null});
+
+/* ---------- papel de parede ---------- */
+function carregarFundo(){
+  let f = null; try{ f = localStorage.getItem('pt-fundo'); }catch(e){}
+  const url = f || 'ini/papel.jpg';
+  $('fundo').style.backgroundImage = 'url("' + url + '")';
+  $('mini').style.backgroundImage = 'url("' + url + '")';
+  $('fundoTxt').textContent = f ? 'Escolhido da Galeria' : 'Original';
+}
+$('escolher').onclick = () => $('arquivo').click();
+$('original').onclick = () => { try{ localStorage.removeItem('pt-fundo'); }catch(e){} carregarFundo(); };
+$('arquivo').onchange = () => {
+  const arq = $('arquivo').files[0]; if(!arq) return;
+  const img = new Image();
+  img.onload = () => {
+    // guarda no tamanho da tela do iPhone (3x), cortando como "preencher"
+    const W = Math.round(innerWidth * 3), H = Math.round(innerHeight * 3);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const s = Math.max(W / img.width, H / img.height);
+    const w = img.width * s, h = img.height * s;
+    c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    let q = 0.9, url = c.toDataURL('image/jpeg', q);
+    while(url.length > 3500000 && q > 0.5){ q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+    try{ localStorage.setItem('pt-fundo', url); }catch(e){ alert('Não consegui guardar essa foto. Tente outra.'); }
+    carregarFundo(); URL.revokeObjectURL(img.src); $('arquivo').value = '';
+  };
+  img.src = URL.createObjectURL(arq);
+};
+
+/* ---------- menu ---------- */
+function montarCores(){
+  const g = $('cores'); g.innerHTML = '';
+  CORES.forEach(c => {
+    const d = document.createElement('div'); d.className = 'cor';
+    d.innerHTML = '<div class="bola" style="background:' + c.css + (c.id === 'preto' ? ';box-shadow:0 0 0 1px #555' : '') + '"></div>' +
+      '<input type="text" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="' + c.nome + ' (vazio)">' +
+      '<div class="passo"><div data-d="-1">−</div><b></b><div data-d="1">+</div></div>';
+    const inp = d.querySelector('input'), b = d.querySelector('b');
+    inp.value = A.cores[c.id].t; b.textContent = A.cores[c.id].v;
+    inp.oninput = () => { A.cores[c.id].t = inp.value; salvar(); };
+    d.querySelectorAll('[data-d]').forEach(x => x.onclick = () => {
+      A.cores[c.id].v = Math.max(0, Math.min(9, A.cores[c.id].v + +x.dataset.d)); b.textContent = A.cores[c.id].v; salvar();
+    });
+    d.querySelector('.bola').onclick = () => vibrarCor(c.id, true);
+    g.appendChild(d);
+  });
+}
+function pintarMenu(){
+  document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', !!A[s.dataset.k]));
+  document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.classList.toggle('on', d.dataset.v === String(A[g.dataset.k]))));
+  $('forca').value = A.forca; $('forcaTxt').textContent = A.forca >= 100 ? 'Máx.' : A.forca;
+  $('forcaDica').textContent = A.forca >= 100 ? 'No máximo: vibração clássica do iPhone (a mais forte)' : 'Ajustável: quanto maior, mais forte';
+  $('l1').value = A.l1; $('l2').value = A.l2;
+}
+document.querySelectorAll('.sw').forEach(s => s.onclick = () => { A[s.dataset.k] = !A[s.dataset.k]; salvar(); pintarMenu(); desenharFoco(); });
+document.querySelectorAll('.seg').forEach(g => g.querySelectorAll('div').forEach(d => d.onclick = () => {
+  A[g.dataset.k] = d.dataset.v; salvar(); pintarMenu(); if(g.dataset.k === 'letra' || g.dataset.k === 'peso') tb.medir();
+}));
+$('forca').oninput = e => { A.forca = +e.target.value; salvar(); pintarMenu(); };
+$('forca').onchange = () => vibrarTeste();
+$('l1').oninput = e => { A.l1 = e.target.value; salvar(); desenharFoco(); };
+$('l2').oninput = e => { A.l2 = e.target.value; salvar(); desenharFoco(); };
+$('zerar').onclick = () => { recebeuCor = false; linha2 = null; numeroMostrado = false; desenharFoco(); setUltima('Zerado: volta a mostrar "' + (A.l2 || '') + '"'); };
+$('entrar').onclick = () => nat('entrar').catch(() => {});
+$('reconectar').onclick = () => { setStatus('amarelo', 'Reconectando…'); nat('recarregar').catch(() => {}); };
+
+/* ---------- vibração ---------- */
+function vibrarCor(id, teste){
+  const c = A.cores[id];
+  if(!c || (!A.vibrar && !teste) || c.v <= 0) return;
+  nat('vibrar', {n:c.v, forca:A.forca, tutu:!!A.tutu, rep:+A.rep}).catch(() => {});
+  if(window.__teste) window.__teste.vibrou.push({id, n:c.v, forca:A.forca, tutu:!!A.tutu, rep:+A.rep});
+}
+let testeT = null;
+function vibrarTeste(){ clearTimeout(testeT); testeT = setTimeout(() => nat('vibrar', {n:1, forca:A.forca, tutu:false, rep:1}).catch(() => {}), 150); }
+
+/* ---------- recebimento (o iPhone avisa o que a página do paint.land mostrou) ---------- */
+let conectado = false, grupo = '', textoInicial = '', ultimaMsg = null, numeroMostrado = false;
+function setStatus(cor, txt){ $('stDot').className = cor; $('stTxt').textContent = txt; }
+function setUltima(txt){ $('ultima').textContent = txt; }
+const normal = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+function acharCor(texto){
+  // 1) o recado bruto do servidor (se tiver o nome ou o código da cor)
+  if(ultimaMsg && Date.now() - ultimaMsg.t < 2000){
+    const vals = Object.values(ultimaMsg.msg || {}).filter(v => typeof v === 'string').map(normal);
+    for(const c of CORES) if(vals.some(v => c.chaves.includes(v))) return c.id;
+  }
+  // 2) o texto que a página mostrou (nome da cor em inglês ou português)
+  const t = normal(texto);
+  for(const c of CORES) if(c.chaves.includes(t)) return c.id;
+  // 3) o texto é igual a um nome do menu (ex.: o site já manda "Balão")
+  if(t) for(const c of CORES) if(normal(A.cores[c.id].t) === t) return c.id;
+  // 4) texto vazio: é o preto (no site, o preto está com um espaço vazio)
+  if(!t) return 'preto';
+  return null;
+}
+function mostrarNumero(){
+  if(recebeuCor) return;
+  const n = grupo || textoInicial;
+  if(n){ numeroMostrado = true; mostrarLinha2(n); }
+}
+function chegouTexto(texto){
+  const bruto = String(texto == null ? '' : texto).trim();
+  if(/^\d+$/.test(bruto)){            // a página mostra o número dela (ex.: 1108): só antes da 1ª cor
+    if(!grupo) grupo = bruto;
+    if(conectado) mostrarNumero();
+    return;
+  }
+  const id = acharCor(bruto);
+  if(!id){                             // texto que o app não conhece: mostra como chegou
+    if(bruto){ recebeuCor = true; mostrarLinha2(bruto); }
+    setUltima('"' + bruto + '" (cor não reconhecida)');
+    return;
+  }
+  const c = A.cores[id], nomeCor = CORES.find(x => x.id === id).nome;
+  if(c.t.trim()){ recebeuCor = true; mostrarLinha2(c.t.trim()); }
+  setUltima(nomeCor + ' → ' + (c.t.trim() || '(nada)') + ' · ' + c.v + ' vibr.' + (bruto ? '  [site: "' + bruto + '"]' : ''));
+  vibrarCor(id, false);
+}
+window.paintRx = function(d){
+  if(!d || !d.tipo) return;
+  switch(d.tipo){
+    case 'estado':
+      conectado = !!d.conectado;
+      if(d.grupo) grupo = String(d.grupo).trim();
+      if(conectado){ setStatus('verde', 'Conectado' + (grupo ? ' · página ' + grupo : '')); mostrarNumero(); }
+      else setStatus('amarelo', 'Conectando ao servidor…');
+      break;
+    case 'inicial':
+      textoInicial = String(d.texto || '').trim();
+      if(!/^\d+$/.test(textoInicial)) textoInicial = '';
+      if(conectado) mostrarNumero();
+      break;
+    case 'texto': chegouTexto(d.texto); break;
+    case 'msg': ultimaMsg = {msg:d.msg, t:Date.now()}; break;
+    case 'login': conectado = false; setStatus('vermelho', 'Precisa entrar no paint.land (toque em Entrar)'); break;
+    case 'erro': conectado = false; setStatus('vermelho', 'Sem conexão com o paint.land'); break;
+    case 'url': if(!/phonesimulation/i.test(d.path || '')) setStatus('vermelho', 'Precisa entrar no paint.land (toque em Entrar)'); break;
+  }
+};
+
+/* ---------- telas e gestos ---------- */
+function mostrar(id){
+  document.querySelectorAll('.tela').forEach(t => t.classList.toggle('on', t.id === id));
+  if(id === 'lock'){ tb.mostrar(); medirFoco(); } else tb.parar();
+}
+function irMenu(){ document.activeElement && document.activeElement.blur && document.activeElement.blur(); mostrar('menu'); pintarMenu(); $('menu').scrollTop = 0; }
+$('ok').onclick = () => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); mostrar('lock'); };
+
+/* dois dedos deslizando para baixo (na tela de bloqueio) = menu */
+let g2 = null;
+function mediaY(t){ let y = 0; for(const x of t) y += x.clientY; return y / t.length; }
+document.addEventListener('touchstart', e => {
+  if(e.touches.length >= 2) g2 = {y:mediaY(e.touches), dy:0};
+}, {passive:true});
+document.addEventListener('touchmove', e => {
+  if(e.touches.length >= 2 && g2) g2.dy = mediaY(e.touches) - g2.y;
+  if(!$('menu').classList.contains('on')) e.preventDefault();
+}, {passive:false});
+document.addEventListener('touchend', e => {
+  if(!g2 || e.touches.length > 0) return;
+  const dy = g2.dy; g2 = null;
+  if(dy > 70 && $('lock').classList.contains('on')) irMenu();
+});
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+let redim = null;
+addEventListener('resize', () => { clearTimeout(redim); redim = setTimeout(() => { if($('lock').classList.contains('on')){ tb.medir(); medirFoco(); } }, 120); });
+document.addEventListener('visibilitychange', () => { if(!document.hidden && $('lock').classList.contains('on')) tb.mostrar(); });
+
+/* ---------- começo ---------- */
+montarCores(); pintarMenu(); carregarFundo(); mostrar('lock');
+if(NATIVO) nat('iniciar').catch(() => {});
+else setStatus('vermelho', 'Fora do app (sem conexão)');
+</script>
+</body></html>

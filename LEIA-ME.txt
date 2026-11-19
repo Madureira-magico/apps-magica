@@ -28,3 +28,5 @@ https://madureira-magico.github.io/apps-magica/lousa/assistente.html
   calculadora/fonte/ a Calculadora mágica (python3 build.py monta www/; a fonte Cryptext fica em cryptext.css)
   calculadora/www/  tela de início falsa (ini/), calculadora, tela bloqueada da Mnemônica e Ajustes
   calculadora/extras/ parte do iPhone só da Calculadora (salvar o nome em Fotos e imprimir)
+  paint/fonte/      o app Paint (python3 build.py monta www/): tela bloqueada do Timeline + menu das cores
+  paint/extras/     parte do iPhone só do Paint (página do paint.land escondida que recebe a cor, vibração com tutu)
