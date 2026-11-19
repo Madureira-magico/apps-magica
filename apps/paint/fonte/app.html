@@ -67,7 +67,7 @@ input[type=file]{display:none}
 
   <div class="sec">Conexão com o paint.land</div>
   <div class="grupo">
-    <div class="lin"><div style="display:flex;align-items:center"><span id="stDot"></span><span id="stTxt">Conectando…</span></div></div>
+    <div class="lin"><div><div style="display:flex;align-items:center"><span id="stDot"></span><span id="stTxt">Conectando…</span></div><small id="pagina">Página: —</small></div></div>
     <div class="lin bt" id="entrar">Entrar no paint.land (login)</div>
     <div class="lin bt" id="reconectar">Reconectar</div>
     <div class="lin col"><small>Última recebida</small><div id="ultima">—</div></div>
@@ -343,7 +343,11 @@ window.paintRx = function(d){
     case 'msg': ultimaMsg = {msg:d.msg, t:Date.now()}; break;
     case 'login': conectado = false; setStatus('vermelho', 'Precisa entrar no paint.land (toque em Entrar)'); break;
     case 'erro': conectado = false; setStatus('vermelho', 'Sem conexão com o paint.land'); break;
-    case 'url': if(!/phonesimulation/i.test(d.path || '')) setStatus('vermelho', 'Precisa entrar no paint.land (toque em Entrar)'); break;
+    case 'url': case 'pagina':
+      $('pagina').textContent = 'Página: paint.land' + (d.path || '/');
+      if(!/phonesimulation/i.test(d.path || '')) setStatus('vermelho', 'Precisa entrar no paint.land (toque em Entrar)');
+      break;
+    case 'mostrando': if(!d.on) setStatus('amarelo', 'Conectando…'); break;
   }
 };
 

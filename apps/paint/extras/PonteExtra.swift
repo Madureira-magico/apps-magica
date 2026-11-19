@@ -12,11 +12,11 @@ import AudioToolbox
 ///   pararVibrar                  -> corta a vibração
 ///   iniciar                      -> abre a página do paint.land escondida (se ainda não abriu)
 ///   recarregar                   -> recarrega a página do paint.land (reconectar)
-///   entrar                       -> mostra a página do paint.land na tela, para fazer o login
+///   entrar                       -> abre uma tela própria com a página do paint.land, para fazer o login
 ///   maleta                       -> desenho da maleta do iPhone (modo Foco), em PNG
 ///   telaCobrir / icones / ...    -> peça pronta TelasNativas (comum/telas)
 /// O iPhone avisa a página: window.paintRx({tipo: ...})
-///   url {path}                       -> endereço que a página do paint.land abriu
+///   url {path} / pagina {path}       -> endereço que a página do paint.land abriu
 ///   login                            -> o paint.land pediu login
 ///   estado {conectado, grupo}        -> conectado ao servidor e o número da página (ex.: 1108)
 ///   inicial {texto} / texto {texto}  -> texto que a página mostra embaixo (a cor que chegou)
@@ -31,7 +31,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
     private let telas = TelasNativas()
 
     private var receptor: WKWebView?
-    private var fechar: UIButton?
+    private weak var telaLogin: TelaLogin?
     private var mostrando = false
     private var conectado = false
     private var desconectadoDesde = Date()
@@ -73,7 +73,7 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         case "recarregar":
             DispatchQueue.main.async { self.recarregar(); responder(true) }
         case "entrar":
-            DispatchQueue.main.async { self.mostrar(true); responder(true) }
+            DispatchQueue.main.async { self.abrirLogin(); responder(true) }
         case "maleta":
             responder(maleta())
         default:
@@ -102,8 +102,13 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         r.navigationDelegate = self
         r.isUserInteractionEnabled = false
         r.backgroundColor = .white
-        // fica por baixo de tudo: a página do app (fundo preto) cobre por inteiro
-        web.insertSubview(r, at: 0)
+        // fica por baixo de tudo, atrás da tela do app (que cobre por inteiro); só serve para receber
+        if let jan = web.window {
+            r.frame = jan.bounds
+            jan.insertSubview(r, at: 0)
+        } else {
+            web.insertSubview(r, at: 0)
+        }
         receptor = r
         r.load(URLRequest(url: PonteExtra.endereco))
         vigia?.invalidate()
@@ -136,17 +141,12 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
             let c = (d["conectado"] as? Bool) ?? false
             if c != conectado { conectado = c; if !c { desconectadoDesde = Date() } }
         }
-        if tipo == "url", let path = d["path"] as? String {
-            if path.lowercased().contains("/phonesimulation") {
-                // login feito: a página de recebimento abriu, some da tela
-                if mostrando { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.mostrar(false) } }
-            }
-        }
         avisar(d)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         let path = webView.url?.path.lowercased() ?? ""
+        avisar(["tipo": "pagina", "path": webView.url?.path ?? ""])
         if path.contains("/login") || path.contains("/identity/account") {
             conectado = false
             avisar(["tipo": "login"])
@@ -168,45 +168,26 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply, W
         recarregar()
     }
 
-    /// Mostra (ou esconde) a página do paint.land por cima de tudo, para fazer o login.
-    private func mostrar(_ on: Bool) {
-        if receptor == nil { criarReceptor() }
-        guard let r = receptor, let web = web else { return }
-        mostrando = on
-        if on {
-            web.bringSubviewToFront(r)
-            r.isUserInteractionEnabled = true
-            r.frame = web.bounds
-            r.scrollView.contentInsetAdjustmentBehavior = .automatic
-            if fechar == nil {
-                let b = UIButton(type: .system)
-                b.setTitle("Fechar", for: .normal)
-                b.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-                b.setTitleColor(.white, for: .normal)
-                b.backgroundColor = UIColor(red: 0.04, green: 0.52, blue: 1, alpha: 1)
-                b.layer.cornerRadius = 18
-                b.addTarget(self, action: #selector(tocouFechar), for: .touchUpInside)
-                fechar = b
-            }
-            if let b = fechar {
-                let topo = web.safeAreaInsets.top
-                b.frame = CGRect(x: web.bounds.width - 106, y: topo + 6, width: 94, height: 36)
-                b.autoresizingMask = [.flexibleLeftMargin]
-                web.addSubview(b)
-            }
-            // abre a página de entrada do paint.land (se já estiver logado, cai direto na de recebimento)
-            r.load(URLRequest(url: PonteExtra.endereco))
-        } else {
-            fechar?.removeFromSuperview()
-            r.isUserInteractionEnabled = false
-            r.scrollView.contentInsetAdjustmentBehavior = .never
-            web.sendSubviewToBack(r)
-            r.load(URLRequest(url: PonteExtra.endereco))
-        }
-        avisar(["tipo": "mostrando", "on": on])
+    /// Abre o login numa tela própria (como uma janela normal do iPhone). O login fica guardado
+    /// no mesmo lugar que a página escondida usa, então ela passa a entrar sozinha.
+    private func abrirLogin() {
+        guard telaLogin == nil, let tela = tela else { return }
+        let t = TelaLogin(endereco: PonteExtra.endereco)
+        t.terminou = { [weak self] in self?.loginTerminou() }
+        t.modalPresentationStyle = .fullScreen
+        telaLogin = t
+        mostrando = true
+        avisar(["tipo": "mostrando", "on": true])
+        var topo = tela
+        while let p = topo.presentedViewController { topo = p }
+        topo.present(t, animated: true)
     }
 
-    @objc private func tocouFechar() { mostrar(false) }
+    private func loginTerminou() {
+        mostrando = false
+        avisar(["tipo": "mostrando", "on": false])
+        recarregar()
+    }
 
     /// Desenho da maleta do modo Foco do iPhone (o mesmo da tela bloqueada de verdade).
     private func maleta() -> String {
@@ -351,5 +332,122 @@ private final class Recado: NSObject, WKScriptMessageHandler {
     init(_ dono: PonteExtra) { self.dono = dono }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         dono?.recebeu(message.body)
+    }
+}
+
+/// Tela do login do paint.land: barra de cima com o endereço, Recarregar e Fechar.
+/// Fecha sozinha quando sai das páginas de login (entrou) e volta para a página de recebimento.
+final class TelaLogin: UIViewController, WKNavigationDelegate {
+    var terminou: (() -> Void)?
+    private let endereco: URL
+    private var web: WKWebView!
+    private let titulo = UILabel()
+    private let carregando = UIActivityIndicatorView(style: .medium)
+    private var viuLogin = false
+    private var fechou = false
+
+    init(endereco: URL) { self.endereco = endereco; super.init(nibName: nil, bundle: nil) }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+        let barra = UIView()
+        barra.backgroundColor = .secondarySystemBackground
+        barra.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(barra)
+
+        let fechar = UIButton(type: .system)
+        fechar.setTitle("Fechar", for: .normal)
+        fechar.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+        fechar.addTarget(self, action: #selector(tocouFechar), for: .touchUpInside)
+        let recarregar = UIButton(type: .system)
+        recarregar.setTitle("Recarregar", for: .normal)
+        recarregar.titleLabel?.font = .systemFont(ofSize: 17)
+        recarregar.addTarget(self, action: #selector(tocouRecarregar), for: .touchUpInside)
+        titulo.font = .systemFont(ofSize: 13)
+        titulo.textColor = .secondaryLabel
+        titulo.textAlignment = .center
+        titulo.adjustsFontSizeToFitWidth = true
+        titulo.minimumScaleFactor = 0.7
+        titulo.text = "Abrindo o paint.land…"
+        carregando.hidesWhenStopped = true
+        for v in [fechar, recarregar, titulo, carregando] as [UIView] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            barra.addSubview(v)
+        }
+
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+        web = WKWebView(frame: .zero, configuration: config)
+        web.navigationDelegate = self
+        web.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(web)
+
+        NSLayoutConstraint.activate([
+            barra.topAnchor.constraint(equalTo: view.topAnchor),
+            barra.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            barra.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            barra.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 48),
+            recarregar.leadingAnchor.constraint(equalTo: barra.leadingAnchor, constant: 14),
+            recarregar.bottomAnchor.constraint(equalTo: barra.bottomAnchor, constant: -8),
+            fechar.trailingAnchor.constraint(equalTo: barra.trailingAnchor, constant: -14),
+            fechar.centerYAnchor.constraint(equalTo: recarregar.centerYAnchor),
+            titulo.centerXAnchor.constraint(equalTo: barra.centerXAnchor),
+            titulo.centerYAnchor.constraint(equalTo: recarregar.centerYAnchor),
+            titulo.leadingAnchor.constraint(greaterThanOrEqualTo: recarregar.trailingAnchor, constant: 8),
+            titulo.trailingAnchor.constraint(lessThanOrEqualTo: fechar.leadingAnchor, constant: -8),
+            carregando.trailingAnchor.constraint(equalTo: fechar.leadingAnchor, constant: -6),
+            carregando.centerYAnchor.constraint(equalTo: recarregar.centerYAnchor),
+            web.topAnchor.constraint(equalTo: barra.bottomAnchor),
+            web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            web.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        web.load(URLRequest(url: endereco))
+    }
+
+    override var preferredStatusBarStyle: UIStatusBarStyle { .default }
+    override var prefersStatusBarHidden: Bool { false }
+
+    @objc private func tocouFechar() { sair() }
+    @objc private func tocouRecarregar() { web.load(URLRequest(url: endereco)) }
+
+    private func sair() {
+        guard !fechou else { return }
+        fechou = true
+        dismiss(animated: true) { [weak self] in self?.terminou?() }
+    }
+
+    private func mostrarEndereco() {
+        guard let u = web.url else { return }
+        titulo.text = (u.host ?? "") + u.path
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        carregando.startAnimating()
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        carregando.stopAnimating()
+        mostrarEndereco()
+        let path = webView.url?.path.lowercased() ?? ""
+        if path.contains("/identity/account") || path.contains("/login") {
+            viuLogin = true
+        } else if !path.isEmpty {
+            // saiu do login (entrou) ou já estava logado: volta para o app
+            titulo.text = "Entrou! Voltando…"
+            DispatchQueue.main.asyncAfter(deadline: .now() + (viuLogin ? 0.8 : 0.3)) { self.sair() }
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        carregando.stopAnimating()
+        titulo.text = "Erro: " + error.localizedDescription
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        carregando.stopAnimating()
+        titulo.text = "Erro: " + error.localizedDescription
     }
 }
