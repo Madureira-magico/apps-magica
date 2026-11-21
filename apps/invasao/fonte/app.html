@@ -99,7 +99,14 @@ input,textarea{-webkit-user-select:text;user-select:text;font-family:inherit}
 .nome.pulso{transform:scale(1.06)}
 .wl.rede.piscando{transform:scale(1.03) translateX(4rem);z-index:2;transition:none}
 .wl.rede.brilho{z-index:2;background:var(--cartao);box-shadow:0 -7rem 12rem -6rem rgba(236,196,146,.75),0 7rem 12rem -6rem rgba(236,196,146,.75);transition:box-shadow .2s}
-.wl.rede.piscando::after,.wl.rede.brilho::after{opacity:.4}
+.wl.rede.piscando::after,.wl.rede.brilho::after,.wl.rede.brilho2::after{opacity:.4}
+.wl.rede.brilho2{z-index:2}
+#wifi.sombrio2{--verde:#9a89d0}
+#wifi.escuro2{background:var(--dim)!important}
+#wifi.escuro2 .wcard:not(#hero),#wifi.escuro2 .wbtn,#wifi.escuro2 .wpill{background:var(--dimc)}
+#wifi.escuro2 .wl.rede:not(.piscando){background:transparent}
+#wifi.sombrio2 .cad,#wifi.sombrio2 .inf{opacity:.4}
+#wsc{will-change:transform}
 #wifi.desligado #wConectada,#wifi.desligado #wResto{display:none}
 
 /* ---------- EFEITOS (por cima de tudo, sem pegar o toque) ---------- */
@@ -249,7 +256,7 @@ input[type=file]{display:none}
 
 <!-- ================= MENU ================= -->
 <div id="menu" class="tela">
-  <div class="mtopo"><img src="icone.png" alt=""><div><h1>Invasão</h1><p>Controle do EXPLODE SYSTEM · versão 1.1</p></div></div>
+  <div class="mtopo"><img src="icone.png" alt=""><div><h1>Invasão</h1><p>Controle do EXPLODE SYSTEM · versão 1.2</p></div></div>
   <div id="ok">OK</div>
 
   <div class="painel">
@@ -310,7 +317,7 @@ input[type=file]{display:none}
   <div class="grupo efs" id="efeitos"></div>
   <div class="grupo">
     <div class="lin bt" id="verEfeito">Ver o efeito</div>
-    <div class="lin col">Duração do efeito
+    <div class="lin col">Duração do Flash sombrio 2
       <div class="passo"><input type="range" id="duracao" min="1" max="8" step="0.5"><b id="duracaoTxt"></b></div>
     </div>
     <div class="lin col">Ordem das redes que mudam
@@ -347,9 +354,10 @@ input[type=file]{display:none}
   <div class="grupo">
     <div class="lin bt" id="abrirInstr">Instruções</div>
     <div class="lin bt" id="zerar">Zerar o efeito (redes voltam ao normal)</div>
+    <div class="lin bt vermelho" id="restaurar">Restaurar padrão (apaga todos os ajustes)</div>
   </div>
   <div class="dica">Dois dedos deslizando para baixo na tela bloqueada abrem este menu. Na tela de Wi-Fi, o botão <b>Editar</b> também abre.</div>
-  <div class="rodape">Invasão 1.1 · Ricardo Madureira</div>
+  <div class="rodape">Invasão 1.2 · Ricardo Madureira</div>
   <input type="file" id="arquivo" accept="image/*">
 </div>
 
@@ -401,8 +409,8 @@ input[type=file]{display:none}
 
   <h2>Efeitos</h2>
   <ul>
-    <li><b>Flash sombrio</b> (igual ao original): cada rede pisca em cores claras antes de mudar.</li>
-    <li><b>TV fora de sintonia</b>, <b>TV chiado</b> ou <b>Glitch</b>: aparecem por cima da tela quando o espectador toca na rede.</li>
+    <li><b>Flash sombrio 1</b> (igual ao app do aparelho): cada rede pisca em cores claras e brilha bege antes de mudar.</li>
+    <li><b>Flash sombrio 2</b> (igual ao app web): o fundo escurece e pisca, a tela treme, a chave do Wi-Fi fica lilás e as redes piscam em cores fortes. A duração se ajusta no menu.</li>
     <li><b>Invasão</b>: depois da transformação, redes novas com a carta continuam surgindo embaixo da lista.</li>
     <li><b>Gravidade</b>: no fim, as redes despencam até o pé da tela e depois voltam ao lugar.</li>
   </ul>
@@ -439,7 +447,7 @@ const PADRAO = {
   ordem:'sv', naipes:['S','H','C','D'], formato:'simbolo', dica:true,
   palavras:['Explode', 'Abracadabra', 'Feliz aniversário'],
   conectada:'CasaMadu2,4G', conhecida:'#CLARO-WIFI', redesReais:true, falsas:FALSAS.join('\n'), tema:'claro',
-  efeito:'flash', duracao:3, velocidade:'normal', invasao:true, gravidade:false, vibrar:false,
+  efeito:'flash', duracao:5, velocidade:'normal', invasao:true, gravidade:false, vibrar:false,
   avisoFalha:true, avisoConexao:true, ordemTroca:'cima', ledPisca:true, led:50,
   letra:'normal', peso:'500', barraCima:true, operadora:'Claro BR', sinal:'3'
 };
@@ -447,6 +455,8 @@ let A = JSON.parse(JSON.stringify(PADRAO));
 try{ Object.assign(A, JSON.parse(localStorage.getItem('inv-ajustes') || '{}')); }catch(e){}
 if(!Array.isArray(A.naipes) || A.naipes.length !== 4) A.naipes = PADRAO.naipes.slice();
 if(!Array.isArray(A.palavras)) A.palavras = PADRAO.palavras.slice();
+if(A.efeito !== 'flash' && A.efeito !== 'flash2') A.efeito = 'flash';      // TV, chiado e Glitch saíram na 1.2
+if(!A.v12){ A.v12 = true; if(A.duracao === 3) A.duracao = 5; try{ localStorage.setItem('inv-ajustes', JSON.stringify(A)); }catch(e){} }   // 1.2: duração igual à do original (5 s)
 function salvar(){ try{ localStorage.setItem('inv-ajustes', JSON.stringify(A)); }catch(e){} }
 let palavra = '';
 try{ palavra = localStorage.getItem('inv-palavra') || ''; }catch(e){}
@@ -472,7 +482,7 @@ async function status(){
   pintarStatus();
   if(antes !== aparelho.ok) try{ bf.desenhar(); }catch(e){}
   // o aparelho apareceu agora (ex.: ligado depois de abrir o app): já procura as redes do lugar
-  if(aparelho.ok && antes !== true && A.redesReais && (atual === 'lock' || atual === 'pass') && !procurando) procurarRedes('apareceu');
+  if(aparelho.ok && A.redesReais && (atual === 'lock' || atual === 'pass') && !procurando && (antes !== true || !redesReais || Date.now() - redesReais.t > 120000)) procurarRedes('lock');
   avisoBolso();
   return aparelho.ok;
 }
@@ -648,14 +658,15 @@ function desbloquear(p){
   enviar(p);
   zerarEfeito();
   montarLista();
+  if(A.redesReais && (!redesReais || !redesReais.l.length || Date.now() - redesReais.t > 10 * 60000)) setTimeout(() => procurarRedes('wifi'), 400);
   mostrar('wifi');
   anim($('wifi'), [{transform:'scale(1.08)', opacity:0}, {transform:'scale(1)', opacity:1}], 420);
   setTimeout(() => { codigo = ''; ocupado = false; pintarSenha(); }, 300);
 }
 
 /* ================= TELA DE WI-FI ================= */
-const SVG_LOCK = '<svg viewBox="0 0 11 14" style="width:10rem;height:12.8rem;color:var(--cad,currentColor)"><path d="M2.9 6.3V4.4a2.6 2.6 0 0 1 5.2 0v1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x=".6" y="6" width="9.8" height="7.6" rx="1.8" fill="currentColor"/></svg>';
-const SVG_INFO = '<svg viewBox="0 0 26 26" style="width:26rem;height:26rem;color:var(--azul)"><circle cx="13" cy="13" r="11.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="13" cy="7.9" r="1.45" fill="currentColor"/><path d="M10.6 11.4h3.2v7.1M10.6 18.5h5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SVG_LOCK = '<svg class="cad" viewBox="0 0 11 14" style="width:10rem;height:12.8rem;color:var(--cad,currentColor)"><path d="M2.9 6.3V4.4a2.6 2.6 0 0 1 5.2 0v1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x=".6" y="6" width="9.8" height="7.6" rx="1.8" fill="currentColor"/></svg>';
+const SVG_INFO = '<svg class="inf" viewBox="0 0 26 26" style="width:26rem;height:26rem;color:var(--azul)"><circle cx="13" cy="13" r="11.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="13" cy="7.9" r="1.45" fill="currentColor"/><path d="M10.6 11.4h3.2v7.1M10.6 18.5h5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const SVG_CK = '<svg class="ck" viewBox="0 0 20 20" style="color:var(--azul)"><path d="M3.2 10.8l4.6 4.8 9-10.2" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function svgWifi(nivel){
   const o = i => i <= nivel ? 1 : .22;
@@ -682,25 +693,40 @@ let procurando = false;
 async function procurarRedes(motivo){
   if(procurando) return redesReais;
   procurando = true; $('spin').classList.add('on'); pintarRedesInfo();
+  const achadas = new Map();
+  const fora = [A.conectada, ...conhecidas(), palavra].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
+  const nucleo = String(palavra || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const rodada = async () => {
+    const r = await http('/api/wifi_scan', 25), d = json(r);
+    if(!(r.ok && d && Array.isArray(d.networks))) return false;
+    aparelho.ok = true;
+    d.networks.forEach(n => {
+      const nome = String(n && n.ssid != null ? n.ssid : '').trim(), k = nome.toLowerCase();
+      if(!nome || fora.includes(k)) return;
+      if(nucleo.length > 1 && k.replace(/[^a-z0-9]/g, '').includes(nucleo)) return;   // redes do próprio aparelho (com a carta)
+      const rssi = isFinite(+n.rssi) ? +n.rssi : -80, antes = achadas.get(k);
+      if(antes && antes.rssi >= rssi) return;
+      const aberta = n.enc_type === 0 || /aberta|open|none/i.test(String(n.enc || ''));
+      achadas.set(k, {n:nome, rssi, c:!aberta});
+    });
+    return true;
+  };
   try{
-    const r = await http('/api/wifi_scan', 15), d = json(r);
-    if(r.ok && d && Array.isArray(d.networks)){
-      const vistos = new Set(), l = [];
-      const fora = [A.conectada, ...conhecidas(), palavra].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
-      d.networks.slice().sort((a, b) => (+b.rssi || -999) - (+a.rssi || -999)).forEach(n => {
-        const nome = String(n && n.ssid != null ? n.ssid : '').trim(), k = nome.toLowerCase();
-        if(!nome || vistos.has(k) || fora.includes(k)) return;
-        vistos.add(k);
-        const rssi = +n.rssi, nivel = !isFinite(rssi) ? 2 : rssi >= -62 ? 3 : rssi >= -74 ? 2 : 1;
-        const aberta = n.enc_type === 0 || /aberta|open|none/i.test(String(n.enc || ''));
-        l.push({n:nome, s:nivel, c:!aberta});
-      });
-      if(l.length){ redesReais = {t:Date.now(), l:l.slice(0, 30)}; try{ localStorage.setItem('inv-redes', JSON.stringify(redesReais)); }catch(e){} }
-      aparelho.ok = true;
+    // como o app original: uma procura, espera 3,2 s e procura de novo, juntando as duas
+    const ok1 = await rodada();
+    let ok2 = false;
+    if(ok1){ await espera(3200); ok2 = await rodada(); }   // se a primeira falhou, não insiste (igual ao original)
+    T.rodadas = (T.rodadas || 0) + (ok1 ? 1 : 0) + (ok2 ? 1 : 0);
+    if(achadas.size){
+      const l = Array.from(achadas.values()).sort((a, b) => b.rssi - a.rssi).slice(0, 30)
+        .map(x => ({n:x.n, s: x.rssi >= -62 ? 3 : x.rssi >= -74 ? 2 : 1, c:x.c}));
+      redesReais = {t:Date.now(), l}; try{ localStorage.setItem('inv-redes', JSON.stringify(redesReais)); }catch(e){}
     }
   }finally{
     procurando = false; $('spin').classList.remove('on'); pintarRedesInfo();
   }
+  // se a tela de Wi-Fi está mostrando a lista falsa e ninguém tocou ainda, troca pelas redes de verdade
+  if(atual === 'wifi' && !efeitoAtivo && fonteLista === 'falsas' && redesReais && redesReais.l.length && A.redesReais) montarLista();
   return redesReais;
 }
 function conhecidas(){ return String(A.conhecida || '').split('\n').map(s => s.trim()).filter(Boolean); }
@@ -768,9 +794,14 @@ async function transformar(linha, g){
   (T.ordem = T.ordem || []).push(linha.dataset.orig);
   const nome = linha.querySelector('.nome'), v = fatorVel(), alvo = palavra || 'Explode';
   if(A.vibrar) nat('toque').catch(() => {});
-  const flash = A.efeito === 'flash';
-  if(flash){ await piscarLinha(linha, g); if(g !== geracao) return false; linha.classList.add('brilho'); }
-  else { linha.classList.add('toque'); setTimeout(() => linha.classList.remove('toque'), 140); await espera(60); }
+  const f2 = A.efeito === 'flash2';
+  await piscarLinha(linha, g, f2); if(g !== geracao) return false;
+  linha.classList.add(f2 ? 'brilho2' : 'brilho');
+  let brT = null;
+  if(f2){ const cores = ['255,80,200', '90,255,120', '255,220,90', '120,200,255', '255,120,220'];
+    const br = () => { const c = cores[Math.floor(Math.random() * cores.length)], d = cores[Math.floor(Math.random() * cores.length)];
+      linha.style.boxShadow = '0 -6rem 10rem -5rem rgba(' + c + ',.8),0 6rem 10rem -5rem rgba(' + d + ',.8)'; brT = setTimeout(br, 60 + Math.random() * 60); };
+    br(); }
   const de = letras(nome.textContent);
   for(let i = de.length; i >= 0; i--){
     if(g !== geracao) return false;
@@ -786,7 +817,7 @@ async function transformar(linha, g){
     if(i % 2 === 0){ nome.classList.add('pulso'); setTimeout(() => nome.classList.remove('pulso'), 30); }
     await espera(28 * v);
   }
-  linha.classList.remove('brilho');
+  clearTimeout(brT); linha.style.boxShadow = ''; linha.classList.remove('brilho', 'brilho2');
   T.feitas = (T.feitas || 0) + 1;
   return true;
 }
@@ -794,16 +825,19 @@ async function transformar(linha, g){
    ~0,3 s (amarelo, azul-piscina, verde, verde-água, azul-claro) e os ícones trocam de cor junto */
 const FL_FUNDO = ['#fdfedf', '#c5feff', '#c5fec3', '#c4fee7', '#d2fff3', '#d3f9ff'];
 const FL_ICONE = ['#e040e8', '#18d4d4', '#2fc22f', '#2fc29a', '#7fb8ff', '#9be22f'];
-async function piscarLinha(linha, g){
+/* Flash sombrio 2: cores mais fortes e trocando a cada quadro (~0,33 s no total) */
+const FL2_FUNDO = ['#a0dc84', '#99dd84', '#b5feee', '#b5fdbb', '#80d796', '#61919a', '#7ea4d4', '#75a1bb', '#b8dfdc', '#c3f2fe', '#5cff79', '#9ce8c4'];
+async function piscarLinha(linha, g, forte){
   linha.classList.add('piscando'); linha.style.setProperty('--cad', '#3a3a3c');
-  let k = Math.floor(Math.random() * FL_FUNDO.length);
-  for(let i = 0; i < 5; i++){
+  const fundos = forte ? FL2_FUNDO : FL_FUNDO, vezes = forte ? 10 : 6, passo = forte ? 33 : 66;
+  let k = Math.floor(Math.random() * fundos.length);
+  for(let i = 0; i < vezes; i++){
     if(g !== geracao) break;
-    linha.style.background = FL_FUNDO[k % FL_FUNDO.length];
+    linha.style.background = fundos[k % fundos.length];
     linha.style.setProperty('--azul', FL_ICONE[(k + 2) % FL_ICONE.length]);
     linha.querySelector('.ics') && (linha.querySelector('.ics').style.color = FL_ICONE[(k + 4) % FL_ICONE.length]);
     k += 1 + Math.floor(Math.random() * 2);
-    await espera(60);
+    await espera(passo);
   }
   linha.style.background = ''; linha.style.removeProperty('--azul'); linha.style.removeProperty('--cad');
   linha.querySelector('.ics') && (linha.querySelector('.ics').style.color = '');
@@ -911,90 +945,45 @@ function gravidade(g){
   });
 }
 
-/* ---------- Efeitos visuais por cima da tela ---------- */
-let fxT = null, fxFim = null, fxRaf = 0;
+/* ---------- Flash sombrio 2 (copiado do vídeo do app web original) ----------
+   Durante a duração escolhida (padrão 5 s): o fundo cinza da tela pisca escuro (cartões continuam brancos),
+   a tela inteira treme (~3 pontos para os lados, ~2 para cima/baixo), a chave do Wi-Fi fica lilás
+   e o cadeado/"i" ficam apagados. A linha que muda pisca em cores fortes (em transformar). */
+let fxT = null, fxFim = null;
+const FS2_FUNDO = ['#97969b', '#7f7b86', '#9a999c', '#8e8a93', '#7e7a85', '#6f6f6f', '#9e969f', '#8b8a94', '#7a7b83', '#6c6c6c', '#929198', '#76737f', '#63646e'];
 function pararFx(){
-  clearTimeout(fxT); clearTimeout(fxFim); cancelAnimationFrame(fxRaf); fxT = fxFim = null;
-  const fx = $('fx'); fx.className = ''; fx.innerHTML = ''; fx.style.cssText = '';
+  clearTimeout(fxT); clearTimeout(fxFim); fxT = fxFim = null;
+  const w = $('wifi'); w.classList.remove('sombrio2', 'escuro2'); w.style.background = ''; $('wsc').style.transform = '';
+  $('menu').style.background = ''; $('menu').style.transform = '';
+  T.fxAtivo = false;
 }
-function iniciarFx(tipo, ms){
+function iniciarFx(tipo, ms, alvo){
   pararFx();
-  if(!tipo || tipo === 'nenhum') return;
-  const fx = $('fx'); fx.className = 'on'; T.fx = tipo;
-  const vib = () => { if(A.vibrar) nat('toque').catch(() => {}); };
-  if(tipo === 'flash'){ pararFx(); return; }
-  if(tipo === 'flash-antigo'){
-    // (antigo) a tela escurece e pisca em tons escuros
-    const cores = ['rgba(4,6,12,.88)', 'rgba(18,12,28,.82)', 'rgba(8,10,22,.85)', 'rgba(26,8,20,.78)', 'rgba(12,14,8,.8)', 'rgba(20,16,32,.75)'];
-    let i = 0;
-    const passo = () => {
-      if(Math.random() > .42){ i = (i + 1) % cores.length; fx.style.background = cores[i]; fx.style.opacity = String(.38 + Math.random() * .28); }
-      else { fx.style.opacity = '0'; }
-      fxT = setTimeout(passo, fx.style.opacity === '0' ? 22 + Math.random() * 55 : 28 + Math.random() * 42);
-    };
-    passo();
-  } else if(tipo === 'tv'){
-    // TV fora de sintonia: barras coloridas tremendo, com linhas e rasgos
-    const barras = ['#C0C0C0', '#C0C000', '#00C0C0', '#00C000', '#C000C0', '#C00000', '#0000C0'], baixo = ['#0000C0', '#131313', '#C000C0', '#131313', '#00C0C0', '#131313', '#C0C0C0'];
-    fx.innerHTML = '<div id="tvw" style="position:absolute;inset:0"><div style="display:flex;height:76%">' + barras.map(c => '<div style="flex:1;background:' + c + '"></div>').join('') +
-      '</div><div style="display:flex;height:9%">' + baixo.map(c => '<div style="flex:1;background:' + c + '"></div>').join('') + '</div><div style="height:15%;display:flex"><div style="flex:5;background:#00214c"></div><div style="flex:5;background:#fff"></div><div style="flex:5;background:#32006a"></div><div style="flex:7;background:#131313"></div></div></div>' +
-      '<div style="position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.18) 0 1px,transparent 1px 4px)"></div>' +
-      '<div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6) 100%)"></div>';
-    const w = $('tvw');
-    const passo = () => {
-      const some = Math.random() < .12;
-      fx.style.opacity = some ? '0' : '1';
-      w.style.transform = 'translate3d(' + (Math.random() - .5) * 14 + 'px,' + (Math.random() - .5) * 24 + 'px,0) skewY(' + (Math.random() - .5) * .8 + 'deg)';
-      w.style.filter = 'brightness(' + (.75 + Math.random() * .6) + ') hue-rotate(' + (Math.random() * 24) + 'deg)';
-      w.style.clipPath = Math.random() < .15 ? 'inset(' + (Math.random() * 60) + '% 0 ' + (Math.random() * 30) + '% 0)' : 'none';
-      fxT = setTimeout(passo, some ? 70 : 60 + Math.random() * 90);
-    };
-    passo(); vib();
-  } else if(tipo === 'chiado'){
-    // TV chiado: chuvisco preto e branco de verdade (ruído desenhado a cada quadro)
-    const cv = document.createElement('canvas'), w = 150, h = Math.round(150 * innerHeight / innerWidth);
-    cv.width = w; cv.height = h; cv.style.imageRendering = 'pixelated'; fx.appendChild(cv);
-    fx.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.45) 0 1px,transparent 1px 3px)"></div><div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.7) 100%)"></div>');
-    const g = cv.getContext('2d'), img = g.createImageData(w, h), d = img.data;
-    let ultimo = 0;
-    const quadro = t => {
-      if(t - ultimo > 40){
-        ultimo = t;
-        for(let i = 0; i < d.length; i += 4){ const v = Math.random() * 255 | 0; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
-        g.putImageData(img, 0, 0);
-        fx.style.opacity = Math.random() < .08 ? '0.15' : String(.9 + Math.random() * .1);
-      }
-      fxRaf = requestAnimationFrame(quadro);
-    };
-    fxRaf = requestAnimationFrame(quadro); vib();
-  } else if(tipo === 'glitch'){
-    // Glitch: faixas trocando de cor, a tela pula e aparecem códigos de erro
-    const escuro = $('wifi').classList.contains('escuro'), tv = ['_ERR', 'SYS_FAIL', '0xFF00', 'CRITICAL', 'SIGNAL_LOST', 'REBOOT'];
-    fx.style.mixBlendMode = 'difference';
-    const passo = () => {
-      let h = '';
-      if(Math.random() > .3) h += '<div style="position:absolute;inset:0;background:rgba(' + [0, 0, 0].map(() => Math.random() > .5 ? 255 : 0).join(',') + ',.4)"></div>';
-      const n = 6 + Math.floor(Math.random() * 10);
-      for(let i = 0; i < n; i++) if(Math.random() > .15)
-        h += '<div style="position:absolute;top:' + (Math.random() * 100) + '%;left:' + ((Math.random() - .5) * 80) + 'px;width:110%;height:' + (1 + Math.random() * 15) + '%;background:' + (escuro ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.85)') + '"></div>';
-      for(let i = 0; i < 6; i++) if(Math.random() > .55)
-        h += '<div style="position:absolute;top:' + (Math.random() * 100) + '%;left:' + (Math.random() * 80) + '%;font:bold ' + (20 + Math.random() * 36) + 'px monospace;color:lime;transform:skew(' + (Math.random() * 70 - 35) + 'deg);text-shadow:2px 0 red,-2px 0 blue;mix-blend-mode:normal;white-space:nowrap">' + tv[Math.floor(Math.random() * tv.length)] + '</div>';
-      fx.innerHTML = h;
-      fx.style.transform = Math.random() > .8 ? 'translate(' + (Math.random() - .5) * 20 + 'px,' + (Math.random() - .5) * 40 + 'px)' : 'none';
-      fxT = setTimeout(passo, 36 + Math.random() * 85);
-    };
-    passo(); vib();
-  }
+  if(tipo !== 'flash2') return;     // o Flash sombrio 1 acontece só na própria linha
+  const w = $('wifi'), tela = alvo || w, rola = alvo || $('wsc');
+  if(!alvo) w.classList.add('sombrio2');
+  T.fx = tipo; T.fxAtivo = true;
+  const clarear = h => '#' + h.slice(1).match(/../g).map(x => Math.min(255, parseInt(x, 16) + 14).toString(16).padStart(2, '0')).join('');
+  const passo = () => {
+    const escuro = Math.random() > .42, cor = FS2_FUNDO[Math.floor(Math.random() * FS2_FUNDO.length)];
+    if(alvo) alvo.style.background = escuro ? cor : '';
+    else {
+      // como no original: escurece a tela toda (inclusive as listas); só o cartão de cima continua branco
+      w.style.setProperty('--dim', cor); w.style.setProperty('--dimc', clarear(cor));
+      w.classList.toggle('escuro2', escuro);
+    }
+    rola.style.transform = Math.random() > .25 ? 'translate(' + ((Math.random() - .5) * 6).toFixed(1) + 'rem,' + ((Math.random() - .5) * 4).toFixed(1) + 'rem)' : '';
+    if(escuro && A.vibrar && Math.random() > .6) nat('toque').catch(() => {});
+    fxT = setTimeout(passo, escuro ? 30 + Math.random() * 45 : 25 + Math.random() * 50);
+  };
+  passo();
   fxFim = setTimeout(pararFx, ms);
 }
 
 /* ================= MENU ================= */
 const EFEITOS = [
-  {v:'flash', t:'Flash sombrio', d:'A rede pisca em cores claras (igual ao do aparelho original)'},
-  {v:'tv', t:'TV fora de sintonia', d:'Barras coloridas tremendo'},
-  {v:'chiado', t:'TV chiado', d:'Chuvisco preto e branco'},
-  {v:'glitch', t:'Glitch', d:'Faixas, tela pulando e códigos de erro'},
-  {v:'nenhum', t:'Nenhum', d:'Só as letras mudando'}
+  {v:'flash', t:'Flash sombrio 1', d:'Cada rede pisca em cores claras e brilha bege (igual ao app do aparelho)'},
+  {v:'flash2', t:'Flash sombrio 2', d:'O fundo escurece e pisca, a tela treme, a chave fica lilás e as redes piscam em cores fortes (igual ao app web)'}
 ];
 function montarEfeitos(){
   const g = $('efeitos'); g.innerHTML = '';
@@ -1082,8 +1071,17 @@ $('verificar').onclick = async () => { $('stTxt').textContent = 'Verificando…'
 $('reenviar').onclick = async () => { if(!palavra){ alert('Ainda não tem carta ou palavra escolhida.'); return; } $('stTxt').textContent = 'Enviando…'; await enviar(palavra); await status(); };
 $('parar').onclick = async () => { $('stTxt').textContent = 'Parando…'; const ok = await pararTransmissao(); await status(); if(!ok) alert('O aparelho não respondeu.'); };
 $('atualizar').onclick = async () => { await procurarRedes('menu'); if(!(redesReais && redesReais.l.length)) alert('O aparelho não respondeu. Confira se o iPhone está no Wi-Fi do aparelho.'); };
-$('verEfeito').onclick = () => { if(A.efeito === 'flash'){ const l = $('verEfeito'); l.style.color = '#000'; piscarLinha(l, geracao).then(() => l.style.color = ''); } else iniciarFx(A.efeito, A.duracao * 1000); };
+$('verEfeito').onclick = () => {
+  const l = $('verEfeito'); l.style.color = '#000';
+  if(A.efeito === 'flash2') iniciarFx('flash2', Math.min(A.duracao, 3) * 1000, $('menu'));
+  piscarLinha(l, geracao, A.efeito === 'flash2').then(() => l.style.color = '');
+};
 $('zerar').onclick = () => { zerarEfeito(); montarLista(); };
+$('restaurar').onclick = () => {
+  if(!confirm('Voltar todos os ajustes do Invasão ao padrão? (palavras, redes, papel de parede, efeito…)')) return;
+  ['inv-ajustes', 'inv-fundo', 'inv-redes', 'inv-palavra'].forEach(k => { try{ localStorage.removeItem(k); }catch(e){} });
+  location.reload();
+};
 $('abrirInstr').onclick = () => { mostrar('instr'); $('instr').scrollTop = 0; };
 $('instrFechar').onclick = () => irMenu();
 $('escolher').onclick = () => $('arquivo').click();
