@@ -33,3 +33,6 @@ https://madureira-magico.github.io/apps-magica/lousa/assistente.html
   calculadora/extras/ parte do iPhone só da Calculadora (salvar o nome em Fotos e imprimir)
   paint/fonte/      o app Paint (python3 build.py monta www/): tela bloqueada do Timeline + menu das cores
   paint/extras/     parte do iPhone só do Paint (página do paint.land escondida que recebe a cor, vibração com tutu)
+  invasao/fonte/    o app Invasão (python3 build.py monta www/): tela bloqueada, senha da carta (Nipes), Wi-Fi falso do iPhone
+                    que se transforma na carta; manda a carta ao aparelho EXPLODE SYSTEM (192.168.4.1)
+  invasao/extras/   parte do iPhone só do Invasão (pedidos HTTP ao aparelho na rede local, vibração)

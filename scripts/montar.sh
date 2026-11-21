@@ -11,7 +11,7 @@ LINKS=""
 
 for conf in apps/*/app.conf; do
   ID="$(basename "$(dirname "$conf")")"
-  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0; SEGUNDO_PLANO=0; DEITAR=0; ADIAR_BAIXO=0
+  NOME=""; BUNDLE=""; VERSAO="1.0"; ESCONDER_INDICADOR=0; MANTER_ACESA=0; SEGUNDO_PLANO=0; DEITAR=0; ADIAR_BAIXO=0; REDE_LOCAL=0
   source "$conf"
   echo "::group::Montando $NOME ($BUNDLE)"
   T="$RAIZ/build/$ID"; rm -rf "$T"; mkdir -p "$T/App/Assets.xcassets/AppIcon.appiconset"
@@ -30,6 +30,10 @@ J
   if [ "$MANTER_ACESA" = "1" ]; then ACESA=true; else ACESA=false; fi
   if [ "$ADIAR_BAIXO" = "1" ]; then ADIAR=true; else ADIAR=false; fi
   if [ "$DEITAR" = "1" ]; then GIRO="[UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]"; DEITA=true; else GIRO="[UIInterfaceOrientationPortrait]"; DEITA=false; fi
+  if [ "$REDE_LOCAL" = "1" ]; then REDE="        NSLocalNetworkUsageDescription: \"Para conversar com o aparelho de mágica pelo Wi-Fi.\"
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true"; else REDE=""; fi
   if [ "$SEGUNDO_PLANO" = "1" ]; then FUNDO="        UIBackgroundModes: [audio, bluetooth-central]"; else FUNDO=""; fi
   cat > "$T/project.yml" <<Y
 name: App
@@ -67,6 +71,7 @@ targets:
         AdiarGestoBaixo: $ADIAR
         PermiteDeitar: $DEITA
 $FUNDO
+$REDE
         NSBluetoothAlwaysUsageDescription: "Para conversar com os aparelhos de mágica (relógio, Post-It)."
     settings:
       base:
