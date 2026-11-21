@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Telão</title>
+<style>
+:root{--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;overflow:hidden;touch-action:none}
+.screen{position:fixed;inset:0;display:none;overflow:hidden}
+.screen.on{display:block}
+/*PECA:tela-bloqueio.css*/
+
+/* ---------- MENU ---------- */
+#menu{background:#26282d;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+#menu .in{max-width:440px;margin:0 auto;padding:calc(var(--sat) + 12px) 16px calc(var(--sab) + 24px)}
+.tt{font-size:24px;font-weight:600;text-align:center;margin:4px 0 14px}
+.pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:6px}
+.pill{display:flex;align-items:center;gap:6px;border-radius:17px;height:34px;padding:0 13px;font-size:14px;font-weight:500;border:1.5px solid #A32D2D;color:#E24B4A}
+.pill.g{border-color:#1D9E75;color:#5DCAA5}.pill.y{border-color:#BA7517;color:#EF9F27}.pill.n{border-color:#444441;color:#888780}
+.pill svg{width:17px;height:17px}
+.sec{font-size:13px;color:#888780;margin:18px 6px 7px}
+.gr{background:#1c1d21;border-radius:14px;overflow:hidden}
+.rw{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;font-size:16px;border-bottom:.5px solid #33363c;min-height:50px}
+.rw:last-child{border-bottom:0}
+.rw small{color:#888780;font-size:15px;text-align:right}
+.rw .ck{color:#5DCAA5;width:20px;text-align:right;font-size:18px}
+.sw{width:50px;height:30px;border-radius:15px;background:#444441;position:relative;flex-shrink:0;transition:background .2s}
+.sw:after{content:'';position:absolute;left:2px;top:2px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s}
+.sw.on{background:#1D9E75}.sw.on:after{left:22px}
+.btns{display:flex;gap:8px}
+.mini{background:#33363c;border:0;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px}
+.go{display:block;width:100%;margin-top:20px;background:#1D9E75;border:0;border-radius:14px;height:54px;color:#fff;font-size:18px;font-weight:600}
+.nota{font-size:12.5px;color:#888780;text-align:center;margin-top:12px;line-height:1.55}
+.hide{display:none!important}
+
+/* ---------- TELA BLOQUEADA ---------- */
+.wall{position:absolute;inset:0;background:#000 center/cover no-repeat}
+#lc{position:absolute;inset:0;will-change:transform}
+#lock .tbCam.st-got{background:#EF9F27!important}
+#lock .tbCam.st-off,#lock .tbCam.st-fail{background:#E24B4A!important}
+#lock .tbCam.blink{animation:blink .7s steps(2,start) infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* ---------- SENHA ---------- */
+#pass .wall{filter:blur(28px) saturate(1.3);transform:scale(1.2)}
+#pass .dim{position:absolute;inset:0;background:rgba(0,0,0,.42)}
+.pc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:calc(var(--sat) + 9vh)}
+.pc-t{font-size:20px;font-weight:400;letter-spacing:.2px}
+.dots{display:flex;gap:24px;margin-top:22px;height:14px}
+.dt{width:13px;height:13px;border-radius:50%;border:1.4px solid #fff;transition:background .08s}
+.dt.f{background:#fff}
+.shake{animation:shake .45s}
+@keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-18px)}30%{transform:translateX(16px)}45%{transform:translateX(-12px)}60%{transform:translateX(9px)}75%{transform:translateX(-5px)}90%{transform:translateX(2px)}}
+.pad{display:grid;grid-template-columns:repeat(3,78px);column-gap:26px;row-gap:16px;margin-top:9vh}
+.key{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.17);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:background .25s}
+.key.p{background:rgba(255,255,255,.55);transition:none}
+.key b{font-size:37px;font-weight:400;line-height:1}
+.key i{font-style:normal;font-size:10px;font-weight:600;letter-spacing:2px;margin-top:1px;height:12px}
+.key.zero{grid-column:2}
+.pc-b{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 30px);display:flex;justify-content:space-between;padding:0 54px;font-size:17px}
+/* hora fraquinha embaixo (senha e tela preta), igual ao Nipes, um pouco maior */
+.hint{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 33px);text-align:center;font-weight:500;letter-spacing:.5px;pointer-events:none;white-space:pre-line;line-height:1.35}
+.hint .a{font-size:14px;letter-spacing:4px}
+.hint .h{font-size:20px}
+#pass .hint{bottom:calc(var(--sab) + 70px)}
+
+/* ---------- TELA PRETA ---------- */
+#black{background:#000}
+#black .hint{bottom:calc(var(--sab) + 60px)}
+#mic{position:absolute;left:10px;bottom:calc(var(--sab) + 8px);width:52px;height:52px;display:flex;align-items:center;justify-content:center}
+#mic svg{width:20px;height:20px;color:#fff;transition:opacity .15s}
+#mic .ring{position:absolute;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.2);opacity:0}
+#mic.on .ring{opacity:1}
+#bdot{position:absolute;right:20px;bottom:calc(var(--sab) + 28px);width:6px;height:6px;border-radius:50%;display:none}
+#bdot.st-got{display:block;background:#EF9F27}
+#bdot.st-off,#bdot.st-fail{display:block;background:#E24B4A}
+#bdot.blink{animation:blink .7s steps(2,start) infinite}
+
+/* ---------- ensaio do Post-It ---------- */
+#rh{position:fixed;left:12px;right:12px;top:calc(var(--sat) + 8px);z-index:50;background:rgba(20,20,22,.85);border-radius:12px;padding:8px 12px;font-size:13px;color:#D3D1C7;display:none;pointer-events:none}
+#rh.on{display:block}
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<div id="menu" class="screen on"><div class="in">
+  <div class="tt">Telão</div>
+  <div class="pills">
+    <div class="pill" id="pTelao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span id="pTelaoT">Sem sinal</span></div>
+    <div class="pill n" id="pPad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg><span id="pPadT">Post-It</span></div>
+  </div>
+
+  <div class="sec">Entrada da hora</div>
+  <div class="gr">
+    <div class="rw" id="mLock">Tela bloqueada com senha<span class="ck" id="ckLock"></span></div>
+    <div class="rw" id="mBlack">Tela preta com swipes<span class="ck" id="ckBlack"></span></div>
+  </div>
+
+  <div class="sec">Hora embaixo (senha, swipes e microfone)</div>
+  <div class="gr"><div class="rw" id="mHint">Aparência<small id="vHint">Discreta</small></div></div>
+
+  <div class="sec">Aviso do telão (câmera na tela bloqueada, pontinho na tela preta)</div>
+  <div class="gr"><div class="rw" id="mGot">Laranja fica<small id="vGot">até a próxima</small></div></div>
+
+  <div class="sec">Post-It</div>
+  <div class="gr">
+    <div class="rw" id="mPadOn">Post-It ligado<div class="sw" id="swPad"></div></div>
+    <div class="rw" id="mPadDev">Aparelho<small id="vPadDev">conectar</small></div>
+    <div class="rw" id="mRh">Modo ensaio (mostra o que leu)<div class="sw" id="swRh"></div></div>
+  </div>
+
+  <div class="sec">Tela bloqueada</div>
+  <div class="gr">
+    <div class="rw" id="mWall">Papel de parede<small>Escolher</small></div>
+    <div class="rw" id="mLetra">Letra do relógio<small id="vLetra">normal</small></div>
+    <div class="rw" id="mPeso">Grossura do relógio<small id="vPeso">500</small></div>
+  </div>
+  <input type="file" id="fWall" accept="image/*" class="hide">
+
+  <div class="sec">Teste</div>
+  <div class="gr">
+    <div class="rw">Vibrações<div class="btns"><button class="mini" data-v="curta">1</button><button class="mini" data-v="dupla">2</button><button class="mini" data-v="longa">longa</button></div></div>
+    <div class="rw">Última hora<small id="vLast">—</small></div>
+  </div>
+
+  <button class="go" id="goBtn">Começar</button>
+  <div class="nota">Voltar ao menu: arrastar dois dedos para baixo (tela bloqueada)<br>ou segurar fora do microfone (tela preta).<br>Na tela preta, segure o microfone e fale a hora.</div>
+  <div class="nota" id="ver">Telão 1.0</div>
+</div></div>
+
+<!-- TELA BLOQUEADA -->
+<div id="lock" class="screen"><div class="wall" id="lockWall"></div><div id="lc"></div></div>
+
+<!-- SENHA -->
+<div id="pass" class="screen">
+  <div class="wall" id="passWall"></div><div class="dim"></div>
+  <div class="pc"><div class="pc-t">Digite o Código</div><div class="dots" id="dots"></div><div class="pad" id="pad"></div></div>
+  <div class="hint" id="passHint"></div>
+  <div class="pc-b"><span>Emergência</span><span id="cancel">Cancelar</span></div>
+</div>
+
+<!-- TELA PRETA -->
+<div id="black" class="screen">
+  <div class="hint" id="blackHint"></div>
+  <div id="mic"><div class="ring"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+  <div id="bdot"></div>
+</div>
+
+<div id="rh"></div>
+
+<script>
+'use strict';
+/*PECA:tela-bloqueio.js*/
+
+/* ================= base ================= */
+const NAT = !!window.__NATIVE_APP__;
+const $ = id => document.getElementById(id);
+const pad2 = n => String(n).padStart(2, '0');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem('telao_' + k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('telao_' + k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+};
+function nat(cmd, args) {
+  try { return window.webkit.messageHandlers.telao.postMessage(Object.assign({ cmd }, args || {})); }
+  catch (e) { return Promise.reject(e); }
+}
+function natMsg(nome, v) { try { window.webkit.messageHandlers[nome].postMessage(v); } catch (e) {} }
+const vib = tipo => { if (NAT) nat('vibrar', { tipo }).catch(() => {}); else try { navigator.vibrate && navigator.vibrate(tipo === 'dupla' ? [120, 120, 120] : tipo === 'longa' ? 600 : 120); } catch (e) {} };
+
+const cfg = Object.assign({ modo: 'black', hint: '.25', gotSecs: 0, padOn: true, rh: false, letra: 'normal', peso: '500' }, store.get('cfg') || {});
+const saveCfg = () => store.set('cfg', cfg);
+
+/* ================= telas ================= */
+let atual = 'menu';
+function mostrar(id) {
+  ['menu', 'lock', 'pass', 'black'].forEach(s => $(s).classList.toggle('on', s === id));
+  atual = id;
+  if (id === 'lock') { tb.mostrar(); } else if (id !== 'pass') tb.parar();
+  // barra de cima do iPhone: aparece no menu e na tela bloqueada (letras brancas), some na tela preta
+  natMsg('barra', id === 'black'); natMsg('estilo', 'claro');
+  pintarAvisos();
+}
+function comecar() { if (cfg.modo === 'lock') { $('lc').style.transform = ''; mostrar('lock'); } else { limparSwipes(); mostrar('black'); } }
+function abrirMenu() { cancelarMic(); limparSwipes(); mostrar('menu'); desenharMenu(); }
+
+/* ================= Ably: manda a hora ao player (o telão) ================= */
+const ABLY_KEY = '-WkBxA.FUModg:DGe6U1wyeEuOu4_3iuubjnS144Ol3ojOlTb9mmqgmv0';
+const CANAL = 'relogio:interestelar';
+let ably = null, ch = null, online = false, telao = false, pend = null, ultima = null;
+function carregarAbly() {
+  if (window.AblyPubSub) return Promise.resolve(true);
+  return new Promise(ok => { const s = document.createElement('script'); s.src = 'ably.min.js'; s.onload = () => ok(!!window.AblyPubSub); s.onerror = () => ok(false); document.head.appendChild(s); });
+}
+async function ligarAbly() {
+  if (!(await carregarAbly())) { setTimeout(ligarAbly, 8000); return; }
+  try {
+    ably = AblyPubSub.createClient({ key: ABLY_KEY, clientId: 'telao-iphone', echoMessages: false });
+    ch = ably.channels.get(CANAL);
+    ably.connection.on(s => { online = s.current === 'connected'; if (online) verPresenca(); else telao = false; estado(); });
+    ch.presence.subscribe(m => { if (m.clientId !== 'player') return; telao = !(m.action === 'leave' || m.action === 'absent'); estado(); });
+    Promise.resolve(ch.subscribe('recebido', m => resposta(m.data || {}))).catch(() => {});
+  } catch (e) { setTimeout(ligarAbly, 8000); }
+}
+async function verPresenca() { if (!ch) return; try { const ms = await ch.presence.get(); telao = ms.some(m => m.clientId === 'player'); } catch (e) {} estado(); }
+setInterval(() => { if (online) verPresenca(); }, 15000);
+
+/* envia: 1 vibração; o player responde "recebida" e depois "pronto" (2 vibrações) */
+function enviarHora(h, m, de) {
+  h = h % 12 || 12;
+  const hora = h + ':' + pad2(m);
+  ultima = { hora, st: 'enviando' }; desenharUltima();
+  vib('curta');
+  if (!ch || !online) { falhou(hora, 'sem internet'); return; }
+  const id = Math.random().toString(36).slice(2, 10);
+  if (pend) clearTimeout(pend.t);
+  pend = { id, hora, t: setTimeout(() => { if (pend && pend.id === id) { pend = null; falhou(hora, 'o telão não respondeu'); } }, 5000) };
+  Promise.resolve(ch.publish('hora', { hora, id, de })).catch(() => { if (pend && pend.id === id) { clearTimeout(pend.t); pend = null; falhou(hora, 'não enviou'); } });
+}
+function resposta(d) {
+  telao = true; estado();
+  if (!pend || d.id !== pend.id) return;
+  if (d.status === 'recebida') {
+    clearTimeout(pend.t); const id = pend.id, hora = pend.hora;
+    pend.t = setTimeout(() => { if (pend && pend.id === id) { pend = null; falhou(hora, 'o telão não confirmou'); } }, 12000);
+    return;
+  }
+  clearTimeout(pend.t); const hora = pend.hora; pend = null;
+  if (d.status === 'pronto') { vib('dupla'); ultima = { hora: d.pronta || hora, st: 'pronta no telão' }; aviso('got'); }
+  else falhou(hora, 'chegou tarde: vai aparecer ' + (d.pronta || '—'));
+  desenharUltima();
+}
+function falhou(hora, porque) { vib('longa'); ultima = { hora, st: porque }; aviso('fail'); desenharUltima(); }
+
+/* ================= avisos: câmera (tela bloqueada) e pontinho (tela preta) ================= */
+let temp = null, tempT = null;
+function aviso(k) {
+  temp = k; clearTimeout(tempT);
+  if (k === 'fail') tempT = setTimeout(() => { temp = null; pintarAvisos(); }, 3000);
+  else if (k === 'got' && cfg.gotSecs) tempT = setTimeout(() => { if (temp === 'got') { temp = null; pintarAvisos(); } }, cfg.gotSecs * 1000);
+  pintarAvisos();
+}
+function estadoAviso() {
+  if (temp === 'fail') return ['st-fail', true];
+  if (!(online && telao)) return ['st-off', false];
+  if (temp === 'got') return ['st-got', false];
+  return ['', false];
+}
+function pintarAvisos() {
+  const [c, pisca] = estadoAviso();
+  const els = [$('bdot'), document.querySelector('#lock .tbCam')].filter(Boolean);
+  els.forEach(el => { el.classList.remove('st-got', 'st-off', 'st-fail', 'blink'); if (c) el.classList.add(c); if (pisca) el.classList.add('blink'); });
+}
+function estado() {
+  const p = $('pTelao');
+  if (online && telao) { p.className = 'pill g'; $('pTelaoT').textContent = 'Telão conectado'; }
+  else if (online) { p.className = 'pill y'; $('pTelaoT').textContent = 'Telão desligado'; }
+  else { p.className = 'pill'; $('pTelaoT').textContent = 'Sem sinal'; }
+  pintarAvisos();
+}
+function desenharUltima() { $('vLast').textContent = ultima ? ultima.hora + ' · ' + ultima.st : '—'; }
+
+/* hora fraquinha embaixo */
+const hintCor = () => 'rgba(255,255,255,' + cfg.hint + ')';
+function hint(el, setas, hora) {
+  el.style.color = hintCor();
+  el.innerHTML = (setas ? '<div class="a">' + setas + '</div>' : '') + (hora ? '<div class="h">' + hora + '</div>' : '');
+}
+
+/* ================= tela bloqueada (peça pronta do Timeline) ================= */
+const natTelas = NAT ? (cmd, args) => nat(cmd, args) : null;
+const tb = criarTelaBloqueio({ raiz: $('lc'), opcoes: () => ({ letra: cfg.letra, peso: cfg.peso, zeroHora: true }), nativo: natTelas });
+function aplicarPapel() {
+  const u = store.get('papel') || 'ini/papel.jpg';
+  ['lockWall', 'passWall'].forEach(id => $(id).style.backgroundImage = 'url("' + u + '")');
+}
+aplicarPapel();
+
+/* gestos: um dedo para cima abre a senha; dois dedos para baixo abrem o menu */
+const toques = new Map();
+let lockY = null, doisY = null;
+const lc = $('lc');
+$('lock').addEventListener('pointerdown', e => {
+  toques.set(e.pointerId, e.clientY);
+  if (toques.size === 1) lockY = e.clientY;
+  if (toques.size === 2) { doisY = [...toques.values()].reduce((a, b) => a + b, 0) / 2; lockY = null; lc.style.transform = ''; }
+});
+$('lock').addEventListener('pointermove', e => {
+  if (!toques.has(e.pointerId)) return;
+  toques.set(e.pointerId, e.clientY);
+  if (toques.size >= 2 && doisY != null) {
+    const y = [...toques.values()].reduce((a, b) => a + b, 0) / toques.size;
+    if (y - doisY > 70) { doisY = null; toques.clear(); abrirMenu(); }
+    return;
+  }
+  if (lockY != null) { const dy = e.clientY - lockY; if (dy < 0) lc.style.transform = 'translateY(' + (dy * .6) + 'px)'; }
+});
+function fimLock(e) {
+  const tinha = toques.has(e.pointerId); toques.delete(e.pointerId);
+  if (!tinha) return;
+  if (toques.size === 0) doisY = null;
+  if (lockY == null) return;
+  const dy = e.clientY - lockY; lockY = null;
+  if (dy < -45) abrirSenha();
+  else { lc.style.transition = 'transform .25s'; lc.style.transform = ''; setTimeout(() => lc.style.transition = '', 260); }
+}
+$('lock').addEventListener('pointerup', fimLock);
+$('lock').addEventListener('pointercancel', e => { toques.delete(e.pointerId); lockY = null; doisY = null; lc.style.transform = ''; });
+
+/* ================= senha: 4 números = hora; sempre "erra a senha" ================= */
+let code = '', ocupado = false;
+const LET = ['', 'ABC', 'DEF', 'GHI', 'JKL', 'MNO', 'PQRS', 'TUV', 'WXYZ'];
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].forEach(n => {
+  const k = document.createElement('div'); k.className = 'key' + (n === 0 ? ' zero' : '');
+  k.innerHTML = '<b>' + n + '</b><i>' + (n > 0 ? LET[n - 1] : '') + '</i>';
+  k.addEventListener('pointerdown', e => { e.preventDefault(); k.classList.add('p'); tecla(String(n)); });
+  const up = () => k.classList.remove('p'); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => k.addEventListener(ev, up));
+  $('pad').appendChild(k);
+});
+function horaDoCodigo(c) {          // "0813" -> 8:13 ; aceita 00–23 h e 00–59 min
+  if (c.length < 4) return null;
+  const h = +c.slice(0, 2), m = +c.slice(2, 4);
+  return (h <= 23 && m <= 59) ? { h: h % 12 || 12, m } : null;
+}
+function desenharSenha() {
+  const d = $('dots'); d.innerHTML = '';
+  for (let i = 0; i < 4; i++) { const s = document.createElement('div'); s.className = 'dt' + (i < code.length ? ' f' : ''); d.appendChild(s); }
+  $('cancel').textContent = code.length ? 'Apagar' : 'Cancelar';
+  // hora se formando, fraquinha
+  let t = '';
+  if (code.length) {
+    const h = code.length >= 2 ? +code.slice(0, 2) : null;
+    const hs = h == null ? code[0] : (h <= 23 ? String(h % 12 || 12) : '?');
+    t = hs + (code.length >= 2 ? ':' + code.slice(2) : '');
+    if (code.length === 4 && !horaDoCodigo(code)) t += ' ?';
+  }
+  hint($('passHint'), '', t);
+}
+function abrirSenha() {
+  code = ''; desenharSenha(); mostrar('pass');
+  lc.style.transform = '';
+}
+function tecla(n) {
+  if (ocupado || code.length >= 4) return;
+  code += n; desenharSenha();
+  if (code.length === 4) { ocupado = true; setTimeout(conferir, 140); }
+}
+function tremer(fim) {
+  const d = $('dots'); d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
+  setTimeout(() => { d.classList.remove('shake'); fim(); }, 480);
+}
+function conferir() {
+  const t = horaDoCodigo(code);
+  if (t) { enviarHora(t.h, t.m, 'senha'); tremer(() => { code = ''; ocupado = false; desenharSenha(); mostrar('lock'); }); }
+  else tremer(() => { code = ''; ocupado = false; desenharSenha(); });   // hora impossível: não envia, digita de novo
+}
+$('cancel').addEventListener('click', () => {
+  if (ocupado) return;
+  if (code.length) { code = code.slice(0, -1); desenharSenha(); } else mostrar('lock');
+});
+
+/* ================= tela preta: swipes no código do mostrador ================= */
+// 1º swipe vai ao número principal (12/3/6/9), o 2º aponta para o lado. Minutos: mesma tabela, um algarismo por par (0 = ↑↑)
+const CODIGO = { 'UU': 0, 'UR': 1, 'RU': 2, 'RR': 3, 'RD': 4, 'DR': 5, 'DD': 6, 'DL': 7, 'LD': 8, 'LL': 9, 'LU': 10, 'UL': 11 };
+const SETA = { U: '↑', D: '↓', L: '←', R: '→' };
+let sw = [], swT = null, swEspera = false, swFeito = false, swApagar = null;
+function limparSwipes() { sw = []; clearTimeout(swT); clearTimeout(swApagar); swEspera = false; swFeito = false; desenharSwipes(); }
+function lerSwipes() {
+  const pares = []; for (let i = 0; i + 1 < sw.length; i += 2) pares.push(CODIGO[sw[i] + sw[i + 1]]);
+  const out = { h: null, d1: null, d2: null, ok: true };
+  if (pares.length > 0) out.h = pares[0] === 0 ? 12 : pares[0];
+  if (pares.length > 1) { out.d1 = pares[1]; if (pares[1] > 5) out.ok = false; }
+  if (pares.length > 2) { out.d2 = pares[2]; if (pares[2] > 9) out.ok = false; }
+  return out;
+}
+function desenharSwipes() {
+  let setas = '';
+  for (let i = 0; i < sw.length; i++) { setas += SETA[sw[i]]; if (i % 2 === 1 && i < sw.length - 1) setas += ' · '; }
+  const r = lerSwipes();
+  let hora = '';
+  if (r.h != null) hora = r.h + ':' + (r.d1 != null ? (r.d1 > 5 ? '?' : r.d1) : '') + (r.d2 != null ? (r.d2 > 9 ? '?' : r.d2) : '');
+  if (!micOn) hint($('blackHint'), setas, hora);
+}
+function novoSwipe(dir) {
+  if (swEspera) { limparSwipes(); return; }        // swipe a mais nos 2 s: zera tudo
+  if (swFeito) { clearTimeout(swApagar); sw = []; swFeito = false; }   // a hora anterior já foi: começa outra
+  sw.push(dir); desenharSwipes();
+  const r = lerSwipes();
+  if (!r.ok) { aviso('fail'); swFeito = true; clearTimeout(swApagar); swApagar = setTimeout(limparSwipes, 700); return; }
+  if (sw.length === 6) {
+    swEspera = true;
+    swT = setTimeout(() => {
+      const f = lerSwipes();
+      swEspera = false;
+      if (f.ok) enviarHora(f.h, f.d1 * 10 + f.d2, 'swipes');
+      swFeito = true;
+      swApagar = setTimeout(() => { sw = []; swFeito = false; desenharSwipes(); }, 1500);   // a hora fica um instante embaixo e some
+    }, 2000);
+  }
+}
+// gestos da tela preta: swipe = arrastar ≥ 35 px; segurar 1,2 s parado (fora do microfone) = menu
+let bx = null, by = null, bId = null, segurarT = null;
+$('black').addEventListener('pointerdown', e => {
+  if (e.target.closest('#mic')) return;
+  if (bId != null) return;
+  bId = e.pointerId; bx = e.clientX; by = e.clientY;
+  clearTimeout(segurarT); segurarT = setTimeout(() => { bId = null; abrirMenu(); }, 1200);
+});
+$('black').addEventListener('pointermove', e => {
+  if (e.pointerId !== bId) return;
+  if (Math.hypot(e.clientX - bx, e.clientY - by) > 12) clearTimeout(segurarT);
+});
+$('black').addEventListener('pointerup', e => {
+  if (e.pointerId !== bId) return;
+  clearTimeout(segurarT); bId = null;
+  const dx = e.clientX - bx, dy = e.clientY - by;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 35) return;
+  novoSwipe(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'));
+});
+$('black').addEventListener('pointercancel', () => { clearTimeout(segurarT); bId = null; });
+
+/* ================= microfone: segurar e falar a hora ================= */
+let micOn = false, vozTexto = '', vozFimCb = null;
+const UN = { zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13,
+  catorze: 14, quatorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50 };
+function horaDaFala(txt) {
+  let s = ' ' + String(txt || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') + ' ';
+  s = s.replace(/meio[\s-]?dia/g, ' 12 ').replace(/meia[\s-]?noite/g, ' 12 ').replace(/\bh\b|horas?/g, ' horas ').replace(/minutos?/g, ' ').replace(/[,.!?]/g, ' ').replace(/(\d)\s*:\s*(\d)/g, '$1:$2');
+  // palavras -> números (dezenas "vinte e tres" viram 23)
+  const tk = s.split(/\s+/).filter(Boolean).map(w => (w in UN) ? UN[w] : (/^\d+$/.test(w) ? +w : w));
+  const t = [];
+  for (let i = 0; i < tk.length; i++) {
+    const a = tk[i];
+    if (typeof a === 'number' && a >= 20 && a % 10 === 0 && a <= 50 && tk[i + 1] === 'e' && typeof tk[i + 2] === 'number' && tk[i + 2] >= 1 && tk[i + 2] <= 9) { t.push(a + tk[i + 2]); i += 2; }
+    else t.push(a);
+  }
+  const q = t.join(' ');
+  let m;
+  const ok = (h, mi) => (h >= 0 && h <= 24 && mi >= 0 && mi <= 59) ? { h: h % 12 || 12, m: mi } : null;
+  if ((m = q.match(/(\d{1,2}):(\d{2})/))) return ok(+m[1], +m[2]);
+  if ((m = q.match(/(\d{1,2}) (?:horas )?(?:minutos )?para (?:as |a |o )?(\d{1,2})/))) { const mi = +m[1], h = +m[2]; if (mi > 0 && mi < 60) return ok((h + 11) % 12 || 12, 60 - mi); }
+  if ((m = q.match(/(\d{1,2}) (?:horas )?e meia/))) return ok(+m[1], 30);
+  if ((m = q.match(/(\d{1,2}) (?:horas )?e (\d{1,2})/))) return ok(+m[1], +m[2]);
+  if ((m = q.match(/(\d{1,2}) horas (\d{1,2})/))) return ok(+m[1], +m[2]);
+  if ((m = q.match(/\b(\d{3,4})\b/))) { const v = m[1]; return ok(+v.slice(0, -2), +v.slice(-2)); }
+  if ((m = q.match(/(\d{1,2}) (\d{1,2})\b/))) return ok(+m[1], +m[2]);
+  if ((m = q.match(/(\d{1,2}) (?:horas|em ponto)/))) return ok(+m[1], 0);
+  if ((m = q.match(/^\s*(\d{1,2})\s*$/))) return ok(+m[1], 0);
+  return null;
+}
+window.telaoRx = d => {
+  if (d.tipo === 'voz') {
+    vozTexto = d.texto || '';
+    if (micOn) { const t = horaDaFala(vozTexto); hint($('blackHint'), '"' + vozTexto + '"', t ? t.h + ':' + pad2(t.m) : ''); }
+  } else if (d.tipo === 'vozFim') { if (vozFimCb) { const f = vozFimCb; vozFimCb = null; f(); } }
+};
+const mic = $('mic');
+function micVisual() { mic.classList.toggle('on', micOn); mic.querySelector('svg').style.opacity = micOn ? Math.min(1, +cfg.hint * 2 + .1) : Math.max(.12, +cfg.hint * .9); }
+mic.addEventListener('pointerdown', e => {
+  e.preventDefault(); e.stopPropagation();
+  if (micOn) return;
+  micOn = true; vozTexto = ''; micVisual(); hint($('blackHint'), '…', '');
+  if (!NAT) return;
+  nat('vozLigar').then(r => { if (r !== true) { micOn = false; micVisual(); aviso('fail'); hint($('blackHint'), String(r || 'microfone indisponível'), ''); setTimeout(desenharSwipes, 2500); } }).catch(() => {});
+});
+function soltarMic() {
+  if (!micOn) return;
+  micOn = false; micVisual();
+  const terminar = () => {
+    const t = horaDaFala(vozTexto);
+    if (t) { hint($('blackHint'), '', t.h + ':' + pad2(t.m)); enviarHora(t.h, t.m, 'voz'); }
+    else { aviso('fail'); hint($('blackHint'), vozTexto ? '"' + vozTexto + '" ?' : '', ''); }
+    setTimeout(desenharSwipes, 2500);
+  };
+  if (!NAT) { terminar(); return; }
+  let feito = false;
+  const fim = () => { if (feito) return; feito = true; terminar(); };
+  vozFimCb = fim; setTimeout(fim, 1500);          // se o aviso de fim não vier, decide assim mesmo
+  nat('vozDesligar').catch(fim);
+}
+function cancelarMic() { if (micOn) { micOn = false; micVisual(); vozFimCb = null; if (NAT) nat('vozDesligar').catch(() => {}); } }
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => mic.addEventListener(ev, e => { e.stopPropagation(); soltarMic(); }));
+
+/* ================= Post-It (mesmo leitor da letra do app do Relógio) ================= */
+const SVC = '58570001-b5a3-f393-e0a9-e50e24dcca9e';
+const WRITE = '58570002-b5a3-f393-e0a9-e50e24dcca9e';
+const NOTIFY = '58570003-b5a3-f393-e0a9-e50e24dcca9e';
+const DEV = 0x05;
+/*POSTIT*/
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('tempo')), ms))]);
+function listenFor(d, ms) {
+  if (!d || typeof d.watchAdvertisements !== 'function') return Promise.resolve(false);
+  return new Promise(resolve => {
+    let done = false;
+    const finish = ok => { if (done) return; done = true; try { d.removeEventListener('advertisementreceived', onAdv); } catch (e) {} try { if (typeof d.unwatchAdvertisements === 'function') d.unwatchAdvertisements(); } catch (e) {} resolve(ok); };
+    const onAdv = () => finish(true);
+    try { d.addEventListener('advertisementreceived', onAdv); } catch (e) {}
+    try { const p = d.watchAdvertisements(); if (p && p.catch) p.catch(() => finish(false)); } catch (e) { finish(false); return; }
+    setTimeout(() => finish(false), ms);
+  });
+}
+const isPadName = n => /^PAD/i.test((n || '').trim());
+let padType = store.get('padType') || 0x1B;
+let padDevice = null, padWrite = null, padRetrying = false, padToken = 0, padBat = null;
+function setPad(st) {
+  const p = $('pPad'), n = store.get('padName');
+  if (!cfg.padOn) { p.className = 'pill n'; $('pPadT').textContent = 'Post-It desligado'; }
+  else if (st === 'on') { p.className = 'pill g'; $('pPadT').textContent = 'Post-It' + (padBat != null ? ' ' + padBat + '%' : ''); }
+  else if (st === 'wait') { p.className = 'pill y'; $('pPadT').textContent = 'Post-It…'; }
+  else { p.className = n ? 'pill' : 'pill n'; $('pPadT').textContent = n ? 'Post-It desconectado' : 'Post-It'; }
+  $('vPadDev').textContent = st === 'on' ? (padDevice && padDevice.name || n || 'conectado') : (n ? n + ' (desligado)' : 'conectar');
+}
+let padQueue = Promise.resolve();
+function padSend(bytes) {
+  const job = padQueue.then(async () => { if (!padWrite) throw new Error('sem Post-It'); if (padWrite.writeValueWithoutResponse) await padWrite.writeValueWithoutResponse(bytes); else await padWrite.writeValue(bytes); });
+  padQueue = job.catch(() => {}); return job;
+}
+const padOpenCmd = () => new Uint8Array([0x58, 0x57, padType, 0x51, 0, 0, 0, 0]);
+async function padOpen() { try { await padSend(padOpenCmd()); await sleep(250); await padSend(padOpenCmd()); } catch (e) {} }
+async function connectPad() {
+  if (!navigator.bluetooth) return;
+  try {
+    padToken++; setPad('wait');
+    const old = padDevice;
+    const d = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'PAD' }], optionalServices: [SVC] });
+    if (old && old !== d) { padDevice = null; padWrite = null; try { old.gatt.disconnect(); } catch (e) {} }
+    padDevice = d; padDevice.addEventListener('gattserverdisconnected', onPadDisconnected);
+    await openPadGatt();
+  } catch (e) { setPad('lost'); }
+}
+async function openPadGatt() {
+  const dev = padDevice;
+  const server = await dev.gatt.connect();
+  const svc = await server.getPrimaryService(SVC);
+  const wc = await svc.getCharacteristic(WRITE);
+  const nc = await svc.getCharacteristic(NOTIFY);
+  if (dev !== padDevice) throw new Error('trocou');
+  padWrite = wc;
+  nc.removeEventListener('characteristicvaluechanged', onPadNotify);
+  nc.addEventListener('characteristicvaluechanged', onPadNotify);
+  await nc.startNotifications();
+  store.set('padName', dev.name || 'PAD');
+  setPad('on');
+  await padOpen();
+}
+async function onPadDisconnected(ev) {
+  if (ev && ev.target && padDevice && ev.target !== padDevice) return;
+  padWrite = null; ink.clear(); setPad('lost');
+  if (padRetrying || !cfg.padOn) return;
+  padRetrying = true;
+  for (let i = 0; i < 5 && padDevice && !padDevice.gatt.connected && cfg.padOn; i++) {
+    try { setPad('wait'); await openPadGatt(); break; } catch (e) { setPad('lost'); await sleep(1500); }
+  }
+  padRetrying = false;
+  if (!padDevice || !padDevice.gatt.connected) setPad('lost');
+}
+async function autoConnectPad() {
+  const my = ++padToken, cancelled = () => my !== padToken || !cfg.padOn;
+  try {
+    if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== 'function') return;
+    const list = await withTimeout(navigator.bluetooth.getDevices(), 2500);
+    if (cancelled()) return;
+    const d = list.find(x => isPadName(x.name));
+    if (!d) { setPad('lost'); return; }
+    padDevice = d; padDevice.addEventListener('gattserverdisconnected', onPadDisconnected);
+    setPad('wait');
+    await listenFor(d, 8000);
+    for (let i = 0; i < 2; i++) { if (cancelled()) return; try { await withTimeout(openPadGatt(), 8000); return; } catch (e) { await sleep(800); } }
+    if (!cancelled()) { padDevice = null; setPad('lost'); }
+  } catch (e) { if (!cancelled()) { padDevice = null; setPad('lost'); } }
+}
+let lastOpenTry = 0;
+function onPadNotify(ev) {
+  const v = ev.target.value, b = new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
+  if (b.length < 5 || b[0] !== 0x58 || b[1] !== 0x57) return;
+  if (b[2] !== padType && b[2] !== DEV) { padType = b[2]; store.set('padType', padType); if (Date.now() - lastOpenTry > 3000) { lastOpenTry = Date.now(); padOpen(); } }
+  if (b[3] <= 100 && b[3] !== padBat) { padBat = b[3]; setPad('on'); }
+  if (!cfg.padOn) return;
+  ink.feed(b);
+}
+PadReader.setTemplates(PAD_TEMPLATES);
+const ink = PadInk(onPadResult, {});
+setInterval(() => ink.tick(), 150);
+let rhT = null;
+function onPadResult(r) {
+  const t = r.time;
+  if (cfg.rh) { $('rh').textContent = 'Post-It leu: ' + (r.lines.join(' / ') || '(nada)') + '  →  ' + (t ? t.h + ':' + pad2(t.m) : '??'); $('rh').classList.add('on'); clearTimeout(rhT); rhT = setTimeout(() => $('rh').classList.remove('on'), 4000); }
+  if (!t) { aviso('fail'); return; }
+  enviarHora(t.h, t.m, 'postit');
+}
+function setPadOn(on) {
+  cfg.padOn = on; saveCfg();
+  if (on) { if (!padWrite) autoConnectPad(); }
+  else { padToken++; ink.clear(); if (padDevice) { const d = padDevice; padDevice = null; padWrite = null; try { d.gatt.disconnect(); } catch (e) {} } }
+  setPad(padWrite ? 'on' : 'lost'); desenharMenu();
+}
+
+/* ================= menu ================= */
+const HINTS = [['.35', 'Visível'], ['.25', 'Discreta'], ['.14', 'Bem fraca'], ['0', 'Desligada']];
+const GOTS = [2, 5, 10, 15, 30, 0];
+const PESOS = ['400', '500', '600'];
+function desenharMenu() {
+  $('ckLock').textContent = cfg.modo === 'lock' ? '✓' : '';
+  $('ckBlack').textContent = cfg.modo === 'black' ? '✓' : '';
+  $('vHint').textContent = (HINTS.find(h => h[0] === cfg.hint) || HINTS[1])[1];
+  $('vGot').textContent = cfg.gotSecs ? cfg.gotSecs + ' s' : 'até a próxima';
+  $('swPad').classList.toggle('on', cfg.padOn); $('swRh').classList.toggle('on', cfg.rh);
+  $('mPadDev').classList.toggle('hide', !cfg.padOn); $('mRh').classList.toggle('hide', !cfg.padOn);
+  $('vLetra').textContent = cfg.letra; $('vPeso').textContent = cfg.peso;
+  desenharUltima(); estado(); micVisual();
+}
+$('mLock').onclick = () => { cfg.modo = 'lock'; saveCfg(); desenharMenu(); };
+$('mBlack').onclick = () => { cfg.modo = 'black'; saveCfg(); desenharMenu(); };
+$('mHint').onclick = () => { const i = HINTS.findIndex(h => h[0] === cfg.hint); cfg.hint = HINTS[(i + 1) % HINTS.length][0]; saveCfg(); desenharMenu(); };
+$('mGot').onclick = () => { cfg.gotSecs = GOTS[(GOTS.indexOf(cfg.gotSecs) + 1) % GOTS.length]; saveCfg(); desenharMenu(); };
+$('mPadOn').onclick = () => setPadOn(!cfg.padOn);
+$('mPadDev').onclick = () => { padToken++; padDevice = null; connectPad(); };
+$('mRh').onclick = () => { cfg.rh = !cfg.rh; saveCfg(); desenharMenu(); };
+$('mLetra').onclick = () => { cfg.letra = cfg.letra === 'normal' ? 'redonda' : 'normal'; saveCfg(); desenharMenu(); };
+$('mPeso').onclick = () => { cfg.peso = PESOS[(PESOS.indexOf(cfg.peso) + 1) % PESOS.length]; saveCfg(); desenharMenu(); };
+$('mWall').onclick = () => $('fWall').click();
+$('fWall').onchange = e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => {
+    const W = Math.round(innerWidth * Math.min(2, devicePixelRatio || 1)), H = Math.round(innerHeight * Math.min(2, devicePixelRatio || 1));
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const s = Math.max(W / img.width, H / img.height), w = img.width * s, h = img.height * s;
+    c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    URL.revokeObjectURL(url);
+    if (!store.set('papel', c.toDataURL('image/jpeg', .82))) store.set('papel', c.toDataURL('image/jpeg', .6));
+    aplicarPapel();
+  };
+  img.src = url; e.target.value = '';
+};
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => vib(b.dataset.v));
+$('goBtn').onclick = comecar;
+
+/* ================= início ================= */
+desenharMenu(); setPad('lost');
+mostrar('menu');
+ligarAbly();
+if (cfg.padOn) autoConnectPad();
+natMsg('segundoPlano', true);   // continua recebendo com a tela apagada
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  try { if (ably) ably.connect(); } catch (e) {}
+  verPresenca();
+  if (cfg.padOn && !padWrite) autoConnectPad();
+  if (atual === 'lock') tb.mostrar();
+});
+window.__telao = { horaDaFala, horaDoCodigo, novoSwipe, lerSwipes, enviarHora, resposta, get sw() { return sw; }, mostrar, get pend() { return pend; }, cfg };   // para testes
+</script>
+</body>
+</html>

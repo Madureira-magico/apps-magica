@@ -11,6 +11,9 @@ apps/         uma pasta para cada app (listas, bola, relogio, lousa, mosaico, lo
   mosaico/extras/   parte do iPhone só do Mosaico (fotos, rosto, mosaico)
   loteria/www/      o app Loterias (abertura, cartões, volante, modo mágica, ajustes)
   loteria/extras/   parte do iPhone só do Loterias (busca de prêmios, vídeo da abertura, imagens)
+  telao/fonte/       o app Telão (python3 build.py monta www/): tela bloqueada com senha, tela preta com swipes,
+                    microfone e Post-It; manda a hora ao player do Interestelar (madureira-magico.github.io/interestelar)
+  telao/extras/     parte do iPhone só do Telão (vibrações e reconhecimento de fala em português)
 comum/        a "casca" do iPhone, igual para todos os apps
 comum/telas/  PEÇAS PRONTAS: tela de ícones (Mosaico), tela bloqueada (Timeline) e animação de abrir/fechar — ver GUIA.md
 scripts/      a receita que monta os apps
