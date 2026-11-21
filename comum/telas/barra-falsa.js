@@ -2,7 +2,7 @@
    PEÇA PRONTA (comum/telas): BARRA DE CIMA FALSA igual à do iPhone
    (hora, sinal, Wi-Fi e bateria de verdade). Medidas tiradas do print do iPhone (402 pontos de largura).
    Serve para mostrar coisas escondidas no relógio (ex.: "17;05" na Calculadora).
-   Uso: const bf = criarBarraFalsa({ raiz: elemento, nativo: cmd => Promise, opcoes: () => ({sinal: 1-4, wifi: 1-3, soHora: false}) })
+   Uso: const bf = criarBarraFalsa({ raiz: elemento, nativo: cmd => Promise, opcoes: () => ({sinal: 1-4, wifi: 1-3, soHora: false, rede: '5G' (opcional: mostra o texto no lugar do Wi-Fi)}) })
         bf.mostrar(true/false)   bf.hora(texto ou null = hora certa)   bf.desenhar()
         soHora: desenha só o relógio (o resto da barra vem de outro lugar, ex.: a foto congelada da barra de verdade).
         operadora: 'Claro BR' -> como na TELA BLOQUEADA: o nome da operadora no lugar da hora (medidas do print do Paint).
@@ -76,6 +76,14 @@ function criarBarraFalsa(o){
     cx.fillStyle = '#fff';
     // Wi-Fi: 3 ondas (as que passam do escolhido ficam apagadas)
     const cxw = px(968), cyw = px(116);
+    if(p.rede){
+      // sem Wi-Fi: no lugar do ícone, o texto da rede de dados (ex.: "5G"), como no iPhone
+      cx.font = '600 100px -apple-system, system-ui, "Inter", sans-serif';
+      const mr = cx.measureText('5G'), tr = 100 * px(34) / mr.actualBoundingBoxAscent;
+      cx.font = '600 ' + tr + 'px -apple-system, system-ui, "Inter", sans-serif';
+      cx.textAlign = 'center'; cx.textBaseline = 'alphabetic'; cx.fillStyle = '#fff';
+      cx.fillText(String(p.rede), cxw, cyw);
+    } else {
     cx.save(); cx.lineCap = 'round';
     [[px(37), 3], [px(24), 2]].forEach(([r, nivel]) => {
       cx.strokeStyle = p.wifi >= nivel ? '#fff' : 'rgba(255,255,255,.25)'; cx.lineWidth = px(8);
@@ -83,6 +91,7 @@ function criarBarraFalsa(o){
     });
     cx.fillStyle = '#fff'; cx.beginPath(); cx.moveTo(cxw, cyw); cx.arc(cxw, cyw - px(2), px(13), Math.PI * 1.27, Math.PI * 1.73); cx.closePath(); cx.fill();
     cx.restore();
+    }
     // bateria: corpo, nível, número dentro e a pontinha
     const bx = px(1017), by = px(77), bw = px(75), bh = px(40), br = px(13), n = Math.max(0, Math.min(1, bat.nivel));
     const caixa = () => { cx.beginPath(); cx.roundRect ? cx.roundRect(bx, by, bw, bh, br) : cx.rect(bx, by, bw, bh); };

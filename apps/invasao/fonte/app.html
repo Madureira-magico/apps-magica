@@ -56,47 +56,50 @@ input,textarea{-webkit-user-select:text;user-select:text;font-family:inherit}
 .jsub{font-size:13px;color:rgba(255,255,255,.55);margin:-8px 16px 12px}
 
 /* ---------- WI-FI (igual aos Ajustes do iPhone, iOS 26) ---------- */
-#wifi{--fundo:#f2f2f7;--cartao:#fff;--txt:#000;--cinza:#8a8a8e;--linha:#c6c6c8;--azul:#0a7aff;--verde:#34c759;--vidro:rgba(255,255,255,.82);--toque:#d1d1d6;background:var(--fundo);color:var(--txt)}
-#wifi.escuro{--fundo:#000;--cartao:#1c1c1e;--txt:#fff;--cinza:#8d8d93;--linha:#38383a;--azul:#0a84ff;--verde:#30d158;--vidro:rgba(44,44,46,.82);--toque:#3a3a3c}
+#wifi{--fundo:#f2f2f6;--cartao:#fff;--txt:#000;--cinza:#85858a;--desc:#7f7f7f;--linha:#d8d8dc;--azul:#3b86f7;--verde:#65c466;--vidro:rgba(246,246,250,.92);--toque:#d1d1d6;background:var(--fundo);color:var(--txt)}
+#wifi.escuro{--fundo:#000;--cartao:#1c1c1e;--txt:#fff;--cinza:#8d8d93;--desc:#98989d;--linha:#38383a;--azul:#0a84ff;--verde:#30d158;--vidro:rgba(44,44,46,.82);--toque:#3a3a3c}
 #wsc{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:calc(var(--sat) + 88rem) 16rem calc(var(--sab) + 40rem)}
 #wnav{position:absolute;left:0;right:0;top:0;height:calc(var(--sat) + 74rem);z-index:3;pointer-events:none}
 #wnav::before{content:'';position:absolute;inset:0;background:linear-gradient(var(--fundo) 55%,transparent);opacity:0;transition:opacity .2s}
 #wnav.rolou::before{opacity:1}
-.wbtn,.wpill{position:absolute;top:calc(var(--sat) + 2rem);height:44rem;border-radius:22rem;background:var(--vidro);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 1rem 8rem rgba(0,0,0,.10),0 0 0 .5px rgba(0,0,0,.04);display:flex;align-items:center;justify-content:center;pointer-events:auto;color:var(--txt)}
+.wbtn,.wpill{position:absolute;top:calc(var(--sat) + 2rem);height:44rem;border-radius:22rem;background:var(--vidro);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 1rem 6rem rgba(0,0,0,.06),0 0 0 .5px rgba(0,0,0,.13);display:flex;align-items:center;justify-content:center;pointer-events:auto;color:var(--txt)}
 .wbtn{left:15rem;width:44rem}
-.wpill{right:15rem;padding:0 15rem;font-size:17rem}
+.wpill{right:15rem;padding:0 17rem;font-size:20.5rem;font-weight:600}
 .wbtn:active,.wpill:active{opacity:.6}
 #wTit{position:absolute;left:0;right:0;top:calc(var(--sat) + 2rem);height:44rem;line-height:44rem;text-align:center;font-size:17rem;font-weight:600;opacity:0;transition:opacity .2s}
 #wnav.rolou #wTit{opacity:1}
 .wcard{background:var(--cartao);border-radius:26rem;overflow:hidden}
 #hero{padding:14rem 0 0}
-.hIc{margin:0 0 0 19rem;width:58rem;height:58rem;border-radius:13rem;background:linear-gradient(#2a95ff,#0a6cff);display:flex;align-items:center;justify-content:center}
-.hT{font-size:28rem;font-weight:700;margin:12rem 19rem 3rem;letter-spacing:.2rem}
-.hX{font-size:17rem;line-height:25rem;color:var(--cinza);margin:0 19rem 12rem}
+.hIc{margin:0 0 0 19rem;width:58rem;height:58rem;border-radius:13rem;background:linear-gradient(#4a96f4,#3780ec);display:flex;align-items:center;justify-content:center}
+.hT{font-size:25.3rem;font-weight:700;margin:13rem 19rem 4rem;letter-spacing:.2rem}
+.hX{font-size:20.6rem;line-height:25.1rem;color:var(--desc);margin:0 19rem 13rem}
 .azul{color:var(--azul)}
-.wl{position:relative;display:flex;align-items:center;min-height:56rem;padding:0 19rem 0 51rem;font-size:17rem;gap:10rem}
-.wl::after{content:'';position:absolute;left:51rem;right:0;top:0;height:.5px;background:var(--linha)}
+.wl{position:relative;display:flex;align-items:center;min-height:54rem;padding:0 22rem 0 51rem;font-size:20.2rem;gap:10rem}
+.wl::after{content:'';position:absolute;left:51rem;right:19rem;top:0;height:1px;transform:scaleY(.5);transform-origin:top;background:var(--linha)}
 .wl.semlinha::after{display:none}
-.wl.cheia{padding-left:19rem}.wl.cheia::after{left:19rem}
+.wl.cheia{padding-left:19rem}.wl.cheia::after,.wl.tgl::after{left:19rem}
 .wl .nome{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wl .ics{display:flex;align-items:center;gap:13rem;flex:none}
-.wl.rede{min-height:60rem;transition:background .35s}
+.wl .ics{display:flex;align-items:center;gap:11rem;flex:none}
+.wl.rede{min-height:58.5rem;transition:background .35s}
 .wl.rede.toque{background:var(--toque);transition:none}
-.wl .ck{position:absolute;left:19rem;top:50%;transform:translateY(-50%);width:20rem;height:20rem}
-.wl small{display:block;font-size:15rem;color:var(--cinza);margin-top:1rem}
+.wl .ck{position:absolute;left:20rem;top:50%;transform:translateY(-50%);width:23.5rem;height:23.5rem}
+.wl small{display:block;font-size:17.5rem;color:var(--cinza);margin-top:1rem}
 .wl .dir{color:var(--cinza);display:flex;align-items:center;gap:6rem;flex:none}
 .tg{width:63rem;height:28rem;border-radius:14rem;background:#e9e9ea;position:relative;flex:none;transition:background .25s;margin-left:auto}
 #wifi.escuro .tg{background:#39393d}
 .tg::after{content:'';position:absolute;top:2rem;left:2rem;width:38rem;height:24rem;border-radius:12rem;background:#fff;box-shadow:0 2rem 5rem rgba(0,0,0,.18);transition:left .25s}
 .tg.on{background:var(--verde)}.tg.on::after{left:23rem}
-.wsec{font-size:17rem;font-weight:600;color:var(--cinza);margin:26rem 19rem 9rem;display:flex;align-items:center;gap:8rem}
-.wrod{font-size:15rem;line-height:20rem;color:var(--cinza);margin:8rem 19rem 0}
+.wsec{font-size:20.2rem;font-weight:600;color:var(--cinza);margin:31rem 19rem 11rem;display:flex;align-items:center;gap:8rem}
+.wrod{font-size:17.5rem;line-height:22rem;color:var(--cinza);margin:8rem 19rem 0}
 .wesp{height:26rem}
 .spin{width:16rem;height:16rem;position:relative;display:none}
 .spin.on{display:inline-block}
 .spin i{position:absolute;left:7rem;top:0;width:2rem;height:4.5rem;border-radius:1rem;background:var(--cinza);transform-origin:1rem 8rem;animation:spinf .8s linear infinite}
 @keyframes spinf{from{opacity:1}to{opacity:.15}}
 .nome.pulso{transform:scale(1.06)}
+.wl.rede.piscando{transform:scale(1.03) translateX(4rem);z-index:2;transition:none}
+.wl.rede.brilho{z-index:2;background:var(--cartao);box-shadow:0 -7rem 12rem -6rem rgba(236,196,146,.75),0 7rem 12rem -6rem rgba(236,196,146,.75);transition:box-shadow .2s}
+.wl.rede.piscando::after,.wl.rede.brilho::after{opacity:.4}
 #wifi.desligado #wConectada,#wifi.desligado #wResto{display:none}
 
 /* ---------- EFEITOS (por cima de tudo, sem pegar o toque) ---------- */
@@ -208,12 +211,12 @@ input[type=file]{display:none}
       <div class="hIc"><svg width="34" height="34" viewBox="0 0 24 24" style="width:34rem;height:34rem"><g fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round"><path d="M3.2 9.6a12.6 12.6 0 0 1 17.6 0"/><path d="M6.6 13.2a7.8 7.8 0 0 1 10.8 0"/></g><path d="M12 20.2l-2.9-3a4.1 4.1 0 0 1 5.8 0z" fill="#fff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
       <div class="hT" id="hT">Wi-Fi</div>
       <div class="hX">Conecte-se a uma rede Wi-Fi, veja as redes disponíveis e gerencie os ajustes de conexão a redes e pontos de acesso pessoal por perto. <span class="azul">Saiba mais...</span></div>
-      <div class="wl cheia"><span>Wi-Fi</span><div class="tg on" id="wTg"></div></div>
+      <div class="wl tgl"><span>Wi-Fi</span><div class="tg on" id="wTg"></div></div>
       <div class="wl rede" id="wConectada"></div>
     </div>
     <div id="wResto">
       <div id="blocoConhecida">
-        <div class="wsec">Rede Conhecida</div>
+        <div class="wsec" id="tConhecida">Rede Conhecida</div>
         <div class="wcard" id="lConhecida"></div>
       </div>
       <div class="wsec">Outras Redes <span class="spin" id="spin"></span></div>
@@ -246,7 +249,7 @@ input[type=file]{display:none}
 
 <!-- ================= MENU ================= -->
 <div id="menu" class="tela">
-  <div class="mtopo"><img src="icone.png" alt=""><div><h1>Invasão</h1><p>Controle do EXPLODE SYSTEM · versão 1.0</p></div></div>
+  <div class="mtopo"><img src="icone.png" alt=""><div><h1>Invasão</h1><p>Controle do EXPLODE SYSTEM · versão 1.1</p></div></div>
   <div id="ok">OK</div>
 
   <div class="painel">
@@ -265,6 +268,7 @@ input[type=file]{display:none}
     </div>
     <div class="lin"><div>Luz pisca ao transmitir<br><small>Desligado: mais discreto</small></div><div class="sw" data-k="ledPisca"></div></div>
     <div class="lin"><div>Avisar com vibração se falhar<br><small>Se o aparelho não responder ao enviar</small></div><div class="sw" data-k="avisoFalha"></div></div>
+    <div class="lin"><div>Avisar no bolso ao conectar<br><small>1 toque = achou o aparelho · 2 toques = não achou</small></div><div class="sw" data-k="avisoConexao"></div></div>
   </div>
 
   <div class="sec"><i style="background:#ff375f">♠︎</i>Carta (senha)</div>
@@ -290,7 +294,7 @@ input[type=file]{display:none}
     <svg width="14" height="14" viewBox="0 0 24 24"><g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M3.2 9.6a12.6 12.6 0 0 1 17.6 0"/><path d="M6.6 13.2a7.8 7.8 0 0 1 10.8 0"/></g><circle cx="12" cy="18" r="2" fill="#fff"/></svg></i>Tela de Wi-Fi</div>
   <div class="grupo">
     <div class="lin">Rede conectada<input type="text" id="conectada" autocomplete="off" autocorrect="off" spellcheck="false"></div>
-    <div class="lin"><div>Rede conhecida<br><small>Vazio: esconde</small></div><input type="text" id="conhecida" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+    <div class="lin col">Redes conhecidas (uma por linha)<br><small>Vazio: esconde a parte de redes conhecidas</small><textarea id="conhecida" style="min-height:80px" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea></div>
     <div class="lin"><div>Redes do local<br><small>O aparelho procura as redes de verdade</small></div><div class="sw" data-k="redesReais"></div></div>
     <div class="lin bt" id="atualizar">Procurar as redes agora</div>
     <div class="lin col"><small id="redesInfo">—</small></div>
@@ -308,6 +312,10 @@ input[type=file]{display:none}
     <div class="lin bt" id="verEfeito">Ver o efeito</div>
     <div class="lin col">Duração do efeito
       <div class="passo"><input type="range" id="duracao" min="1" max="8" step="0.5"><b id="duracaoTxt"></b></div>
+    </div>
+    <div class="lin col">Ordem das redes que mudam
+      <div class="seg" data-k="ordemTroca"><div data-v="cima">De cima para baixo</div><div data-v="sorteada">Sorteada</div></div>
+      <small style="margin-top:6px">Sempre: primeiro a tocada; por último as conhecidas e a conectada</small>
     </div>
     <div class="lin col">Velocidade das letras
       <div class="seg" data-k="velocidade"><div data-v="lenta">Lenta</div><div data-v="normal">Normal</div><div data-v="rapida">Rápida</div></div>
@@ -341,7 +349,7 @@ input[type=file]{display:none}
     <div class="lin bt" id="zerar">Zerar o efeito (redes voltam ao normal)</div>
   </div>
   <div class="dica">Dois dedos deslizando para baixo na tela bloqueada abrem este menu. Na tela de Wi-Fi, o botão <b>Editar</b> também abre.</div>
-  <div class="rodape">Invasão 1.0 · Ricardo Madureira</div>
+  <div class="rodape">Invasão 1.1 · Ricardo Madureira</div>
   <input type="file" id="arquivo" accept="image/*">
 </div>
 
@@ -365,11 +373,12 @@ input[type=file]{display:none}
 
   <h2>Na apresentação</h2>
   <ol>
-    <li>O app fica na tela bloqueada. Deslize para cima para abrir a senha.</li>
+    <li>O app fica na tela bloqueada. <b>Como saber se está conectado:</b> na barra de cima aparece o <b>ícone do Wi-Fi</b> quando achou o aparelho, e <b>5G</b> quando não achou. No bolso: <b>1 toque</b> de vibração = achou; <b>2 toques</b> = não achou (o app confere sozinho a cada 3 segundos).</li>
+    <li>Deslize para cima para abrir a senha. Para voltar para a tela da hora, <b>segure o dedo 1,5 segundo</b> numa parte vazia da tela da senha.</li>
     <li>Digite a carta na senha. Com a ordem <b>Naipe + carta</b>: 1º número = naipe, depois a carta com 2 números (01 a 13), e o 4º número é qualquer um.
       <div class="cx" id="instrEx"></div></li>
     <li>Ao destravar, o aparelho <b>já começa a criar as redes em segredo</b>, e o app abre a tela de Wi-Fi.</li>
-    <li>Peça para o espectador tocar em qualquer rede. Ela se transforma primeiro, depois as outras, e por último as redes de cima (conhecida e conectada).</li>
+    <li>Peça para o espectador tocar em qualquer rede. Ela se transforma primeiro, depois as outras de cima para baixo, e por último as redes de cima (conhecidas e conectada).</li>
     <li>Peça para todos olharem a lista de Wi-Fi dos próprios celulares.</li>
   </ol>
 
@@ -392,7 +401,8 @@ input[type=file]{display:none}
 
   <h2>Efeitos</h2>
   <ul>
-    <li><b>Flash sombrio</b>, <b>TV fora de sintonia</b>, <b>TV chiado</b> ou <b>Glitch</b>: aparecem por cima da tela quando o espectador toca na rede.</li>
+    <li><b>Flash sombrio</b> (igual ao original): cada rede pisca em cores claras antes de mudar.</li>
+    <li><b>TV fora de sintonia</b>, <b>TV chiado</b> ou <b>Glitch</b>: aparecem por cima da tela quando o espectador toca na rede.</li>
     <li><b>Invasão</b>: depois da transformação, redes novas com a carta continuam surgindo embaixo da lista.</li>
     <li><b>Gravidade</b>: no fim, as redes despencam até o pé da tela e depois voltam ao lugar.</li>
   </ul>
@@ -430,7 +440,7 @@ const PADRAO = {
   palavras:['Explode', 'Abracadabra', 'Feliz aniversário'],
   conectada:'CasaMadu2,4G', conhecida:'#CLARO-WIFI', redesReais:true, falsas:FALSAS.join('\n'), tema:'claro',
   efeito:'flash', duracao:3, velocidade:'normal', invasao:true, gravidade:false, vibrar:false,
-  avisoFalha:true, ledPisca:true, led:50,
+  avisoFalha:true, avisoConexao:true, ordemTroca:'cima', ledPisca:true, led:50,
   letra:'normal', peso:'500', barraCima:true, operadora:'Claro BR', sinal:'3'
 };
 let A = JSON.parse(JSON.stringify(PADRAO));
@@ -457,9 +467,23 @@ let aparelho = {ok:null, st:null, t:0};
 let envio = {palavra:'', ok:null, t:0};
 async function status(){
   const r = await http('/api/status', 4), d = json(r);
+  const antes = aparelho.ok;
   aparelho = {ok: !!(r.ok && d), st: d, t: Date.now()};
   pintarStatus();
+  if(antes !== aparelho.ok) try{ bf.desenhar(); }catch(e){}
+  // o aparelho apareceu agora (ex.: ligado depois de abrir o app): já procura as redes do lugar
+  if(aparelho.ok && antes !== true && A.redesReais && (atual === 'lock' || atual === 'pass') && !procurando) procurarRedes('apareceu');
+  avisoBolso();
   return aparelho.ok;
+}
+/* aviso no bolso: 1 toque = achou o aparelho; 2 toques = não achou (ou perdeu) */
+let avisado = null, desdeLock = Date.now();
+function vibra(n){ T.vibrou = (T.vibrou || []).concat(n); for(let i = 0; i < n; i++) setTimeout(() => nat('toque', {forte:true}).catch(() => {}), i * 220); }
+function avisoBolso(){
+  if(!A.avisoConexao) return;
+  if(aparelho.ok && avisado !== true){ avisado = true; vibra(1); }
+  else if(!aparelho.ok && avisado === true){ avisado = false; vibra(2); }
+  else if(!aparelho.ok && avisado === null && Date.now() - desdeLock > 8000){ avisado = false; vibra(2); }
 }
 async function enviar(p, silencio){
   p = String(p || '').trim(); if(!p) return false;
@@ -503,7 +527,7 @@ function textoCarta(c){
 const bytes = s => new TextEncoder().encode(s).length;
 
 /* ================= TELA BLOQUEADA ================= */
-const bf = criarBarraFalsa({raiz:$('lock'), nativo: NATIVO ? cmd => nat(cmd) : null, opcoes:() => ({sinal:+A.sinal || 3, wifi:3, operadora:A.operadora || '', puxador:true})});
+const bf = criarBarraFalsa({raiz:$('lock'), nativo: NATIVO ? cmd => nat(cmd) : null, opcoes:() => ({sinal:+A.sinal || 3, wifi:3, operadora:A.operadora || '', puxador:true, rede: aparelho.ok ? null : '5G'})});
 const tb = criarTelaBloqueio({raiz:$('tb'), opcoes:() => ({letra:A.letra, peso:A.peso, zeroHora:true}), nativo: NATIVO ? (cmd, a) => nat(cmd, a) : null});
 function carregarFundo(){
   let f = null; try{ f = localStorage.getItem('inv-fundo'); }catch(e){}
@@ -577,6 +601,16 @@ $('cancelar').addEventListener('click', () => {
   abrirNova();
 });
 $('emerg').addEventListener('click', () => { if(!ocupado) abrirPalavras(); });
+let segT = null, segXY = null;
+$('pass').addEventListener('pointerdown', e => {
+  if(e.target.closest('.pk, #emerg, #cancelar')) return;
+  segXY = [e.clientX, e.clientY]; clearTimeout(segT);
+  segT = setTimeout(() => { segT = null; if(atual !== 'pass' || $('janPal').classList.contains('on') || $('janNova').classList.contains('on')) return;
+    codigo = ''; ocupado = false; pintarSenha(); voltarHora(); }, 1500);
+});
+$('pass').addEventListener('pointermove', e => { if(segT && segXY && Math.hypot(e.clientX - segXY[0], e.clientY - segXY[1]) > 12){ clearTimeout(segT); segT = null; } });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('pass').addEventListener(ev, () => { clearTimeout(segT); segT = null; }));
+function voltarHora(){ mostrar('lock'); anim($('lock'), [{opacity:0}, {opacity:1}], 280); }
 function abrirSenha(){
   codigo = ''; ocupado = false; pintarSenha();
   mostrar('pass');
@@ -620,12 +654,12 @@ function desbloquear(p){
 }
 
 /* ================= TELA DE WI-FI ================= */
-const SVG_LOCK = '<svg viewBox="0 0 11 14" style="width:11rem;height:14rem"><path d="M2.9 6.3V4.4a2.6 2.6 0 0 1 5.2 0v1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x=".6" y="6" width="9.8" height="7.6" rx="1.8" fill="currentColor"/></svg>';
+const SVG_LOCK = '<svg viewBox="0 0 11 14" style="width:10rem;height:12.8rem;color:var(--cad,currentColor)"><path d="M2.9 6.3V4.4a2.6 2.6 0 0 1 5.2 0v1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x=".6" y="6" width="9.8" height="7.6" rx="1.8" fill="currentColor"/></svg>';
 const SVG_INFO = '<svg viewBox="0 0 26 26" style="width:26rem;height:26rem;color:var(--azul)"><circle cx="13" cy="13" r="11.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="13" cy="7.9" r="1.45" fill="currentColor"/><path d="M10.6 11.4h3.2v7.1M10.6 18.5h5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const SVG_CK = '<svg class="ck" viewBox="0 0 20 20" style="color:var(--azul)"><path d="M3.5 10.6l4.3 4.3 8.7-9.6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SVG_CK = '<svg class="ck" viewBox="0 0 20 20" style="color:var(--azul)"><path d="M3.2 10.8l4.6 4.8 9-10.2" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function svgWifi(nivel){
   const o = i => i <= nivel ? 1 : .22;
-  return '<svg viewBox="0 0 24 18" style="width:19rem;height:14rem"><g fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round">' +
+  return '<svg viewBox="0 0 24 18" style="width:16rem;height:12rem"><g fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round">' +
     '<path d="M2.2 6.6a14 14 0 0 1 19.6 0" opacity="' + o(3) + '"/><path d="M5.9 10.3a8.8 8.8 0 0 1 12.2 0" opacity="' + o(2) + '"/></g>' +
     '<path d="M12 16.6l-3-3.1a4.3 4.3 0 0 1 6 0z" fill="currentColor" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" opacity="' + o(1) + '"/></svg>';
 }
@@ -652,7 +686,7 @@ async function procurarRedes(motivo){
     const r = await http('/api/wifi_scan', 15), d = json(r);
     if(r.ok && d && Array.isArray(d.networks)){
       const vistos = new Set(), l = [];
-      const fora = [A.conectada, A.conhecida, palavra].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
+      const fora = [A.conectada, ...conhecidas(), palavra].map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
       d.networks.slice().sort((a, b) => (+b.rssi || -999) - (+a.rssi || -999)).forEach(n => {
         const nome = String(n && n.ssid != null ? n.ssid : '').trim(), k = nome.toLowerCase();
         if(!nome || vistos.has(k) || fora.includes(k)) return;
@@ -669,11 +703,12 @@ async function procurarRedes(motivo){
   }
   return redesReais;
 }
+function conhecidas(){ return String(A.conhecida || '').split('\n').map(s => s.trim()).filter(Boolean); }
 function listaParaMostrar(){
   const falsas = A.falsas.split('\n').map(s => s.trim()).filter(Boolean).map(n => ({n, s:nivelDe(n), c:true}));
   let l = (A.redesReais && redesReais && redesReais.l.length) ? redesReais.l.slice() : falsas.slice();
   if(l.length < 4){ const tem = new Set(l.map(x => x.n.toLowerCase())); for(const f of falsas){ if(l.length >= 8) break; if(!tem.has(f.n.toLowerCase())) l.push(f); } }
-  const fora = [A.conectada, A.conhecida].map(s => String(s || '').trim().toLowerCase());
+  const fora = [A.conectada, ...conhecidas()].map(s => String(s || '').trim().toLowerCase());
   return l.filter(x => !fora.includes(x.n.toLowerCase()));
 }
 let fonteLista = '';
@@ -682,8 +717,10 @@ function montarLista(){
   const c = $('wConectada'), novo = linhaRede(A.conectada || 'Wi-Fi', 3, true, true);
   novo.id = 'wConectada'; novo.classList.add('conectada'); c.replaceWith(novo);
   const lk = $('lConhecida'); lk.innerHTML = '';
-  $('blocoConhecida').classList.toggle('oculto', !String(A.conhecida || '').trim());
-  if(String(A.conhecida || '').trim()){ const r = linhaRede(A.conhecida.trim(), 3, false, false); r.classList.add('semlinha'); lk.appendChild(r); }
+  const conh = conhecidas();
+  $('blocoConhecida').classList.toggle('oculto', !conh.length);
+  $('tConhecida').textContent = conh.length > 1 ? 'Redes Conhecidas' : 'Rede Conhecida';
+  conh.forEach((n, i) => { const r = linhaRede(n, i ? 2 : 3, i > 0, false); if(i === 0) r.classList.add('semlinha'); lk.appendChild(r); });
   const lo = $('lOutras'); lo.innerHTML = '';
   const l = listaParaMostrar();
   l.forEach((x, i) => { const r = linhaRede(x.n, x.s, x.c, false); if(i === 0) r.classList.add('semlinha'); lo.appendChild(r); });
@@ -728,10 +765,12 @@ const fatorVel = () => A.velocidade === 'lenta' ? 1.6 : A.velocidade === 'rapida
 async function transformar(linha, g){
   if(!linha || linha.dataset.feita) return true;
   linha.dataset.feita = '1';
+  (T.ordem = T.ordem || []).push(linha.dataset.orig);
   const nome = linha.querySelector('.nome'), v = fatorVel(), alvo = palavra || 'Explode';
-  linha.classList.add('toque'); setTimeout(() => linha.classList.remove('toque'), 140);
   if(A.vibrar) nat('toque').catch(() => {});
-  await espera(60);
+  const flash = A.efeito === 'flash';
+  if(flash){ await piscarLinha(linha, g); if(g !== geracao) return false; linha.classList.add('brilho'); }
+  else { linha.classList.add('toque'); setTimeout(() => linha.classList.remove('toque'), 140); await espera(60); }
   const de = letras(nome.textContent);
   for(let i = de.length; i >= 0; i--){
     if(g !== geracao) return false;
@@ -747,8 +786,28 @@ async function transformar(linha, g){
     if(i % 2 === 0){ nome.classList.add('pulso'); setTimeout(() => nome.classList.remove('pulso'), 30); }
     await espera(28 * v);
   }
+  linha.classList.remove('brilho');
   T.feitas = (T.feitas || 0) + 1;
   return true;
+}
+/* Flash sombrio (igual ao do aparelho original): a linha cresce um pouco e pisca em cores claras
+   ~0,3 s (amarelo, azul-piscina, verde, verde-água, azul-claro) e os ícones trocam de cor junto */
+const FL_FUNDO = ['#fdfedf', '#c5feff', '#c5fec3', '#c4fee7', '#d2fff3', '#d3f9ff'];
+const FL_ICONE = ['#e040e8', '#18d4d4', '#2fc22f', '#2fc29a', '#7fb8ff', '#9be22f'];
+async function piscarLinha(linha, g){
+  linha.classList.add('piscando'); linha.style.setProperty('--cad', '#3a3a3c');
+  let k = Math.floor(Math.random() * FL_FUNDO.length);
+  for(let i = 0; i < 5; i++){
+    if(g !== geracao) break;
+    linha.style.background = FL_FUNDO[k % FL_FUNDO.length];
+    linha.style.setProperty('--azul', FL_ICONE[(k + 2) % FL_ICONE.length]);
+    linha.querySelector('.ics') && (linha.querySelector('.ics').style.color = FL_ICONE[(k + 4) % FL_ICONE.length]);
+    k += 1 + Math.floor(Math.random() * 2);
+    await espera(60);
+  }
+  linha.style.background = ''; linha.style.removeProperty('--azul'); linha.style.removeProperty('--cad');
+  linha.querySelector('.ics') && (linha.querySelector('.ics').style.color = '');
+  linha.classList.remove('piscando');
 }
 function embaralhar(a){ for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 async function tocouRede(linha){
@@ -760,7 +819,8 @@ async function tocouRede(linha){
   if(palavra && envio.ok !== true) enviar(palavra, true);
   iniciarFx(A.efeito, A.duracao * 1000);
   if(!await transformar(linha, g)) return;
-  const outras = embaralhar(Array.from($('lOutras').querySelectorAll('.wl.rede')).filter(x => x !== linha));
+  let outras = Array.from($('lOutras').querySelectorAll('.wl.rede')).filter(x => x !== linha);
+  if(A.ordemTroca === 'sorteada') outras = embaralhar(outras);
   const topo = [...$('lConhecida').querySelectorAll('.wl.rede'), $('wConectada')].filter(x => x !== linha);
   for(const x of [...outras, ...topo]){
     if(!await transformar(x, g)) return;
@@ -862,8 +922,9 @@ function iniciarFx(tipo, ms){
   if(!tipo || tipo === 'nenhum') return;
   const fx = $('fx'); fx.className = 'on'; T.fx = tipo;
   const vib = () => { if(A.vibrar) nat('toque').catch(() => {}); };
-  if(tipo === 'flash'){
-    // flash sombrio: a tela escurece e pisca em tons escuros
+  if(tipo === 'flash'){ pararFx(); return; }
+  if(tipo === 'flash-antigo'){
+    // (antigo) a tela escurece e pisca em tons escuros
     const cores = ['rgba(4,6,12,.88)', 'rgba(18,12,28,.82)', 'rgba(8,10,22,.85)', 'rgba(26,8,20,.78)', 'rgba(12,14,8,.8)', 'rgba(20,16,32,.75)'];
     let i = 0;
     const passo = () => {
@@ -929,7 +990,7 @@ function iniciarFx(tipo, ms){
 
 /* ================= MENU ================= */
 const EFEITOS = [
-  {v:'flash', t:'Flash sombrio', d:'A tela escurece e pisca (o do aparelho original)'},
+  {v:'flash', t:'Flash sombrio', d:'A rede pisca em cores claras (igual ao do aparelho original)'},
   {v:'tv', t:'TV fora de sintonia', d:'Barras coloridas tremendo'},
   {v:'chiado', t:'TV chiado', d:'Chuvisco preto e branco'},
   {v:'glitch', t:'Glitch', d:'Faixas, tela pulando e códigos de erro'},
@@ -1021,7 +1082,7 @@ $('verificar').onclick = async () => { $('stTxt').textContent = 'Verificando…'
 $('reenviar').onclick = async () => { if(!palavra){ alert('Ainda não tem carta ou palavra escolhida.'); return; } $('stTxt').textContent = 'Enviando…'; await enviar(palavra); await status(); };
 $('parar').onclick = async () => { $('stTxt').textContent = 'Parando…'; const ok = await pararTransmissao(); await status(); if(!ok) alert('O aparelho não respondeu.'); };
 $('atualizar').onclick = async () => { await procurarRedes('menu'); if(!(redesReais && redesReais.l.length)) alert('O aparelho não respondeu. Confira se o iPhone está no Wi-Fi do aparelho.'); };
-$('verEfeito').onclick = () => iniciarFx(A.efeito, A.duracao * 1000);
+$('verEfeito').onclick = () => { if(A.efeito === 'flash'){ const l = $('verEfeito'); l.style.color = '#000'; piscarLinha(l, geracao).then(() => l.style.color = ''); } else iniciarFx(A.efeito, A.duracao * 1000); };
 $('zerar').onclick = () => { zerarEfeito(); montarLista(); };
 $('abrirInstr').onclick = () => { mostrar('instr'); $('instr').scrollTop = 0; };
 $('instrFechar').onclick = () => irMenu();
@@ -1056,6 +1117,7 @@ function mostrar(id){
   if(id === 'menu' || id === 'instr') barraReal(true, 'claro');
   clearInterval(pollT); pollT = null;
   if(id === 'menu'){ status(); pollT = setInterval(status, 5000); }
+  if(id === 'lock' || id === 'pass'){ if(id === 'lock' && avisado !== true){ desdeLock = Date.now(); } pollT = setInterval(status, 3000); }
 }
 function irMenu(){
   if(atual !== 'menu' && atual !== 'instr') antesMenu = atual;

@@ -9,7 +9,7 @@ import WebKit
 ///   http {caminho, tempo}  -> GET http://192.168.4.1 + caminho; responde {ok, status, corpo}
 ///                             ex.: /api/setword?word=6%20%E2%99%A6%EF%B8%8F, /api/start, /api/stop,
 ///                                  /api/status, /api/wifi_scan, /api/gpio20?on=1&brightness=50&blink_tx=1
-///   toque                  -> um toquinho de vibração (cada rede que se transforma, se ligado no menu)
+///   toque {forte}          -> um toquinho de vibração (cada rede que muda; forte = aviso no bolso de conexão)
 ///   erro                   -> vibração de erro (o aparelho não respondeu)
 ///   telaCobrir / icones / bateria ... -> peça pronta TelasNativas (comum/telas)
 @objc(PonteExtra)
@@ -51,8 +51,9 @@ final class PonteExtra: NSObject, ExtraDoApp, WKScriptMessageHandlerWithReply {
             let tempo = max(1, min(30, (d["tempo"] as? NSNumber)?.doubleValue ?? 5))
             pedir(caminho, tempo: tempo, responder)
         case "toque":
+            let forte = (d["forte"] as? Bool) ?? false
             DispatchQueue.main.async {
-                let g = UIImpactFeedbackGenerator(style: .light)
+                let g = UIImpactFeedbackGenerator(style: forte ? .heavy : .light)
                 g.prepare()
                 g.impactOccurred()
                 responder(true)
