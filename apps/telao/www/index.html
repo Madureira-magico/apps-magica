@@ -135,7 +135,7 @@ html,body{margin:0;height:100%;background:#000;color:#fff;font-family:-apple-sys
 
   <button class="go" id="goBtn">Começar</button>
   <div class="nota">Voltar ao menu: arrastar dois dedos para baixo (tela bloqueada)<br>ou segurar fora do microfone (tela preta).<br>Na tela preta, segure o microfone e fale a hora.</div>
-  <div class="nota" id="ver">Telão 1.0</div>
+  <div class="nota" id="ver">Telão 1.1</div>
 </div></div>
 
 <!-- TELA BLOQUEADA -->
@@ -283,7 +283,7 @@ function nat(cmd, args) {
 function natMsg(nome, v) { try { window.webkit.messageHandlers[nome].postMessage(v); } catch (e) {} }
 const vib = tipo => { if (NAT) nat('vibrar', { tipo }).catch(() => {}); else try { navigator.vibrate && navigator.vibrate(tipo === 'dupla' ? [120, 120, 120] : tipo === 'longa' ? 600 : 120); } catch (e) {} };
 
-const cfg = Object.assign({ modo: 'black', hint: '.25', gotSecs: 0, padOn: true, rh: false, letra: 'normal', peso: '500' }, store.get('cfg') || {});
+const cfg = Object.assign({ modo: 'lock', hint: '.25', gotSecs: 0, padOn: true, rh: false, letra: 'normal', peso: '500' }, store.get('cfg') || {});
 const saveCfg = () => store.set('cfg', cfg);
 
 /* ================= telas ================= */
@@ -1195,7 +1195,7 @@ $('goBtn').onclick = comecar;
 
 /* ================= início ================= */
 desenharMenu(); setPad('lost');
-mostrar('menu');
+comecar();   // abre direto na tela escolhida no menu (tela bloqueada, ou a tela preta)
 ligarAbly();
 if (cfg.padOn) autoConnectPad();
 natMsg('segundoPlano', true);   // continua recebendo com a tela apagada
